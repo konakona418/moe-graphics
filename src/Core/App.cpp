@@ -3,8 +3,6 @@
 #include "Core/Config.hpp"
 #include "Core/Window.hpp"
 
-#include "Render/Vulkan/VulkanContext.hpp"
-
 namespace moe {
     void App::initialize() {
         Logger::info("Starting Moe Graphics Engine application...");
@@ -20,23 +18,12 @@ namespace moe {
         m_window->setResizeCallback([this](int width, int height) {
             Logger::info("Window resized to {}x{}", width, height);
 
-            std::pair<int, int> newExtent;
-            glfwGetFramebufferSize(this->m_window->getHandle(), &newExtent.first, &newExtent.second);
-            this->m_defaultRenderTarget->recreate(newExtent);
+            // todo: handle resize event
         });
 
         std::pair<int, int> defaultExtent;
         glfwGetFramebufferSize(m_window->getHandle(),
                                &defaultExtent.first, &defaultExtent.second);
-
-        m_vulkanContext = std::make_unique<VulkanContext>();
-        m_vulkanContext->initialize(m_window->getHandle());
-
-        m_renderServer = std::make_unique<VulkanRenderServer>();
-        m_renderServer->initialize(m_vulkanContext.get());
-
-        m_defaultRenderTarget = std::make_unique<VulkanSwapchainRenderTarget>();
-        m_defaultRenderTarget->initialize(m_vulkanContext.get(), defaultExtent);
 
         Logger::info("Moe Graphics Engine application started.");
     }
@@ -51,10 +38,6 @@ namespace moe {
 
     void App::shutdown() {
         Logger::info("Shutting down engine...");
-
-        m_defaultRenderTarget->shutdown();
-        m_renderServer->shutdown();
-        m_vulkanContext->shutdown();
 
         m_window->shutdown();
 
