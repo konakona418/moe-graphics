@@ -19,3 +19,9 @@
 [submodule "vendors/spdlog"]
 	path = vendors/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "vendors/volk"]
+	path = vendors/volk
+	url = https://github.com/zeux/volk.git
+[submodule "vendors/fmt"]
+	path = vendors/fmt
+	url = https://github.com/fmtlib/fmt.git

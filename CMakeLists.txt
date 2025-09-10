@@ -16,26 +16,27 @@ add_subdirectory(vendors/vk-bootstrap)
 
 add_subdirectory(vendors/VulkanMemoryAllocator)
 
+add_subdirectory(vendors/volk)
+
 add_subdirectory(vendors/spdlog)
+add_subdirectory(vendors/fmt)
 
 include_directories(include)
 
 file(GLOB_RECURSE ENGINE_SOURCES src/Engine/*.cpp)
 file(GLOB_RECURSE RENDER_SOURCES src/Render/*.cpp)
 file(GLOB_RECURSE CORE_SOURCES src/Core/*.cpp)
-file(GLOB_RECURSE PLUGIN_SOURCES plugins/*/*.cpp)
 
 add_executable(moe-graphics 
   main.cpp
   ${ENGINE_SOURCES}
   ${RENDER_SOURCES}
   ${CORE_SOURCES}
-  ${PLUGIN_SOURCES}
 )
 
 target_link_libraries(moe-graphics PUBLIC
   glfw glm::glm glslang 
-  vk-bootstrap::vk-bootstrap VulkanMemoryAllocator
+  vk-bootstrap::vk-bootstrap VulkanMemoryAllocator volk_headers
   spdlog::spdlog
 )
 
