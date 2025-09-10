@@ -1,13 +1,18 @@
 #include "Core/Logger.hpp"
+
 #include <mutex>
+#include <spdlog/async.h>
+#include <spdlog/async_logger.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-
 
 namespace moe {
     std::shared_ptr<Logger> Logger::m_instance{nullptr};
 
     void Logger::initialize() {
+        constexpr std::size_t queue_size = 8192;
+        spdlog::init_thread_pool(queue_size, 1);
+
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_pattern("[%T] [%^%l%$] %v");
 
@@ -15,7 +20,12 @@ namespace moe {
         file_sink->set_pattern("[%Y-%m-%d %T] [%l] %v");
 
         std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
-        m_logger = std::make_shared<spdlog::logger>("moe", sinks.begin(), sinks.end());
+
+        m_logger = std::make_shared<spdlog::async_logger>(
+                "moe",
+                sinks.begin(), sinks.end(),
+                spdlog::thread_pool(),
+                spdlog::async_overflow_policy::block);
         m_logger->set_level(spdlog::level::debug);
         m_logger->flush_on(spdlog::level::info);
 
@@ -25,9 +35,10 @@ namespace moe {
     void Logger::shutdown() {
         spdlog::drop_all();
         m_logger.reset();
+        spdlog::shutdown();
     }
 
-    void Logger::update() {
+    void Logger::flush() {
         if (m_logger) m_logger->flush();
     }
 

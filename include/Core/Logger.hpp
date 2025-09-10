@@ -4,34 +4,29 @@
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
 
-
 namespace moe {
     class Logger : public Module {
     public:
         void initialize() override;
         void shutdown() override;
-        void update() override;
+        void flush();
 
         template<typename... Args>
         static void info(const char* fmt, const Args&... args) {
             get()->log(spdlog::level::info, fmt, args...);
         }
-
         template<typename... Args>
         static void warn(const char* fmt, const Args&... args) {
             get()->log(spdlog::level::warn, fmt, args...);
         }
-
         template<typename... Args>
         static void error(const char* fmt, const Args&... args) {
             get()->log(spdlog::level::err, fmt, args...);
         }
-
         template<typename... Args>
         static void critical(const char* fmt, const Args&... args) {
             get()->log(spdlog::level::critical, fmt, args...);
         }
-
         template<typename... Args>
         static void debug(const char* fmt, const Args&... args) {
             get()->log(spdlog::level::debug, fmt, args...);

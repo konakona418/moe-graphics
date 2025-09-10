@@ -1,7 +1,6 @@
 #pragma once
 
 #include "VulkanContext.hpp"
-#include <memory>
 
 namespace moe {
     class VulkanRenderServer {
@@ -9,7 +8,7 @@ namespace moe {
         VulkanRenderServer() = default;
         ~VulkanRenderServer() = default;
 
-        void initialize();
+        void initialize(VulkanContext* ctx);
 
         void shutdown();
 
@@ -20,6 +19,15 @@ namespace moe {
         void endFrame();
 
     private:
-        std::unique_ptr<VulkanContext> m_context;
+        VulkanContext* m_context{nullptr};
+
+        std::vector<VkFence> m_inFlightFences;
+        std::vector<VkFence> m_imagesInFlight;
+        std::vector<VkSemaphore> m_imageAvailableSemaphores;
+        std::vector<VkSemaphore> m_renderFinishedSemaphores;
+
+        void cleanup();
+
+        void createSyncObjects();
     };
 }// namespace moe

@@ -1,16 +1,18 @@
 #include "Render/Vulkan/VulkanContext.hpp"
-#include "Core/Config.hpp"
 #include "Core/Logger.hpp"
 
 
 namespace moe {
 
-    void VulkanContext::initialize() {
+    void VulkanContext::initialize(GLFWwindow* window) {
         Logger::info("Initializing Vulkan context...");
+
         createInstance();
-        createSurface();
+        createSurface(window);
         lookupPhysicalDevice();
         createDevice();
+        createQueues();
+
         Logger::info("Vulkan context initialized successfully.");
     }
 
@@ -19,7 +21,6 @@ namespace moe {
         vkb::destroy_device(m_device);
 
         vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
-        glfwDestroyWindow(m_window);
 
         vkb::destroy_instance(m_instance);
         Logger::info("Vulkan context shut down successfully.");
@@ -57,22 +58,16 @@ namespace moe {
         m_instance = *vkbInstance;
     }
 
-    void VulkanContext::createSurface() {
-        auto windowMetrics = moe::Config::get()->m_windowSize;
-        auto windowTitle = moe::Config::get()->m_windowTitle;
-
-        glfwInit();
-
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        m_window = glfwCreateWindow(windowMetrics.first, windowMetrics.second, windowTitle.c_str(), nullptr, nullptr);
-
-        if (!m_window) {
-            Logger::critical("Failed to create GLFW window");
-            throw std::runtime_error("Failed to create GLFW window");
+    void VulkanContext::createSurface(GLFWwindow* window) {
+        if (!window) {
+            Logger::critical("Null window handle passed to VulkanContext::createSurface");
+            throw std::runtime_error("Null window handle");
         }
-
-        glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface);
-        Logger::info("Created GLFW window");
+        if (glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface) != VK_SUCCESS) {
+            Logger::critical("Failed to create Vulkan surface");
+            throw std::runtime_error("Failed to create Vulkan surface");
+        }
+        Logger::info("Created Vulkan surface from window");
     }
 
     void VulkanContext::lookupPhysicalDevice() {
@@ -108,6 +103,25 @@ namespace moe {
 
         m_device = *vkbDevice;
         Logger::info("Vulkan device created successfully.");
+    }
+
+    void VulkanContext::createQueues() {
+        auto graphicsQueue = m_device.get_queue(vkb::QueueType::graphics);
+        if (!graphicsQueue) {
+            Logger::critical("Failed to get graphics queue: {}", graphicsQueue.error().message());
+            throw std::runtime_error("Failed to get graphics queue");
+        }
+
+        m_graphicsQueue = std::move(graphicsQueue.value());
+        Logger::info("Graphics queue created successfully.");
+
+        auto presentQueue = m_device.get_queue(vkb::QueueType::present);
+        if (!presentQueue) {
+            Logger::critical("Failed to get present queue: {}", presentQueue.error().message());
+            throw std::runtime_error("Failed to get present queue");
+        }
+
+        m_presentQueue = std::move(presentQueue.value());
     }
 
 }// namespace moe

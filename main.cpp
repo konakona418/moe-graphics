@@ -1,10 +1,9 @@
-#include "Core/Logger.hpp"
-#include "Render/Vulkan/VulkanRenderServer.hpp"
+#include "Core/App.hpp"
 
 int main() {
-    moe::Logger::info("Hello World!");
-    moe::VulkanRenderServer renderServer;
-    renderServer.initialize();
-    renderServer.shutdown();
+    moe::App app;
+    app.initialize();
+    app.runUntilExit();
+    app.shutdown();
     return 0;
 }

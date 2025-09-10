@@ -10,28 +10,35 @@ namespace moe {
 
     class VulkanContext {
     public:
+        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
+
         VulkanContext() = default;
         ~VulkanContext() = default;
 
-        void initialize();
+        void initialize(GLFWwindow* window);
 
         void shutdown();
 
-    private:
         vkb::Instance m_instance;
+
         vkb::PhysicalDevice m_physicalDevice;
         vkb::Device m_device;
 
-        GLFWwindow* m_window;
         VkSurfaceKHR m_surface;
 
-        void createInstance();
+        VkQueue m_graphicsQueue;
+        VkQueue m_presentQueue;
 
-        void createSurface();
+    private:
+        void createInstance();
 
         void lookupPhysicalDevice();
 
+        void createSurface(GLFWwindow* window);
+
         void createDevice();
+
+        void createQueues();
     };
 
 }// namespace moe
