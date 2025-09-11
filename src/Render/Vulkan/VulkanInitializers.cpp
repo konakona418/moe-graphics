@@ -131,5 +131,37 @@ namespace moe {
 
             return info;
         }
+
+        VkRenderingAttachmentInfo renderingAttachmentInfo(VkImageView imageView, VkClearValue* clearValue, VkImageLayout layout) {
+            VkRenderingAttachmentInfo attachment{};
+            attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            attachment.pNext = nullptr;
+
+            attachment.imageView = imageView;
+            attachment.imageLayout = layout;
+            attachment.loadOp = clearValue ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            if (clearValue) {
+                attachment.clearValue = *clearValue;
+            }
+
+            return attachment;
+        }
+
+        VkRenderingInfo renderingInfo(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment) {
+            VkRenderingInfo renderInfo{};
+            renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            renderInfo.pNext = nullptr;
+
+            renderInfo.renderArea = VkRect2D{VkOffset2D{0, 0}, renderExtent};
+            renderInfo.layerCount = 1;
+            renderInfo.colorAttachmentCount = 1;
+            renderInfo.pColorAttachments = colorAttachment;
+            renderInfo.pDepthAttachment = depthAttachment;
+            renderInfo.pStencilAttachment = nullptr;
+
+            return renderInfo;
+        }
     }// namespace VkInit
 }// namespace moe

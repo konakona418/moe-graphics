@@ -10,6 +10,11 @@
 #include <chrono>
 #include <thread>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
+
+
 namespace moe {
     constexpr bool enableValidationLayers{true};
 
@@ -40,6 +45,9 @@ namespace moe {
         initSwapchain();
         initCommands();
         initSyncPrimitives();
+        initDescriptors();
+
+        initImGUI();
 
         m_isInitialized = true;
     }
@@ -70,8 +78,36 @@ namespace moe {
                 continue;
             }
 
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            ImGui::ShowDemoWindow();
+
+            ImGui::Render();
+
             draw();
         }
+    }
+    void VulkanEngine::immediateSubmit(Function<void(VkCommandBuffer)>&& fn) {
+        MOE_VK_CHECK(vkResetFences(m_device, 1, &m_immediateModeFence));
+        MOE_VK_CHECK(vkResetCommandBuffer(m_immediateModeCommandBuffer, 0));
+
+        auto commandBuffer = m_immediateModeCommandBuffer;
+        VkCommandBufferBeginInfo beginInfo = VkInit::commandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+        MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+        fn(commandBuffer);
+
+        MOE_VK_CHECK(vkEndCommandBuffer(commandBuffer));
+
+        auto commandSubmitInfo = VkInit::commandBufferSubmitInfo(commandBuffer);
+        auto submitInfo = VkInit::submitInfo(&commandSubmitInfo, nullptr, nullptr);
+
+        MOE_VK_CHECK(vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, m_immediateModeFence));
+
+        MOE_VK_CHECK(vkWaitForFences(m_device, 1, &m_immediateModeFence, VK_TRUE, UINT64_MAX));
     }
 
     void VulkanEngine::draw() {
@@ -133,7 +169,13 @@ namespace moe {
 
         VkUtils::transitionImage(
                 commandBuffer, m_swapchainImages[swapchainImageIndex],
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+        drawImGUI(commandBuffer, m_swapchainImageViews[swapchainImageIndex]);
+
+        VkUtils::transitionImage(
+                commandBuffer, m_swapchainImages[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         MOE_VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
@@ -172,6 +214,15 @@ namespace moe {
         VkImageSubresourceRange range = VkUtils::makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
         vkCmdClearColorImage(commandBuffer, m_drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &range);
+    }
+
+    void VulkanEngine::drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget) {
+        auto attachment = VkInit::renderingAttachmentInfo(drawTarget, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        auto renderInfo = VkInit::renderingInfo(m_swapchainExtent, &attachment, nullptr);
+
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+        vkCmdEndRendering(commandBuffer);
     }
 
     void VulkanEngine::cleanup() {
@@ -330,6 +381,68 @@ namespace moe {
         });
     }
 
+    void VulkanEngine::initImGUI() {
+        VkDescriptorPoolSize pool_sizes[] = {
+                {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+                {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+                {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000},
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 1000;
+        poolInfo.poolSizeCount = (uint32_t) std::size(pool_sizes);
+        poolInfo.pPoolSizes = pool_sizes;
+
+        VkDescriptorPool imguiPool;
+        MOE_VK_CHECK(vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &imguiPool));
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+
+        ImGuiIO& imGuiIo = ImGui::GetIO();
+        imGuiIo.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+        ImGui::StyleColorsDark();
+
+        ImGui_ImplGlfw_InitForVulkan(m_window, true);
+
+        ImGui_ImplVulkan_InitInfo initInfo = {};
+        initInfo.Instance = m_instance;
+        initInfo.PhysicalDevice = m_physicalDevice;
+        initInfo.Device = m_device;
+        initInfo.Queue = m_graphicsQueue;
+        initInfo.DescriptorPool = imguiPool;
+        initInfo.MinImageCount = 3;
+        initInfo.ImageCount = 3;
+        initInfo.UseDynamicRendering = true;
+
+        initInfo.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+        initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &m_swapchainImageFormat;
+
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+
+        m_mainDeletionQueue.pushFunction([=]() {
+            ImGui_ImplVulkan_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+
+            vkDestroyDescriptorPool(m_device, imguiPool, nullptr);
+        });
+    }
+
     void VulkanEngine::initSwapchain() {
         createSwapchain(m_windowExtent.width, m_windowExtent.height);
 
@@ -411,6 +524,16 @@ namespace moe {
                     vkAllocateCommandBuffers(m_device, &allocInfo, &m_frames[i].mainCommandBuffer),
                     "Failed to allocate command buffer");
         }
+
+        // ImGUI
+        MOE_VK_CHECK(vkCreateCommandPool(m_device, &createInfo, nullptr, &m_immediateModeCommandPool));
+
+        auto allocInfo = VkInit::commandBufferAllocateInfo(m_immediateModeCommandPool);
+        MOE_VK_CHECK(vkAllocateCommandBuffers(m_device, &allocInfo, &m_immediateModeCommandBuffer));
+
+        m_mainDeletionQueue.pushFunction([=] {
+            vkDestroyCommandPool(m_device, m_immediateModeCommandPool, nullptr);
+        });
     }
 
     void VulkanEngine::initSyncPrimitives() {
@@ -430,6 +553,26 @@ namespace moe {
                     vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_frames[i].renderFinishedSemaphore),
                     "Failed to create semaphore");
         }
+
+        MOE_VK_CHECK(vkCreateFence(m_device, &fenceInfo, nullptr, &m_immediateModeFence));
+        m_mainDeletionQueue.pushFunction([=] {
+            vkDestroyFence(m_device, m_immediateModeFence, nullptr);
+        });
+    }
+
+    void VulkanEngine::initDescriptors() {
+        Vector<VulkanDescriptorAllocator::VulkanDescriptorPoolSizeRatio> ratios = {
+                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+        };
+
+        m_globalDescriptorAllocator.initPool(m_device, 10, ratios);
+
+        // !
+        // todo
+
+        m_mainDeletionQueue.pushFunction([&] {
+            m_globalDescriptorAllocator.destroyPool(m_device);
+        });
     }
 
     void VulkanEngine::queueEvent(WindowEvent event) {
