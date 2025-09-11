@@ -24,11 +24,19 @@ file(GLOB_RECURSE ENGINE_SOURCES src/Engine/*.cpp)
 file(GLOB_RECURSE RENDER_SOURCES src/Render/*.cpp)
 file(GLOB_RECURSE CORE_SOURCES src/Core/*.cpp)
 
+file(GLOB IMGUI_SOURCES 
+  vendors/imgui/imgui*.h 
+  vendors/imgui/imgui*.cpp 
+  vendors/imgui/backends/imgui_impl_glfw.*
+  vendors/imgui/backends/imgui_impl_vulkan.*)
+
 add_executable(moe-graphics 
   main.cpp
   ${ENGINE_SOURCES}
   ${RENDER_SOURCES}
   ${CORE_SOURCES}
+
+  ${IMGUI_SOURCES}
 )
 
 target_link_libraries(moe-graphics PRIVATE
@@ -39,6 +47,8 @@ target_link_libraries(moe-graphics PRIVATE
 
 target_include_directories(moe-graphics PRIVATE
   vendors/span/include
+  vendors/imgui
+  vendors/imgui/backends
 )
 
 find_package(Vulkan REQUIRED)
