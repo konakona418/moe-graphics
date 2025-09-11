@@ -2,24 +2,21 @@ cmake_minimum_required(VERSION 3.10.0)
 project(moe-graphics VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
-
-set(USE_VULKAN_SDK ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(vendors/glfw)
 add_subdirectory(vendors/glm)
-
-set(ENABLE_SPIRV OFF)
-add_subdirectory(vendors/glslang)
-
-set(VK_BOOTSTRAP_VULKAN_HEADER_DIR ${PROJECT_SOURCE_DIR}/vendors/Vulkan-Headers/include)
+add_subdirectory(vendors/Vulkan-Headers)
 add_subdirectory(vendors/vk-bootstrap)
 
+set(VULKAN_HEADERS_INSTALL_DIR ${PROJECT_SOURCE_DIR}/vendors/Vulkan-Headers)
 add_subdirectory(vendors/VulkanMemoryAllocator)
 
 add_subdirectory(vendors/volk)
 
-add_subdirectory(vendors/spdlog)
 add_subdirectory(vendors/fmt)
+set(SPDLOG_FMT_EXTERNAL ON)
+add_subdirectory(vendors/spdlog)
 
 include_directories(include)
 
@@ -34,20 +31,18 @@ add_executable(moe-graphics
   ${CORE_SOURCES}
 )
 
-target_link_libraries(moe-graphics PUBLIC
-  glfw glm::glm glslang 
+target_link_libraries(moe-graphics PRIVATE
+  glfw glm::glm
   vk-bootstrap::vk-bootstrap VulkanMemoryAllocator volk_headers
-  spdlog::spdlog
+  spdlog::spdlog fmt::fmt
 )
 
-if(USE_VULKAN_SDK)
-  find_package(Vulkan REQUIRED)
+target_include_directories(moe-graphics PRIVATE
+  vendors/span/include
+)
 
-  target_link_directories(moe-graphics PUBLIC ${Vulkan_LIBRARY_DIRS})
-  target_link_libraries(moe-graphics PUBLIC ${Vulkan_LIBRARIES})
-else()
-  error("Currently only Vulkan SDK is supported.")
-endif()
+find_package(Vulkan REQUIRED)
+target_link_libraries(moe-graphics PRIVATE ${Vulkan_LIBRARIES})
 
 include(CTest)
 enable_testing()

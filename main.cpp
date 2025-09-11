@@ -1,6 +1,9 @@
-#include "Core/App.hpp"
+#include "Render/Vulkan/VulkanEngine.hpp"
 
 int main() {
-    moe::App app;
+    moe::VulkanEngine engine;
+    engine.init();
+    engine.run();
+    engine.cleanup();
     return 0;
 }

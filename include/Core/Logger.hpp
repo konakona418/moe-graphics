@@ -1,5 +1,6 @@
 #pragma once
 #include "Module.hpp"
+
 #include <memory>
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
@@ -36,8 +37,8 @@ namespace moe {
 
     private:
         template<typename... Args>
-        void log(spdlog::level::level_enum lvl, const char* fmt, const Args&... args) {
-            if (m_logger) m_logger->log(lvl, fmt, args...);
+        void log(spdlog::level::level_enum lvl, const char* fmt, Args&&... args) {
+            if (m_logger) m_logger->log(lvl, fmt::v11::format_string<Args...>(fmt), std::forward<Args>(args)...);
         }
 
         std::shared_ptr<spdlog::logger> m_logger;
