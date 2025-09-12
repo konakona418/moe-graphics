@@ -3,9 +3,12 @@
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
+
 #include <GLFW/glfw3.h>
 
 namespace moe {
+    struct VulkanGPUMeshBuffer;
+
     struct DeletionQueue {
         Deque<Function<void()>> deletors;
 
@@ -37,6 +40,7 @@ namespace moe {
         bool m_isInitialized{false};
         int32_t m_frameNumber{0};
         bool m_stopRendering{false};
+        bool m_resizeRequested{false};
         VkExtent2D m_windowExtent{1280, 720};
 
         GLFWwindow* m_window{nullptr};
@@ -59,6 +63,7 @@ namespace moe {
         uint32_t m_graphicsQueueFamilyIndex;
 
         VulkanAllocatedImage m_drawImage;
+        VulkanAllocatedImage m_depthImage;
         VkExtent2D m_drawExtent;
 
         VkFence m_immediateModeFence;
@@ -77,20 +82,42 @@ namespace moe {
 
         void immediateSubmit(Function<void(VkCommandBuffer)>&& fn);
 
+        VulkanAllocatedBuffer allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+
+        void destroyBuffer(VulkanAllocatedBuffer& buffer);
+
+        VulkanGPUMeshBuffer uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices);
+
         FrameData& getCurrentFrame() { return m_frames[m_frameNumber % FRAMES_IN_FLIGHT]; }
 
     private:
-        enum class WindowEventType : uint8_t {
-            Close,
-            Minimized,
-            Restored,
-        };
-
         struct WindowEvent {
-            WindowEventType type;
 
-            template<WindowEventType E>
-            bool is() { return type == E; }
+            struct Close {};
+            struct Minimize {};
+            struct RestoreFromMinimize {};
+            struct Resize {
+                uint32_t width;
+                uint32_t height;
+            };
+
+            Variant<std::monostate,
+                    Close,
+                    Minimize,
+                    RestoreFromMinimize,
+                    Resize>
+                    args;
+
+            template<typename T>
+            bool is() { return std::holds_alternative<T>(args); }
+
+            template<typename T>
+            auto getIf() {
+                if (std::holds_alternative<T>(args)) {
+                    return Optional<T>{std::get<T>(args)};
+                }
+                return Optional<T>{std::nullopt};
+            }
         };
 
         Queue<WindowEvent> m_pollingEvents;
@@ -110,6 +137,8 @@ namespace moe {
         void createSwapchain(uint32_t width, uint32_t height);
 
         void destroySwapchain();
+
+        void recreateSwapchain(uint32_t width, uint32_t height);
 
         void initCommands();
 

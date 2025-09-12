@@ -26,7 +26,13 @@ namespace moe {
 
         VkRenderingAttachmentInfo renderingAttachmentInfo(VkImageView imageView, VkClearValue* clearValue, VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+        VkRenderingAttachmentInfo depthRenderingAttachmentInfo(VkImageView imageView, VkImageLayout layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
         VkRenderingInfo renderingInfo(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment);
+
+        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo();
+
+        VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint = "main");
     }// namespace VkInit
 
 }// namespace moe

@@ -149,6 +149,20 @@ namespace moe {
             return attachment;
         }
 
+        VkRenderingAttachmentInfo depthRenderingAttachmentInfo(VkImageView imageView, VkImageLayout layout) {
+            VkRenderingAttachmentInfo attachment{};
+            attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            attachment.pNext = nullptr;
+
+            attachment.imageView = imageView;
+            attachment.imageLayout = layout;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachment.clearValue.depthStencil.depth = 0.f;
+
+            return attachment;
+        }
+
         VkRenderingInfo renderingInfo(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment) {
             VkRenderingInfo renderInfo{};
             renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -162,6 +176,32 @@ namespace moe {
             renderInfo.pStencilAttachment = nullptr;
 
             return renderInfo;
+        }
+
+        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo() {
+            VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+            pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            pipelineLayoutInfo.pNext = nullptr;
+
+            pipelineLayoutInfo.flags = 0;
+            pipelineLayoutInfo.setLayoutCount = 0;
+            pipelineLayoutInfo.pSetLayouts = nullptr;
+            pipelineLayoutInfo.pushConstantRangeCount = 0;
+            pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+            return pipelineLayoutInfo;
+        }
+
+        VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint) {
+            VkPipelineShaderStageCreateInfo shaderStageInfo{};
+            shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shaderStageInfo.pNext = nullptr;
+
+            shaderStageInfo.stage = stage;
+            shaderStageInfo.module = module;
+            shaderStageInfo.pName = entryPoint;
+
+            return shaderStageInfo;
         }
     }// namespace VkInit
 }// namespace moe

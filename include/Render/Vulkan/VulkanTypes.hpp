@@ -9,7 +9,9 @@
 #include <queue>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
+
 
 
 #include <tcb/span.hpp>
@@ -18,6 +20,8 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 namespace moe {
     template<typename... TArgs>
@@ -51,6 +55,9 @@ namespace moe {
     template<typename T>
     using Span = tcb::span<T>;
 
+    template<typename... TArgs>
+    using Variant = std::variant<TArgs...>;
+
     struct VulkanAllocatedImage {
         VkImage image;
         VkImageView imageView;
@@ -59,12 +66,28 @@ namespace moe {
         VkFormat imageFormat;
     };
 
+    struct VulkanAllocatedBuffer {
+        VkBuffer buffer;
+        VmaAllocation vmaAllocation;
+        VmaAllocationInfo vmaAllocationInfo;
+    };
+
+    struct Vertex {
+        glm::vec3 pos;
+        float uv_x;
+        glm::vec3 normal;
+        float uv_y;
+        glm::vec4 color;
+    };
+
+    struct VulkanGPUDrawPushConstants {
+        glm::mat4 transform;
+        VkDeviceAddress vertexBufferAddr;
+    };
+
 }// namespace moe
 
 #include <fmt/format.h>
-
-#include <glm/mat4x4.hpp>
-#include <glm/vec4.hpp>
 
 #include "Core/Logger.hpp"
 

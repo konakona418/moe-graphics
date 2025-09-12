@@ -1,6 +1,8 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
+#include "Render/Vulkan/VulkanGPUMesh.hpp"
 #include "Render/Vulkan/VulkanInitializers.hpp"
 #include "Render/Vulkan/VulkanUtils.hpp"
+
 
 #include <VkBootstrap.h>
 
@@ -55,21 +57,38 @@ namespace moe {
     void VulkanEngine::run() {
         bool shouldQuit = false;
 
+        std::pair<uint32_t, uint32_t> newMetric;
+
         while (!shouldQuit) {
             glfwPollEvents();
 
+            if (m_resizeRequested) {
+                Logger::debug("resize args: {}x{}", newMetric.first, newMetric.second);
+                recreateSwapchain(newMetric.first, newMetric.second);
+
+                m_resizeRequested = false;
+            }
+
             while (auto e = pollEvent()) {
-                if (e->is<WindowEventType::Close>()) {
+                if (e->is<WindowEvent::Close>()) {
                     Logger::debug("window closing...");
                     shouldQuit = true;
                 }
 
-                if (e->is<WindowEventType::Minimized>()) {
+                if (e->is<WindowEvent::Minimize>()) {
                     Logger::debug("window minimized");
                     m_stopRendering = true;
-                } else if (e->is<WindowEventType::Restored>()) {
+                } else if (e->is<WindowEvent::RestoreFromMinimize>()) {
                     Logger::debug("window restored from minimize");
                     m_stopRendering = false;
+                }
+
+                if (auto resize = e->getIf<WindowEvent::Resize>()) {
+                    if (resize->width && resize->height) {
+                        Logger::debug("window resize: {}x{}", resize->width, resize->height);
+                        m_resizeRequested = true;
+                        newMetric = {resize->width, resize->height};
+                    }
                 }
             }
 
@@ -89,6 +108,7 @@ namespace moe {
             draw();
         }
     }
+
     void VulkanEngine::immediateSubmit(Function<void(VkCommandBuffer)>&& fn) {
         MOE_VK_CHECK(vkResetFences(m_device, 1, &m_immediateModeFence));
         MOE_VK_CHECK(vkResetCommandBuffer(m_immediateModeCommandBuffer, 0));
@@ -110,6 +130,95 @@ namespace moe {
         MOE_VK_CHECK(vkWaitForFences(m_device, 1, &m_immediateModeFence, VK_TRUE, UINT64_MAX));
     }
 
+    VulkanAllocatedBuffer VulkanEngine::allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.pNext = nullptr;
+
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+
+        VmaAllocationCreateInfo vmaAllocInfo{};
+        vmaAllocInfo.usage = memoryUsage;
+        vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VulkanAllocatedBuffer buffer;
+        MOE_VK_CHECK(
+                vmaCreateBuffer(
+                        m_allocator,
+                        &bufferInfo,
+                        &vmaAllocInfo,
+                        &buffer.buffer,
+                        &buffer.vmaAllocation,
+                        &buffer.vmaAllocationInfo));
+
+        return buffer;
+    }
+
+    void VulkanEngine::destroyBuffer(VulkanAllocatedBuffer& buffer) {
+        vmaDestroyBuffer(m_allocator, buffer.buffer, buffer.vmaAllocation);
+    }
+
+    VulkanGPUMeshBuffer VulkanEngine::uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices) {
+        const size_t vertBufferSize = vertices.size() * sizeof(Vertex);
+        const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+
+        VulkanGPUMeshBuffer surface;
+        surface.vertexBuffer = allocateBuffer(
+                vertBufferSize,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+        VkBufferDeviceAddressInfo deviceAddrInfo{};
+        deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        deviceAddrInfo.buffer = surface.vertexBuffer.buffer;
+
+        surface.vertexBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+
+        surface.indexBuffer = allocateBuffer(
+                indexBufferSize,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+        VulkanAllocatedBuffer stagingBuffer = allocateBuffer(
+                vertBufferSize + indexBufferSize,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VMA_MEMORY_USAGE_CPU_ONLY);
+
+        void* data = stagingBuffer.vmaAllocation->GetMappedData();
+
+        std::memcpy(data, vertices.data(), vertBufferSize);
+        std::memcpy(static_cast<uint8_t*>(data) + vertBufferSize,
+                    indices.data(), indexBufferSize);
+
+        immediateSubmit([&](VkCommandBuffer cmdBuffer) {
+            VkBufferCopy vertCopy{};
+            vertCopy.srcOffset = 0;
+            vertCopy.dstOffset = 0;
+            vertCopy.size = vertBufferSize;
+
+            vkCmdCopyBuffer(cmdBuffer,
+                            stagingBuffer.buffer, surface.vertexBuffer.buffer,
+                            1, &vertCopy);
+
+            VkBufferCopy indexCopy{};
+            indexCopy.srcOffset = vertBufferSize;
+            indexCopy.dstOffset = 0;
+            indexCopy.size = indexBufferSize;
+
+            vkCmdCopyBuffer(cmdBuffer,
+                            stagingBuffer.buffer, surface.indexBuffer.buffer,
+                            1, &indexCopy);
+        });
+
+        destroyBuffer(stagingBuffer);
+
+        return surface;
+    }
+
     void VulkanEngine::draw() {
         auto& currentFrame = getCurrentFrame();
 
@@ -128,15 +237,23 @@ namespace moe {
                 "Failed to reset fence");
 
         uint32_t swapchainImageIndex;
-        MOE_VK_CHECK_MSG(
-                vkAcquireNextImageKHR(
-                        m_device,
-                        m_swapchain,
-                        VkUtils::secsToNanoSecs(1.0f),
-                        currentFrame.imageAvailableSemaphore,
-                        VK_NULL_HANDLE,
-                        &swapchainImageIndex),
-                "Failed to acquire next image");
+        VkResult acquireResult = vkAcquireNextImageKHR(
+                m_device,
+                m_swapchain,
+                VkUtils::secsToNanoSecs(1.0f),
+                currentFrame.imageAvailableSemaphore,
+                VK_NULL_HANDLE,
+                &swapchainImageIndex);
+
+        if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            // ! note that with resize event hooked, no need to set resize flag here.
+            // ! another note: some drivers can fix suboptimal cases automatically, which is quite absurd.
+            Logger::warn("vkAcquireNextImageKHR returned VK_ERROR_OUT_OF_DATE_KHR, forcing resize.");
+            m_resizeRequested = true;
+            return;
+        } else if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
+            MOE_LOG_AND_THROW("Failed to acquire next swapchain image");
+        }
 
         VkCommandBuffer commandBuffer = currentFrame.mainCommandBuffer;
 
@@ -150,7 +267,13 @@ namespace moe {
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
         //! fixme: general image layout is not an optimal choice.
-        VkUtils::transitionImage(commandBuffer, m_drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        VkUtils::transitionImage(
+                commandBuffer, m_drawImage.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+        VkUtils::transitionImage(
+                commandBuffer, m_depthImage.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
         drawBackground(commandBuffer);
 
@@ -204,7 +327,12 @@ namespace moe {
 
         presentInfo.pImageIndices = &swapchainImageIndex;
 
-        MOE_VK_CHECK(vkQueuePresentKHR(m_graphicsQueue, &presentInfo));
+        VkResult presentResult = vkQueuePresentKHR(m_graphicsQueue, &presentInfo);
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            // ! note that with resize event hooked, no need to set resize flag here.
+            Logger::warn("vkQueuePresentKHR returned VK_ERROR_OUT_OF_DATE_KHR, forcing resize.");
+            m_resizeRequested = true;
+        }
 
         m_frameNumber++;
     }
@@ -268,8 +396,7 @@ namespace moe {
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        // todo: handle window resize.
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         m_window = glfwCreateWindow(m_windowExtent.width, m_windowExtent.height, "Moe Graphics Engine", nullptr, nullptr);
 
@@ -281,12 +408,24 @@ namespace moe {
 
         glfwSetWindowCloseCallback(m_window, [](auto* window) {
             auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-            engine->queueEvent({WindowEventType::Close});
+            engine->queueEvent({WindowEvent::Close{}});
         });
 
         glfwSetWindowIconifyCallback(m_window, [](auto* window, int iconified) {
             auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-            engine->queueEvent({iconified ? WindowEventType::Minimized : WindowEventType::Restored});
+            if (iconified) {
+                engine->queueEvent({WindowEvent::Minimize{}});
+            } else {
+                engine->queueEvent({WindowEvent::RestoreFromMinimize{}});
+            }
+        });
+
+        glfwSetWindowSizeCallback(m_window, [](auto* window, int width, int height) {
+            auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+
+            engine->queueEvent({WindowEvent::Resize{
+                    static_cast<uint32_t>(width),
+                    static_cast<uint32_t>(height)}});
         });
     }
 
@@ -382,7 +521,7 @@ namespace moe {
     }
 
     void VulkanEngine::initImGUI() {
-        VkDescriptorPoolSize pool_sizes[] = {
+        VkDescriptorPoolSize poolSizes[]{
                 {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
                 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
                 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
@@ -396,12 +535,12 @@ namespace moe {
                 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000},
         };
 
-        VkDescriptorPoolCreateInfo poolInfo = {};
+        VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         poolInfo.maxSets = 1000;
-        poolInfo.poolSizeCount = (uint32_t) std::size(pool_sizes);
-        poolInfo.pPoolSizes = pool_sizes;
+        poolInfo.poolSizeCount = (uint32_t) std::size(poolSizes);
+        poolInfo.pPoolSizes = poolSizes;
 
         VkDescriptorPool imguiPool;
         MOE_VK_CHECK(vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &imguiPool));
@@ -416,14 +555,14 @@ namespace moe {
 
         ImGui_ImplGlfw_InitForVulkan(m_window, true);
 
-        ImGui_ImplVulkan_InitInfo initInfo = {};
+        ImGui_ImplVulkan_InitInfo initInfo{};
         initInfo.Instance = m_instance;
         initInfo.PhysicalDevice = m_physicalDevice;
         initInfo.Device = m_device;
         initInfo.Queue = m_graphicsQueue;
         initInfo.DescriptorPool = imguiPool;
-        initInfo.MinImageCount = 3;
-        initInfo.ImageCount = 3;
+        initInfo.MinImageCount = FRAMES_IN_FLIGHT;
+        initInfo.ImageCount = FRAMES_IN_FLIGHT;
         initInfo.UseDynamicRendering = true;
 
         initInfo.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
@@ -454,27 +593,41 @@ namespace moe {
         m_drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
         m_drawImage.imageExtent = drawExtent;
 
-        VkImageUsageFlags usage{};
-        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+        m_depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
+        m_depthImage.imageExtent = drawExtent;
 
-        VkImageCreateInfo imageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, usage, drawExtent);
+        VkImageUsageFlags drawImageUsage{};
+        drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        drawImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        drawImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
+
+        VkImageUsageFlags depthImageUsage{};
+        depthImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+        VkImageCreateInfo drawImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, drawImageUsage, drawExtent);
+
+        VkImageCreateInfo depthImageInfo = VkInit::imageCreateInfo(m_depthImage.imageFormat, depthImageUsage, drawExtent);
 
         VmaAllocationCreateInfo allocCreateInfo{};
         allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         allocCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        vmaCreateImage(m_allocator, &imageInfo, &allocCreateInfo, &m_drawImage.image, &m_drawImage.vmaAllocation, nullptr);
+        vmaCreateImage(m_allocator, &drawImageInfo, &allocCreateInfo, &m_drawImage.image, &m_drawImage.vmaAllocation, nullptr);
+        vmaCreateImage(m_allocator, &depthImageInfo, &allocCreateInfo, &m_depthImage.image, &m_depthImage.vmaAllocation, nullptr);
 
-        VkImageViewCreateInfo imageViewInfo = VkInit::imageViewCreateInfo(m_drawImage.imageFormat, m_drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+        VkImageViewCreateInfo drawImageViewInfo = VkInit::imageViewCreateInfo(m_drawImage.imageFormat, m_drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+        VkImageViewCreateInfo depthImageViewInfo = VkInit::imageViewCreateInfo(m_depthImage.imageFormat, m_depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-        MOE_VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &m_drawImage.imageView));
+        MOE_VK_CHECK(vkCreateImageView(m_device, &drawImageViewInfo, nullptr, &m_drawImage.imageView));
+        MOE_VK_CHECK(vkCreateImageView(m_device, &depthImageViewInfo, nullptr, &m_depthImage.imageView));
 
         m_mainDeletionQueue.pushFunction([=] {
             vkDestroyImageView(m_device, m_drawImage.imageView, nullptr);
             vmaDestroyImage(m_allocator, m_drawImage.image, m_drawImage.vmaAllocation);
+
+            vkDestroyImageView(m_device, m_depthImage.imageView, nullptr);
+            vmaDestroyImage(m_allocator, m_depthImage.image, m_depthImage.vmaAllocation);
         });
     }
 
@@ -483,11 +636,12 @@ namespace moe {
 
         m_swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
 
-        auto swapchainResult = swapchainBuilder.set_desired_format({m_swapchainImageFormat, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-                                       .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-                                       .set_desired_extent(width, height)
-                                       .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-                                       .build();
+        auto swapchainResult =
+                swapchainBuilder.set_desired_format({m_swapchainImageFormat, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+                        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                        .set_desired_extent(width, height)
+                        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                        .build();
 
         if (!swapchainResult) {
             MOE_LOG_AND_THROW("Failed to create swapchain.");
@@ -506,6 +660,17 @@ namespace moe {
         }
 
         vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+    }
+
+    void VulkanEngine::recreateSwapchain(uint32_t width, uint32_t height) {
+        vkDeviceWaitIdle(m_device);
+
+        destroySwapchain();
+
+        m_windowExtent.width = width;
+        m_windowExtent.height = height;
+
+        createSwapchain(m_windowExtent.width, m_windowExtent.height);
     }
 
     void VulkanEngine::initCommands() {
