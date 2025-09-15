@@ -18,6 +18,8 @@ add_subdirectory(vendors/fmt)
 set(SPDLOG_FMT_EXTERNAL ON)
 add_subdirectory(vendors/spdlog)
 
+add_subdirectory(vendors/fastgltf)
+
 include_directories(include)
 
 file(GLOB_RECURSE ENGINE_SOURCES src/Engine/*.cpp)
@@ -30,6 +32,10 @@ file(GLOB IMGUI_SOURCES
   vendors/imgui/backends/imgui_impl_glfw.*
   vendors/imgui/backends/imgui_impl_vulkan.*)
 
+file(GLOB STB_IMAGES_SOURCES 
+  vendors/stb/stb_image.h
+)
+
 add_executable(moe-graphics 
   main.cpp
   ${ENGINE_SOURCES}
@@ -37,18 +43,21 @@ add_executable(moe-graphics
   ${CORE_SOURCES}
 
   ${IMGUI_SOURCES}
+  ${STB_IMAGES_SOURCES}
 )
 
 target_link_libraries(moe-graphics PRIVATE
   glfw glm::glm
   vk-bootstrap::vk-bootstrap VulkanMemoryAllocator volk_headers
   spdlog::spdlog fmt::fmt
+  fastgltf::fastgltf
 )
 
 target_include_directories(moe-graphics PRIVATE
   vendors/span/include
   vendors/imgui
   vendors/imgui/backends
+  vendors/stb
 )
 
 find_package(Vulkan REQUIRED)
