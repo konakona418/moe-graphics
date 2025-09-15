@@ -27,6 +27,7 @@ namespace moe {
         VkFence inFlightFence;
 
         DeletionQueue deletionQueue;
+        VulkanDescriptorAllocatorDynamic descriptorAllocator;
     };
 
     constexpr uint32_t FRAMES_IN_FLIGHT = 2;

@@ -62,13 +62,6 @@ namespace moe {
         while (!shouldQuit) {
             glfwPollEvents();
 
-            if (m_resizeRequested) {
-                Logger::debug("resize args: {}x{}", newMetric.first, newMetric.second);
-                recreateSwapchain(newMetric.first, newMetric.second);
-
-                m_resizeRequested = false;
-            }
-
             while (auto e = pollEvent()) {
                 if (e->is<WindowEvent::Close>()) {
                     Logger::debug("window closing...");
@@ -85,11 +78,18 @@ namespace moe {
 
                 if (auto resize = e->getIf<WindowEvent::Resize>()) {
                     if (resize->width && resize->height) {
-                        Logger::debug("window resize: {}x{}", resize->width, resize->height);
+                        // Logger::debug("window resize: {}x{}", resize->width, resize->height);
                         m_resizeRequested = true;
                         newMetric = {resize->width, resize->height};
                     }
                 }
+            }
+
+            if (m_resizeRequested) {
+                Logger::debug("resize args: {}x{}", newMetric.first, newMetric.second);
+                recreateSwapchain(newMetric.first, newMetric.second);
+
+                m_resizeRequested = false;
             }
 
             if (m_stopRendering) {
@@ -231,6 +231,8 @@ namespace moe {
                 "Failed to wait for fence");
 
         currentFrame.deletionQueue.flush();
+
+        currentFrame.descriptorAllocator.clearPools(m_device);
 
         MOE_VK_CHECK_MSG(
                 vkResetFences(m_device, 1, &currentFrame.inFlightFence),
@@ -726,19 +728,35 @@ namespace moe {
     }
 
     void VulkanEngine::initDescriptors() {
-        Vector<VulkanDescriptorAllocator::VulkanDescriptorPoolSizeRatio> ratios = {
+        Vector<VulkanDescriptorAllocator::PoolSizeRatio> ratios = {
                 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
         };
 
-        m_globalDescriptorAllocator.initPool(m_device, 10, ratios);
+        m_globalDescriptorAllocator.init(m_device, 10, ratios);
 
         // !
         // todo
 
+        Vector<VulkanDescriptorAllocatorDynamic::PoolSizeRatio> dynamicRatios = {
+                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
+        };
+
+        for (int i = 0; i < FRAMES_IN_FLIGHT; ++i) {
+            m_frames[i].descriptorAllocator = {};
+            m_frames[i].descriptorAllocator.init(m_device, 10, dynamicRatios);
+
+            m_frames[i].deletionQueue.pushFunction([&] {
+                m_frames[i].descriptorAllocator.destroyPools(m_device);
+            });
+        }
+
         m_mainDeletionQueue.pushFunction([&] {
             m_globalDescriptorAllocator.destroyPool(m_device);
         });
-    }
+    }// namespace moe
 
     void VulkanEngine::queueEvent(WindowEvent event) {
         m_pollingEvents.push(event);
