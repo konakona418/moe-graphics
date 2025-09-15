@@ -49,6 +49,8 @@ namespace moe {
         initSyncPrimitives();
         initDescriptors();
 
+        initDefaultResources();
+
         initImGUI();
 
         m_isInitialized = true;
@@ -153,6 +155,87 @@ namespace moe {
                         &buffer.vmaAllocationInfo));
 
         return buffer;
+    }
+
+    VulkanAllocatedImage VulkanEngine::allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        VkImageCreateInfo imageInfo = VkInit::imageCreateInfo(format, usage, extent);
+
+        if (mipmap) {
+            imageInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+        } else {
+            imageInfo.mipLevels = 1;
+        }
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        allocInfo.flags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VulkanAllocatedImage image{};
+        image.imageExtent = extent;
+        image.imageFormat = format;
+
+        MOE_VK_CHECK(
+                vmaCreateImage(m_allocator, &imageInfo, &allocInfo, &image.image, &image.vmaAllocation, nullptr));
+
+        VkImageAspectFlags aspect =
+                format == VK_FORMAT_D32_SFLOAT
+                        ? VK_IMAGE_ASPECT_DEPTH_BIT
+                        : VK_IMAGE_ASPECT_COLOR_BIT;
+        VkImageViewCreateInfo imageViewInfo = VkInit::imageViewCreateInfo(format, image.image, aspect);
+        imageViewInfo.subresourceRange.levelCount = imageInfo.mipLevels;
+
+        MOE_VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &image.imageView));
+
+        return image;
+    }
+
+    VulkanAllocatedImage VulkanEngine::allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        size_t imageSize = extent.width * extent.height * extent.depth * 4;// rgba8
+        VulkanAllocatedBuffer stagingBuffer = allocateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        std::memcpy(stagingBuffer.vmaAllocation->GetMappedData(), data, imageSize);
+
+        VulkanAllocatedImage image = allocateImage(
+                extent, format,
+                usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                mipmap);
+        immediateSubmit([&](VkCommandBuffer cmd) {
+            VkUtils::transitionImage(
+                    cmd, image.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            VkBufferImageCopy copyRegion{};
+            copyRegion.bufferOffset = 0;
+            copyRegion.bufferRowLength = 0;
+            copyRegion.bufferImageHeight = 0;
+
+            copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyRegion.imageSubresource.mipLevel = 0;
+            copyRegion.imageSubresource.baseArrayLayer = 0;
+            copyRegion.imageSubresource.layerCount = 1;
+            copyRegion.imageExtent = extent;
+
+            vkCmdCopyBufferToImage(
+                    cmd,
+                    stagingBuffer.buffer,
+                    image.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1,
+                    &copyRegion);
+
+            VkUtils::transitionImage(
+                    cmd, image.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        });
+
+        destroyBuffer(stagingBuffer);
+
+        return image;
+    }
+
+    void VulkanEngine::destroyImage(VulkanAllocatedImage& image) {
+        vkDestroyImageView(m_device, image.imageView, nullptr);
+        vmaDestroyImage(m_allocator, image.image, image.vmaAllocation);
     }
 
     void VulkanEngine::destroyBuffer(VulkanAllocatedBuffer& buffer) {
@@ -757,7 +840,66 @@ namespace moe {
         m_mainDeletionQueue.pushFunction([&] {
             m_globalDescriptorAllocator.destroyPool(m_device);
         });
-    }// namespace moe
+    }
+
+    void VulkanEngine::initDefaultResources() {
+        {
+            uint32_t color = glm::packUnorm4x8(glm::vec4(1.0f));
+            m_defaultData.whiteTexture = allocateImage(
+                    &color,
+                    {1, 1, 1},
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT);
+        }
+        {
+            uint32_t color = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            m_defaultData.blackTexture = allocateImage(
+                    &color,
+                    {1, 1, 1},
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT);
+        }
+        {
+            uint32_t magenta = glm::packUnorm4x8(glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+            uint32_t black = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+
+            Array<uint32_t, 16 * 16> checkerboard{};
+            for (int x = 0; x < 16; ++x) {
+                for (int y = 0; y < 16; ++y) {
+                    checkerboard[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+                }
+            }
+
+            m_defaultData.checkerboardTexture = allocateImage(
+                    checkerboard.data(),
+                    {16, 16, 1},
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT);
+        }
+        {
+            VkSamplerCreateInfo samplerInfo{};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+
+            vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultData.linearSampler);
+
+            samplerInfo.minFilter = VK_FILTER_NEAREST;
+            samplerInfo.magFilter = VK_FILTER_NEAREST;
+
+            vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultData.nearestSampler);
+        }
+
+        m_mainDeletionQueue.pushFunction([&] {
+            vkDestroySampler(m_device, m_defaultData.linearSampler, nullptr);
+            vkDestroySampler(m_device, m_defaultData.nearestSampler, nullptr);
+
+            destroyImage(m_defaultData.whiteTexture);
+            destroyImage(m_defaultData.blackTexture);
+            destroyImage(m_defaultData.checkerboardTexture);
+        });
+    }
 
     void VulkanEngine::queueEvent(WindowEvent event) {
         m_pollingEvents.push(event);

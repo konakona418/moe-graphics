@@ -71,6 +71,15 @@ namespace moe {
         VkCommandBuffer m_immediateModeCommandBuffer;
         VkCommandPool m_immediateModeCommandPool;
 
+        struct {
+            VulkanAllocatedImage whiteTexture;
+            VulkanAllocatedImage blackTexture;
+            VulkanAllocatedImage checkerboardTexture;
+
+            VkSampler nearestSampler;
+            VkSampler linearSampler;
+        } m_defaultData;
+
         static VulkanEngine& get();
 
         void init();
@@ -84,6 +93,12 @@ namespace moe {
         void immediateSubmit(Function<void(VkCommandBuffer)>&& fn);
 
         VulkanAllocatedBuffer allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+
+        VulkanAllocatedImage allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
+        VulkanAllocatedImage allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
+        void destroyImage(VulkanAllocatedImage& image);
 
         void destroyBuffer(VulkanAllocatedBuffer& buffer);
 
@@ -146,6 +161,8 @@ namespace moe {
         void initSyncPrimitives();
 
         void initDescriptors();
+
+        void initDefaultResources();
 
         void drawBackground(VkCommandBuffer commandBuffer);
 

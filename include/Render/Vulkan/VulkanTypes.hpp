@@ -13,7 +13,6 @@
 #include <vector>
 
 
-
 #include <tcb/span.hpp>
 
 #include <vk_mem_alloc.h>
@@ -21,6 +20,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <glm/mat4x4.hpp>
+#include <glm/packing.hpp>
 #include <glm/vec4.hpp>
 
 namespace moe {
@@ -83,6 +83,12 @@ namespace moe {
     struct VulkanGPUDrawPushConstants {
         glm::mat4 transform;
         VkDeviceAddress vertexBufferAddr;
+    };
+
+    struct VulkanGPUSceneData {
+        glm::vec4 ambientColor;
+        glm::vec4 sunlightDirection;
+        glm::vec4 sunlightColor;
     };
 
 }// namespace moe
