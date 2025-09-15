@@ -90,11 +90,11 @@ namespace moe {
     }
 
     void VulkanDescriptorAllocatorDynamic::clearPools(VkDevice device) {
-        for (auto& pool: m_usedPools) {
+        for (auto pool: m_readyPools) {
             vkResetDescriptorPool(device, pool, 0);
         }
 
-        for (auto& pool: m_usedPools) {
+        for (auto pool: m_usedPools) {
             vkResetDescriptorPool(device, pool, 0);
             m_readyPools.push_back(pool);
         }
@@ -103,12 +103,12 @@ namespace moe {
     }
 
     void VulkanDescriptorAllocatorDynamic::destroyPools(VkDevice device) {
-        for (auto& pool: m_usedPools) {
+        for (auto pool: m_usedPools) {
             vkDestroyDescriptorPool(device, pool, nullptr);
         }
         m_usedPools.clear();
 
-        for (auto& pool: m_readyPools) {
+        for (auto pool: m_readyPools) {
             vkDestroyDescriptorPool(device, pool, nullptr);
         }
         m_readyPools.clear();
@@ -129,7 +129,7 @@ namespace moe {
         VkDescriptorSet descriptorSet;
         auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
 
-        if (result != VK_SUCCESS) {
+        if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
             m_usedPools.push_back(pool);
 
             pool = getPool(device);

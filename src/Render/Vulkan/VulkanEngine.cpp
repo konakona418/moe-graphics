@@ -748,7 +748,8 @@ namespace moe {
             m_frames[i].descriptorAllocator = {};
             m_frames[i].descriptorAllocator.init(m_device, 10, dynamicRatios);
 
-            m_frames[i].deletionQueue.pushFunction([&] {
+            // ! note that the index 'i' should not be captured by reference here
+            m_mainDeletionQueue.pushFunction([&, i] {
                 m_frames[i].descriptorAllocator.destroyPools(m_device);
             });
         }
