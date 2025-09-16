@@ -33,6 +33,8 @@ namespace moe {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo();
 
         VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint = "main");
+
+        VkPushConstantRange pushConstantRange(VkShaderStageFlags stageFlags, uint32_t size, uint32_t offset);
     }// namespace VkInit
 
 }// namespace moe

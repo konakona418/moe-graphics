@@ -203,5 +203,14 @@ namespace moe {
 
             return shaderStageInfo;
         }
+
+        VkPushConstantRange pushConstantRange(VkShaderStageFlags stageFlags, uint32_t size, uint32_t offset) {
+            VkPushConstantRange range{};
+            range.stageFlags = stageFlags;
+            range.offset = offset;
+            range.size = size;
+
+            return range;
+        }
     }// namespace VkInit
 }// namespace moe
