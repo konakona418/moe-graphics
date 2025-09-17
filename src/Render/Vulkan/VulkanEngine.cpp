@@ -48,6 +48,7 @@ namespace moe {
         initCommands();
         initSyncPrimitives();
         initDescriptors();
+        initCaches();
 
         initDefaultResources();
 
@@ -810,6 +811,14 @@ namespace moe {
         });
     }
 
+    void VulkanEngine::initCaches() {
+        m_caches.imageCache.init(*this);
+
+        m_mainDeletionQueue.pushFunction([&] {
+            m_caches.imageCache.destroy();
+        });
+    }
+
     void VulkanEngine::initDescriptors() {
         Vector<VulkanDescriptorAllocator::PoolSizeRatio> ratios = {
                 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
@@ -845,19 +854,23 @@ namespace moe {
     void VulkanEngine::initDefaultResources() {
         {
             uint32_t color = glm::packUnorm4x8(glm::vec4(1.0f));
-            m_defaultData.whiteTexture = allocateImage(
+            auto image = allocateImage(
                     &color,
                     {1, 1, 1},
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
+
+            m_caches.imageCache.addImage(std::move(image));
         }
         {
             uint32_t color = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            m_defaultData.blackTexture = allocateImage(
+            auto image = allocateImage(
                     &color,
                     {1, 1, 1},
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
+
+            m_caches.imageCache.addImage(std::move(image));
         }
         {
             uint32_t magenta = glm::packUnorm4x8(glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
@@ -870,11 +883,13 @@ namespace moe {
                 }
             }
 
-            m_defaultData.checkerboardTexture = allocateImage(
+            auto image = allocateImage(
                     checkerboard.data(),
                     {16, 16, 1},
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
+
+            m_caches.imageCache.addImage(std::move(image));
         }
         {
             VkSamplerCreateInfo samplerInfo{};
@@ -894,10 +909,6 @@ namespace moe {
         m_mainDeletionQueue.pushFunction([&] {
             vkDestroySampler(m_device, m_defaultData.linearSampler, nullptr);
             vkDestroySampler(m_device, m_defaultData.nearestSampler, nullptr);
-
-            destroyImage(m_defaultData.whiteTexture);
-            destroyImage(m_defaultData.blackTexture);
-            destroyImage(m_defaultData.checkerboardTexture);
         });
     }
 

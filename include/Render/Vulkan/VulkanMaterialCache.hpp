@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Render/Vulkan/VulkanCacheUtils.hpp"
 #include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanMaterial.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
@@ -31,11 +32,9 @@ namespace moe {
 
         bool m_initialized{false};
         VulkanEngine* m_engine{nullptr};
-        MaterialId m_nextMaterialId{0};
         UnorderedMap<MaterialId, VulkanCPUMaterial> m_materials;
 
-        Deque<MaterialId> m_recycledMaterialIds;
-        UnorderedSet<MaterialId> m_recycledMaterialIdLookup;
+        VulkanCacheIdAllocator<MaterialId> m_idAllocator;
 
         VulkanAllocatedBuffer m_materialBuffer;
 

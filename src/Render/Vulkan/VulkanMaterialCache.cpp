@@ -62,8 +62,7 @@ namespace moe {
 
     void VulkanMaterialCache::destroy() {
         m_engine->destroyBuffer(m_materialBuffer);
-        m_recycledMaterialIds.clear();
-        m_recycledMaterialIdLookup.clear();
+        m_idAllocator.reset();
         m_materials.clear();
 
         m_initialized = false;
@@ -71,27 +70,15 @@ namespace moe {
     }
 
     void VulkanMaterialCache::recycleMaterialId(MaterialId id) {
-        m_recycledMaterialIds.push_back(id);
-        m_recycledMaterialIdLookup.insert(id);
-
+        m_idAllocator.recycleId(id);
         Logger::debug("Recycling material id {}", id);
     }
 
     MaterialId VulkanMaterialCache::allocateMaterialId() {
-        if (!m_recycledMaterialIds.empty()) {
-            MaterialId id = m_recycledMaterialIds.front();
-
-            m_recycledMaterialIds.pop_front();
-            m_recycledMaterialIdLookup.erase(id);
-
-            Logger::info("Reusing recycled material id {}", id);
-            return id;
-        }
-        return m_nextMaterialId++;
+        return m_idAllocator.allocateId();
     }
 
     bool VulkanMaterialCache::isMaterialIdValid(MaterialId id) {
-        return m_recycledMaterialIdLookup.find(id) == m_recycledMaterialIdLookup.end() &&
-               id < m_nextMaterialId;
+        return m_idAllocator.isIdValid(id);
     }
 }// namespace moe

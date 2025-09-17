@@ -3,6 +3,7 @@
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
+#include "Render/Vulkan/VulkanImageCache.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -72,10 +73,10 @@ namespace moe {
         VkCommandPool m_immediateModeCommandPool;
 
         struct {
-            VulkanAllocatedImage whiteTexture;
-            VulkanAllocatedImage blackTexture;
-            VulkanAllocatedImage checkerboardTexture;
+            VulkanImageCache imageCache;
+        } m_caches;
 
+        struct {
             VkSampler nearestSampler;
             VkSampler linearSampler;
         } m_defaultData;
@@ -161,6 +162,8 @@ namespace moe {
         void initSyncPrimitives();
 
         void initDescriptors();
+
+        void initCaches();
 
         void initDefaultResources();
 
