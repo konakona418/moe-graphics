@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -52,4 +53,7 @@ namespace moe {
 
     template<typename... TArgs>
     using UnorderedMap = std::unordered_map<TArgs...>;
+
+    template<typename... TArgs>
+    using UnorderedSet = std::unordered_set<TArgs...>;
 }// namespace moe

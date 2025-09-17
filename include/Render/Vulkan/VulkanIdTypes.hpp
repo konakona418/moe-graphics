@@ -2,7 +2,7 @@
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
-    using BaseIdType = size_t;
+    using BaseIdType = uint32_t;
 
     using MaterialId = BaseIdType;
     using MeshId = BaseIdType;

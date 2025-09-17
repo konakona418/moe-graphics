@@ -7,6 +7,6 @@ namespace moe {
     class VulkanEngine;
 
     namespace VkLoaders {
-        Optional<Vector<SharedPtr<VulkanMeshAsset>>> LoadGLTFMeshFromFile(VulkanEngine& engine, StringView filename);
+        Optional<VulkanMeshAssetGroup> loadGLTFMeshFromFile(VulkanEngine& engine, StringView filename);
     }// namespace VkLoaders
 }// namespace moe
