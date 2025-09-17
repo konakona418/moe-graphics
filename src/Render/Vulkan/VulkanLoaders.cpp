@@ -13,7 +13,7 @@
 
 namespace moe {
     namespace VkLoaders {
-        Optional<VulkanMeshAssetGroup> loadGLTFMeshFromFile(VulkanEngine& engine, StringView filename) {
+        Optional<VulkanMeshAsset> loadGLTFMeshFromFile(VulkanEngine& engine, StringView filename) {
             std::filesystem::path path = filename;
 
             fastgltf::GltfDataBuffer buf;
@@ -32,13 +32,13 @@ namespace moe {
             }
 
             asset = std::move(load.get());
-            Vector<SharedPtr<VulkanMeshAsset>> meshes;
+            Vector<SharedPtr<VulkanMesh>> meshes;
 
             Vector<uint32_t> indices;
             Vector<Vertex> vertices;
 
             for (auto& mesh: asset.meshes) {
-                VulkanMeshAsset meshAsset;
+                VulkanMesh meshAsset;
                 meshAsset.name = mesh.name;
 
                 indices.clear();
@@ -113,7 +113,7 @@ namespace moe {
                 meshes.emplace_back(std::make_shared<VulkanMeshAsset>(std::move(meshAsset)));
             }
 
-            return VulkanMeshAssetGroup{std::move(meshes)};
+            return VulkanMeshAsset{std::move(meshes)};
         }
     }// namespace VkLoaders
 }// namespace moe

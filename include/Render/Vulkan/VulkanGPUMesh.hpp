@@ -18,13 +18,17 @@ namespace moe {
         uint32_t vertexCount;
     };
 
-    struct VulkanMeshAsset {
+    struct VulkanGPUMeshBufferSet {
+        Vector<VulkanGPUMeshBuffer> buffers;
+    };
+
+    struct VulkanMesh {
         String name;
         Vector<VulkanMeshGeoSurface> surfaces;
         VulkanGPUMeshBuffer gpuBuffer;
     };
 
-    struct VulkanMeshAssetGroup {
-        Vector<SharedPtr<VulkanMeshAsset>> meshes;
+    struct VulkanMeshAsset {
+        Vector<SharedPtr<VulkanMesh>> meshes;
     };
 }// namespace moe

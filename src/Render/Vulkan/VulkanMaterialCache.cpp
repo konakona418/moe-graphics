@@ -1,6 +1,5 @@
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanEngine.hpp"
-#include "Render/Vulkan/VulkanLoaders.hpp"
 
 
 namespace moe {
