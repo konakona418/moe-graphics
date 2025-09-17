@@ -1,26 +1,48 @@
 #pragma once
 
+#include "Render/Vulkan/VulkanMeshDrawCommand.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
+
+// fwd decl
+namespace moe {
+    class VulkanEngine;
+    class VulkanMeshCache;
+    class VulkanMaterialCache;
+}// namespace moe
 
 namespace moe {
     namespace Pipeline {
         struct VulkanMeshPipeline {
-            enum class MaterialPass : uint8_t {
-                Opaque = 0,
-                Transparent,
-                Count
+        public:
+            VulkanMeshPipeline() = default;
+            ~VulkanMeshPipeline() = default;
+
+            void init(VulkanEngine& engine);
+
+            void draw(
+                    VkCommandBuffer cmdBuffer,
+                    VulkanMeshCache& meshCache,
+                    VulkanMaterialCache& materialCache,
+                    Span<VulkanMeshDrawCommand> drawCommands,
+                    VulkanAllocatedBuffer& sceneDataBuffer);
+
+            void destroy();
+
+        private:
+            struct alignas(16) PushConstants {
+                glm::mat4 transform;
+                VkDeviceAddress vertexBufferAddr;
+                VkDeviceAddress sceneDataAddress;
+                MaterialId materialId;
             };
 
-            struct MaterialPipeline {
-                VkPipeline pipeline;
-                VkPipelineLayout layout;
-            };
+            bool m_initialized{false};
+            VulkanEngine* m_engine{nullptr};
 
-            struct MaterialInstance {
-                MaterialPipeline* pipeline;
-                VkDescriptorSet descriptorSet;
-                MaterialPass pass;
-            };
+            VkPipelineLayout m_pipelineLayout;
+            VkPipeline m_pipeline;
+            VkDescriptorSet m_descriptorSet;
         };
     }// namespace Pipeline
 }// namespace moe

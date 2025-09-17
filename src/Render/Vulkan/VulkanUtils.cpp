@@ -1,5 +1,7 @@
 #include "Render/Vulkan/VulkanUtils.hpp"
 
+#include <fstream>
+
 namespace moe {
     namespace VkUtils {
         void transitionImage(VkCommandBuffer cmdBuffer, VkImage image, VkImageLayout srcLayout, VkImageLayout dstLayout) {
@@ -85,6 +87,33 @@ namespace moe {
             blitInfo.filter = VK_FILTER_LINEAR;
 
             vkCmdBlitImage2(cmdBuffer, &blitInfo);
+        }
+
+        VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename) {
+            std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
+
+            if (!file.is_open()) {
+                MOE_LOG_AND_THROW(
+                        fmt::format("Failed to open shader file: {}", filename).c_str());
+            }
+
+            size_t fileSize = static_cast<size_t>(file.tellg());
+            file.seekg(0);
+            std::vector<char> buffer(fileSize);
+            file.read(buffer.data(), fileSize);
+            file.close();
+
+            VkShaderModuleCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            createInfo.pNext = nullptr;
+
+            createInfo.codeSize = buffer.size();
+            createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
+
+            VkShaderModule shaderModule;
+            MOE_VK_CHECK(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));
+
+            return shaderModule;
         }
     }// namespace VkUtils
 }// namespace moe

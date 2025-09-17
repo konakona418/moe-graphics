@@ -30,7 +30,7 @@ namespace moe {
 
         VkRenderingInfo renderingInfo(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment);
 
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo();
+        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo(Span<VkDescriptorSetLayout> setLayouts = {}, Span<VkPushConstantRange> pushConstants = {});
 
         VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint = "main");
 

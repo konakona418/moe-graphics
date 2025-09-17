@@ -178,16 +178,18 @@ namespace moe {
             return renderInfo;
         }
 
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo() {
+        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo(Span<VkDescriptorSetLayout> setLayouts, Span<VkPushConstantRange> pushConstants) {
             VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipelineLayoutInfo.pNext = nullptr;
 
             pipelineLayoutInfo.flags = 0;
-            pipelineLayoutInfo.setLayoutCount = 0;
-            pipelineLayoutInfo.pSetLayouts = nullptr;
-            pipelineLayoutInfo.pushConstantRangeCount = 0;
-            pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+            pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+            pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+
+            pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstants.size());
+            pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 
             return pipelineLayoutInfo;
         }

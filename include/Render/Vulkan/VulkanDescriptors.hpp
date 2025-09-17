@@ -6,7 +6,7 @@ namespace moe {
     struct VulkanDescriptorLayoutBuilder {
         Vector<VkDescriptorSetLayoutBinding> bindings;
 
-        void addBinding(uint32_t binding, VkDescriptorType type);
+        VulkanDescriptorLayoutBuilder& addBinding(uint32_t binding, VkDescriptorType type);
         void clear();
         VkDescriptorSetLayout build(VkDevice device, VkShaderStageFlags shaderStage, void* next = nullptr, VkDescriptorSetLayoutCreateFlags createFlags = 0);
     };

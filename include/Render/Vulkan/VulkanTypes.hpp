@@ -24,6 +24,8 @@ namespace moe {
         VkBuffer buffer;
         VmaAllocation vmaAllocation;
         VmaAllocationInfo vmaAllocationInfo;
+
+        VkDeviceAddress address;
     };
 
     struct Vertex {
@@ -34,15 +36,17 @@ namespace moe {
         glm::vec4 color;
     };
 
-    struct VulkanGPUDrawPushConstants {
-        glm::mat4 transform;
-        VkDeviceAddress vertexBufferAddr;
-    };
-
     struct VulkanGPUSceneData {
+        glm::vec4 cameraPosition;
+        glm::mat4 view;
+        glm::mat4 projection;
+        glm::mat4 viewProjection;
+
         glm::vec4 ambientColor;
         glm::vec4 sunlightDirection;
         glm::vec4 sunlightColor;
+
+        VulkanAllocatedBuffer materialBuffer;
     };
 
 }// namespace moe

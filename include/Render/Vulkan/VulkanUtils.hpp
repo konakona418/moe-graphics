@@ -9,5 +9,7 @@ namespace moe {
         VkImageSubresourceRange makeImageSubresourceRange(VkImageAspectFlags aspectFlags);
 
         void copyImage(VkCommandBuffer cmdBuffer, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize);
+
+        VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename);
     }// namespace VkUtils
 }// namespace moe

@@ -77,6 +77,10 @@ namespace moe {
         } m_caches;
 
         struct {
+            MaterialId whiteMaterialId;
+            MaterialId blackMaterialId;
+            MaterialId checkerboardMaterialId;
+
             VkSampler nearestSampler;
             VkSampler linearSampler;
         } m_defaultData;

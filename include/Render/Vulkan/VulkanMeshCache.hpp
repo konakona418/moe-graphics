@@ -1,14 +1,15 @@
 #pragma once
 
 #include "Render/Vulkan/VulkanCacheUtils.hpp"
+#include "Render/Vulkan/VulkanGPUMesh.hpp"
 #include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
 
 
 // fwd decl
 namespace moe {
     class VulkanEngine;
-    class VulkanMeshAsset;
     class VulkanGPUMeshBufferSet;
 }// namespace moe
 
@@ -23,6 +24,8 @@ namespace moe {
         MeshId loadMesh(VulkanMeshAsset mesh);
 
         MeshId loadMeshFromFile(StringView filename);
+
+        Optional<VulkanMeshAsset> getMesh(MeshId id) const;
 
         void destroy();
 

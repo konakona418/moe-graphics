@@ -4,6 +4,7 @@
 
 namespace moe {
     class VulkanPipelineBuilder {
+    public:
         Vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly;

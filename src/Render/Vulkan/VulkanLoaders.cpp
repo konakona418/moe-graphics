@@ -110,7 +110,7 @@ namespace moe {
                 }
 
                 meshAsset.gpuBuffer = engine.uploadMesh(indices, vertices);
-                meshes.emplace_back(std::make_shared<VulkanMeshAsset>(std::move(meshAsset)));
+                meshes.emplace_back(std::make_shared<VulkanMesh>(std::move(meshAsset)));
             }
 
             return VulkanMeshAsset{std::move(meshes)};

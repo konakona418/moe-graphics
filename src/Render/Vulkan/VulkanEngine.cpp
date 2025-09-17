@@ -155,6 +155,16 @@ namespace moe {
                         &buffer.vmaAllocation,
                         &buffer.vmaAllocationInfo));
 
+        if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            VkBufferDeviceAddressInfo deviceAddrInfo{};
+            deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            deviceAddrInfo.buffer = buffer.buffer;
+
+            buffer.address = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+        } else {
+            buffer.address = 0;
+        }
+
         return buffer;
     }
 
@@ -569,6 +579,7 @@ namespace moe {
                 physicalDeviceSelector.set_minimum_version(1, 3)
                         .set_required_features_12(vkPhysicalDeviceVulkan12Features)
                         .set_required_features_13(vkPhysicalDeviceVulkan13Features)
+                        .add_required_extension("VK_EXT_descriptor_indexing")
                         .set_surface(m_surface)
                         .select();
 
@@ -860,7 +871,7 @@ namespace moe {
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
 
-            m_caches.imageCache.addImage(std::move(image));
+            m_defaultData.whiteMaterialId = m_caches.imageCache.addImage(std::move(image));
         }
         {
             uint32_t color = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -870,7 +881,7 @@ namespace moe {
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
 
-            m_caches.imageCache.addImage(std::move(image));
+            m_defaultData.blackMaterialId = m_caches.imageCache.addImage(std::move(image));
         }
         {
             uint32_t magenta = glm::packUnorm4x8(glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
@@ -889,7 +900,7 @@ namespace moe {
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_USAGE_SAMPLED_BIT);
 
-            m_caches.imageCache.addImage(std::move(image));
+            m_defaultData.checkerboardMaterialId = m_caches.imageCache.addImage(std::move(image));
         }
         {
             VkSamplerCreateInfo samplerInfo{};

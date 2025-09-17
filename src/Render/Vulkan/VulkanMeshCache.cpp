@@ -1,6 +1,5 @@
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanEngine.hpp"
-#include "Render/Vulkan/VulkanGPUMesh.hpp"
 #include "Render/Vulkan/VulkanLoaders.hpp"
 
 
@@ -31,6 +30,16 @@ namespace moe {
         }
 
         return loadMesh(mesh.value());
+    }
+
+    Optional<VulkanMeshAsset> VulkanMeshCache::getMesh(MeshId id) const {
+        MOE_ASSERT(m_initialized, "VulkanMeshCache not initialized");
+
+        auto it = m_meshes.find(id);
+        if (it != m_meshes.end()) {
+            return it->second;
+        }
+        return std::nullopt;
     }
 
     void VulkanMeshCache::destroy() {
