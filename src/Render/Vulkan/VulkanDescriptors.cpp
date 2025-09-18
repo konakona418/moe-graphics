@@ -1,10 +1,10 @@
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 
 namespace moe {
-    VulkanDescriptorLayoutBuilder& VulkanDescriptorLayoutBuilder::addBinding(uint32_t binding, VkDescriptorType type) {
+    VulkanDescriptorLayoutBuilder& VulkanDescriptorLayoutBuilder::addBinding(uint32_t binding, VkDescriptorType type, size_t descriptorCount) {
         VkDescriptorSetLayoutBinding bind{};
         bind.binding = binding;
-        bind.descriptorCount = 1;
+        bind.descriptorCount = descriptorCount;
         bind.descriptorType = type;
 
         bindings.push_back(bind);

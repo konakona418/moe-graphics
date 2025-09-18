@@ -27,6 +27,12 @@ namespace moe {
 
         void destroy();
 
+        VkDeviceAddress getMaterialBufferAddress() {
+            MOE_ASSERT(m_initialized, "VulkanMaterialCache not initialized");
+            MOE_ASSERT(m_materialBuffer.address != 0, "Material buffer not allocated");
+            return m_materialBuffer.address;
+        }
+
     private:
         constexpr static uint32_t MAX_MATERIAL_COUNT = 1024;
 

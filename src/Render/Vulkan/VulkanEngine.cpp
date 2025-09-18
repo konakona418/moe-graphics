@@ -49,6 +49,7 @@ namespace moe {
         initSyncPrimitives();
         initDescriptors();
         initCaches();
+        initBindlessSet();
 
         initDefaultResources();
 
@@ -392,7 +393,7 @@ namespace moe {
                 {
                         .meshId = m_pipelines.testMeshId,
                         .transform = glm::mat4(1.0f),
-                        .overrideMaterial = NULL_MATERIAL_ID,
+                        .overrideMaterial = m_pipelines.testMaterialId,
                 },
         };
         m_pipelines.meshPipeline.draw(
@@ -599,19 +600,36 @@ namespace moe {
 
         MOE_VK_CHECK(glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface));
 
-        VkPhysicalDeviceVulkan13Features vkPhysicalDeviceVulkan13Features{};
-        vkPhysicalDeviceVulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        vkPhysicalDeviceVulkan13Features.dynamicRendering = VK_TRUE;
-        vkPhysicalDeviceVulkan13Features.synchronization2 = VK_TRUE;
+        VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures = {
+                .imageCubeArray = VK_TRUE,
+                .geometryShader = VK_TRUE,
+                .depthClamp = VK_TRUE,
+                .samplerAnisotropy = VK_TRUE,
+        };
 
-        VkPhysicalDeviceVulkan12Features vkPhysicalDeviceVulkan12Features{};
-        vkPhysicalDeviceVulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        vkPhysicalDeviceVulkan12Features.bufferDeviceAddress = VK_TRUE;
-        vkPhysicalDeviceVulkan12Features.descriptorIndexing = VK_TRUE;
+        VkPhysicalDeviceVulkan13Features vkPhysicalDeviceVulkan13Features = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+                .synchronization2 = VK_TRUE,
+                .dynamicRendering = VK_TRUE,
+        };
+
+        VkPhysicalDeviceVulkan12Features vkPhysicalDeviceVulkan12Features = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+                .descriptorIndexing = VK_TRUE,
+                // used for bindless descriptors
+                .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+                .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
+                .descriptorBindingPartiallyBound = VK_TRUE,
+                .descriptorBindingVariableDescriptorCount = VK_TRUE,
+                .runtimeDescriptorArray = VK_TRUE,
+                .scalarBlockLayout = VK_TRUE,
+                .bufferDeviceAddress = VK_TRUE,
+        };
 
         vkb::PhysicalDeviceSelector physicalDeviceSelector{vkbInstance};
         auto selectionResult =
                 physicalDeviceSelector.set_minimum_version(1, 3)
+                        .set_required_features(vkPhysicalDeviceFeatures)
                         .set_required_features_12(vkPhysicalDeviceVulkan12Features)
                         .set_required_features_13(vkPhysicalDeviceVulkan13Features)
                         .add_required_extension("VK_EXT_descriptor_indexing")
@@ -904,6 +922,13 @@ namespace moe {
         });
     }
 
+    void VulkanEngine::initBindlessSet() {
+        m_bindlessSet.init(*this);
+        m_mainDeletionQueue.pushFunction([&] {
+            m_bindlessSet.destroy();
+        });
+    }
+
     void VulkanEngine::initDefaultResources() {
         {
             uint32_t color = glm::packUnorm4x8(glm::vec4(1.0f));
@@ -944,29 +969,11 @@ namespace moe {
 
             m_defaultData.checkerboardMaterialId = m_caches.imageCache.addImage(std::move(image));
         }
-        {
-            VkSamplerCreateInfo samplerInfo{};
-            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-
-            samplerInfo.minFilter = VK_FILTER_LINEAR;
-            samplerInfo.magFilter = VK_FILTER_LINEAR;
-
-            vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultData.linearSampler);
-
-            samplerInfo.minFilter = VK_FILTER_NEAREST;
-            samplerInfo.magFilter = VK_FILTER_NEAREST;
-
-            vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultData.nearestSampler);
-        }
-
-        m_mainDeletionQueue.pushFunction([&] {
-            vkDestroySampler(m_device, m_defaultData.linearSampler, nullptr);
-            vkDestroySampler(m_device, m_defaultData.nearestSampler, nullptr);
-        });
     }
 
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
+
         m_pipelines.sceneDataBuffer =
                 allocateBuffer(
                         sizeof(VulkanGPUSceneData),
@@ -975,7 +982,7 @@ namespace moe {
 
         auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
         sceneData->view = sceneData->view = glm::lookAt(
-                glm::vec3(2.f, 2.f, 2.f),
+                glm::vec3(5.f, 5.f, 5.f),
                 glm::vec3(0.f, 0.f, 0.f),
                 glm::vec3(0.f, 1.f, 0.f));
         sceneData->projection = glm::perspective(
@@ -984,11 +991,18 @@ namespace moe {
                 0.1f, 100.f);
         sceneData->projection[1][1] *= -1;
         sceneData->viewProjection = sceneData->projection * sceneData->view;
+        sceneData->materialBuffer = m_caches.materialCache.getMaterialBufferAddress();
 
         m_pipelines.testMeshId = m_caches.meshCache.loadMeshFromFile("./model.glb");
+        m_pipelines.testMaterialId = m_caches.materialCache.loadMaterial(
+                VulkanCPUMaterial{
+                        .baseColor = glm::vec4(1.0f),
+                        .diffuseTexture = m_defaultData.checkerboardMaterialId,
+                });
 
         m_mainDeletionQueue.pushFunction([&] {
             destroyBuffer(m_pipelines.sceneDataBuffer);
+
             m_pipelines.meshPipeline.destroy();
         });
     }

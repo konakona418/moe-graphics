@@ -42,8 +42,6 @@ namespace moe {
 
             VkPipelineLayout m_pipelineLayout;
             VkPipeline m_pipeline;
-            VkDescriptorSet m_descriptorSet;
-            VkDescriptorSetLayout m_descriptorSetLayout;
         };
     }// namespace Pipeline
 }// namespace moe

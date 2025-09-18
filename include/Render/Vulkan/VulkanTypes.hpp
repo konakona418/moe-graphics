@@ -54,7 +54,7 @@ namespace moe {
         glm::vec4 sunlightDirection;
         glm::vec4 sunlightColor;
 
-        // VkDeviceAddress materialBuffer;
+        VkDeviceAddress materialBuffer;
     };
 
 }// namespace moe

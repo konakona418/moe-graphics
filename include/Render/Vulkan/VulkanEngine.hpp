@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
+#include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
+#include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
-#include "Render/Vulkan/VulkanImageCache.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -75,6 +76,9 @@ namespace moe {
         VkCommandBuffer m_immediateModeCommandBuffer;
         VkCommandPool m_immediateModeCommandPool;
 
+
+        VulkanBindlessSet m_bindlessSet;
+
         struct {
             VulkanImageCache imageCache;
             VulkanMeshCache meshCache;
@@ -82,18 +86,16 @@ namespace moe {
         } m_caches;
 
         struct {
-            MaterialId whiteMaterialId;
-            MaterialId blackMaterialId;
-            MaterialId checkerboardMaterialId;
-
-            VkSampler nearestSampler;
-            VkSampler linearSampler;
+            ImageId whiteMaterialId{NULL_IMAGE_ID};
+            ImageId blackMaterialId{NULL_IMAGE_ID};
+            ImageId checkerboardMaterialId{NULL_IMAGE_ID};
         } m_defaultData;
 
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
             VulkanAllocatedBuffer sceneDataBuffer;
             MeshId testMeshId;
+            MaterialId testMaterialId;
         } m_pipelines;
 
         static VulkanEngine& get();
@@ -105,6 +107,11 @@ namespace moe {
         void draw();
 
         void run();
+
+        VulkanBindlessSet& getBindlessSet() {
+            MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
+            return m_bindlessSet;
+        }
 
         void immediateSubmit(Function<void(VkCommandBuffer)>&& fn);
 
@@ -181,6 +188,8 @@ namespace moe {
         void initCaches();
 
         void initDefaultResources();
+
+        void initBindlessSet();
 
         void initPipelines();
 

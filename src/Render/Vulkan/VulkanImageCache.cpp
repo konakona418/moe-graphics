@@ -14,6 +14,8 @@ namespace moe {
         ImageId id = m_idAllocator.allocateId();
         m_images.emplace(id, std::move(image));
 
+        m_engine->getBindlessSet().addImage(id, m_images[id].imageView);
+
         Logger::debug("Added image with id {}", id);
         return id;
     }
@@ -25,6 +27,9 @@ namespace moe {
         if (it != m_images.end()) {
             m_engine->destroyImage(it->second);
             m_images.erase(it);
+
+            // ! fixme: bindless set did not implement image removal
+            // ! it's possible to implement an update image method here
 
             m_idAllocator.recycleId(id);
 

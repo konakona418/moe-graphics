@@ -29,19 +29,10 @@ namespace moe {
                     Array<VkPushConstantRange, 1>{pushRange};
 
             VulkanDescriptorLayoutBuilder layoutBuilder{};
-            // ! todo: layouts
 
-            m_descriptorSetLayout =
-                    layoutBuilder.build(
-                            engine.m_device,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-            auto descriptorLayouts =
-                    Array<VkDescriptorSetLayout, 1>{m_descriptorSetLayout};
-
-            // ! fixme: use bindless descriptor set
-            m_descriptorSet =
-                    m_engine->m_globalDescriptorAllocator.allocate(engine.m_device, descriptorLayouts[0]);
+            auto descriptorLayouts = Array<VkDescriptorSetLayout, 1>{
+                    engine.getBindlessSet().getDescriptorSetLayout(),
+            };
 
             auto pipelineLayoutInfo =
                     VkInit::pipelineLayoutCreateInfo(descriptorLayouts, pushRanges);
@@ -53,7 +44,8 @@ namespace moe {
                             .addShader(vert, frag)
                             .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                             .setPolygonMode(VK_POLYGON_MODE_FILL)
-                            .setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
+                            // ! no idea why counter-clockwise works here
+                            .setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                             .disableMultisampling()
                             .disableBlending()
                             .enableDepthTesting(true, VK_COMPARE_OP_LESS)
@@ -74,11 +66,13 @@ namespace moe {
             MOE_ASSERT(m_initialized, "VulkanMeshPipeline not initialized");
 
             vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+            auto bindlessDescriptorSet = m_engine->getBindlessSet().getDescriptorSet();
             vkCmdBindDescriptorSets(
                     cmdBuffer,
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     m_pipelineLayout,
-                    0, 1, &m_descriptorSet,
+                    0, 1, &bindlessDescriptorSet,
                     0, nullptr);
 
             for (auto& cmd: drawCommands) {
@@ -129,7 +123,6 @@ namespace moe {
         void VulkanMeshPipeline::destroy() {
             MOE_ASSERT(m_initialized, "VulkanMeshPipeline not initialized");
 
-            vkDestroyDescriptorSetLayout(m_engine->m_device, m_descriptorSetLayout, nullptr);
             vkDestroyPipeline(m_engine->m_device, m_pipeline, nullptr);
             vkDestroyPipelineLayout(m_engine->m_device, m_pipelineLayout, nullptr);
 
