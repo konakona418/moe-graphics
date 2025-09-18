@@ -8,6 +8,8 @@ namespace moe {
         bind.descriptorType = type;
 
         bindings.push_back(bind);
+
+        return *this;
     }
 
     void VulkanDescriptorLayoutBuilder::clear() {

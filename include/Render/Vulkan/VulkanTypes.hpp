@@ -6,9 +6,17 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/glm.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/packing.hpp>
+#include <glm/trigonometric.hpp>
 #include <glm/vec4.hpp>
+
 
 namespace moe {
 
@@ -25,7 +33,7 @@ namespace moe {
         VmaAllocation vmaAllocation;
         VmaAllocationInfo vmaAllocationInfo;
 
-        VkDeviceAddress address;
+        VkDeviceAddress address{0};
     };
 
     struct Vertex {
@@ -37,16 +45,16 @@ namespace moe {
     };
 
     struct VulkanGPUSceneData {
-        glm::vec4 cameraPosition;
         glm::mat4 view;
         glm::mat4 projection;
         glm::mat4 viewProjection;
+        glm::vec4 cameraPosition;
 
         glm::vec4 ambientColor;
         glm::vec4 sunlightDirection;
         glm::vec4 sunlightColor;
 
-        VulkanAllocatedBuffer materialBuffer;
+        // VkDeviceAddress materialBuffer;
     };
 
 }// namespace moe

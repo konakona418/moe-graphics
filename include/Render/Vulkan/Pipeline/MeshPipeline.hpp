@@ -30,7 +30,7 @@ namespace moe {
             void destroy();
 
         private:
-            struct alignas(16) PushConstants {
+            struct PushConstants {
                 glm::mat4 transform;
                 VkDeviceAddress vertexBufferAddr;
                 VkDeviceAddress sceneDataAddress;
@@ -43,6 +43,7 @@ namespace moe {
             VkPipelineLayout m_pipelineLayout;
             VkPipeline m_pipeline;
             VkDescriptorSet m_descriptorSet;
+            VkDescriptorSetLayout m_descriptorSetLayout;
         };
     }// namespace Pipeline
 }// namespace moe

@@ -31,17 +31,17 @@ namespace moe {
             VulkanDescriptorLayoutBuilder layoutBuilder{};
             // ! todo: layouts
 
-            auto descriptorLayout =
+            m_descriptorSetLayout =
                     layoutBuilder.build(
                             engine.m_device,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
             auto descriptorLayouts =
-                    Array<VkDescriptorSetLayout, 1>{descriptorLayout};
+                    Array<VkDescriptorSetLayout, 1>{m_descriptorSetLayout};
 
             // ! fixme: use bindless descriptor set
             m_descriptorSet =
-                    m_engine->m_globalDescriptorAllocator.allocate(engine.m_device, descriptorLayout);
+                    m_engine->m_globalDescriptorAllocator.allocate(engine.m_device, descriptorLayouts[0]);
 
             auto pipelineLayoutInfo =
                     VkInit::pipelineLayoutCreateInfo(descriptorLayouts, pushRanges);
@@ -56,7 +56,7 @@ namespace moe {
                             .setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE)
                             .disableMultisampling()
                             .disableBlending()
-                            .enableDepthTesting(true, VK_COMPARE_OP_GREATER_OR_EQUAL)
+                            .enableDepthTesting(true, VK_COMPARE_OP_LESS)
                             .setColorAttachmentFormat(engine.m_drawImage.imageFormat)
                             .setDepthFormat(engine.m_depthImage.imageFormat)
                             .build(engine.m_device);
@@ -92,6 +92,19 @@ namespace moe {
                 for (auto& submesh: meshAsset.meshes) {
                     MOE_ASSERT(sceneDataBuffer.address != 0, "Invalid scene data buffer");
 
+                    const auto viewport = VkViewport{
+                            .x = 0,
+                            .y = 0,
+                            .width = (float) m_engine->m_drawExtent.width,
+                            .height = (float) m_engine->m_drawExtent.height,
+                            .minDepth = 0.f,
+                            .maxDepth = 1.f,
+                    };
+                    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+                    VkRect2D scissor = {.offset = {0, 0}, .extent = m_engine->m_drawExtent};
+                    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
                     vkCmdBindIndexBuffer(cmdBuffer, submesh->gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
                     const auto pushConstants = PushConstants{
                             .transform = cmd.transform,
@@ -116,6 +129,7 @@ namespace moe {
         void VulkanMeshPipeline::destroy() {
             MOE_ASSERT(m_initialized, "VulkanMeshPipeline not initialized");
 
+            vkDestroyDescriptorSetLayout(m_engine->m_device, m_descriptorSetLayout, nullptr);
             vkDestroyPipeline(m_engine->m_device, m_pipeline, nullptr);
             vkDestroyPipelineLayout(m_engine->m_device, m_pipelineLayout, nullptr);
 

@@ -52,6 +52,8 @@ namespace moe {
 
         initDefaultResources();
 
+        initPipelines();
+
         initImGUI();
 
         m_isInitialized = true;
@@ -143,7 +145,10 @@ namespace moe {
 
         VmaAllocationCreateInfo vmaAllocInfo{};
         vmaAllocInfo.usage = memoryUsage;
-        vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        vmaAllocInfo.flags =
+                VMA_ALLOCATION_CREATE_MAPPED_BIT |
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        // todo: allow random access
 
         VulkanAllocatedBuffer buffer;
         MOE_VK_CHECK(
@@ -258,6 +263,9 @@ namespace moe {
         const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
         VulkanGPUMeshBuffer surface;
+        surface.indexCount = static_cast<uint32_t>(indices.size());
+        surface.vertexCount = static_cast<uint32_t>(vertices.size());
+
         surface.vertexBuffer = allocateBuffer(
                 vertBufferSize,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -371,7 +379,29 @@ namespace moe {
                 commandBuffer, m_depthImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-        drawBackground(commandBuffer);
+        //drawBackground(commandBuffer);
+
+        VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
+        VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
+        auto colorAttachment = VkInit::renderingAttachmentInfo(m_drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, &depthClearValue, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, &depthAttachment);
+        vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+        auto drawCmd = Vector<VulkanMeshDrawCommand>{
+                {
+                        .meshId = m_pipelines.testMeshId,
+                        .transform = glm::mat4(1.0f),
+                        .overrideMaterial = NULL_MATERIAL_ID,
+                },
+        };
+        m_pipelines.meshPipeline.draw(
+                commandBuffer,
+                m_caches.meshCache,
+                m_caches.materialCache,
+                drawCmd,
+                m_pipelines.sceneDataBuffer);
+        vkCmdEndRendering(commandBuffer);
 
         VkUtils::transitionImage(
                 commandBuffer, m_drawImage.image,
@@ -534,6 +564,8 @@ namespace moe {
         auto result =
                 builder.set_app_name("Moe Graphics Engine")
                         .request_validation_layers(enableValidationLayers)
+                        .add_debug_messenger_severity(VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+                        .set_debug_messenger_type(VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
                         .set_debug_callback(
                                 [](VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                    VkDebugUtilsMessageTypeFlagsEXT type,
@@ -545,10 +577,13 @@ namespace moe {
                                         } else {
                                             Logger::warn("Validation Layer: {}", data->pMessage);
                                         }
+                                    } else {
+                                        Logger::info("Validation Layer: {}", data->pMessage);
                                     }
                                     return VK_FALSE;
                                 })
                         .require_api_version(1, 3, 0)
+                        .add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT)
                         .build();
 
         if (!result) {
@@ -580,6 +615,7 @@ namespace moe {
                         .set_required_features_12(vkPhysicalDeviceVulkan12Features)
                         .set_required_features_13(vkPhysicalDeviceVulkan13Features)
                         .add_required_extension("VK_EXT_descriptor_indexing")
+                        .add_required_extension("VK_KHR_shader_non_semantic_info")
                         .set_surface(m_surface)
                         .select();
 
@@ -686,6 +722,8 @@ namespace moe {
                 m_windowExtent.width,
                 m_windowExtent.height,
                 1};
+
+        m_drawExtent = {drawExtent.width, drawExtent.height};
 
         m_drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
         m_drawImage.imageExtent = drawExtent;
@@ -824,8 +862,12 @@ namespace moe {
 
     void VulkanEngine::initCaches() {
         m_caches.imageCache.init(*this);
+        m_caches.meshCache.init(*this);
+        m_caches.materialCache.init(*this);
 
         m_mainDeletionQueue.pushFunction([&] {
+            m_caches.materialCache.destroy();
+            m_caches.meshCache.destroy();
             m_caches.imageCache.destroy();
         });
     }
@@ -920,6 +962,34 @@ namespace moe {
         m_mainDeletionQueue.pushFunction([&] {
             vkDestroySampler(m_device, m_defaultData.linearSampler, nullptr);
             vkDestroySampler(m_device, m_defaultData.nearestSampler, nullptr);
+        });
+    }
+
+    void VulkanEngine::initPipelines() {
+        m_pipelines.meshPipeline.init(*this);
+        m_pipelines.sceneDataBuffer =
+                allocateBuffer(
+                        sizeof(VulkanGPUSceneData),
+                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                        VMA_MEMORY_USAGE_AUTO);
+
+        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
+        sceneData->view = sceneData->view = glm::lookAt(
+                glm::vec3(2.f, 2.f, 2.f),
+                glm::vec3(0.f, 0.f, 0.f),
+                glm::vec3(0.f, 1.f, 0.f));
+        sceneData->projection = glm::perspective(
+                glm::radians(45.f),
+                (float) m_drawExtent.width / (float) m_drawExtent.height,
+                0.1f, 100.f);
+        sceneData->projection[1][1] *= -1;
+        sceneData->viewProjection = sceneData->projection * sceneData->view;
+
+        m_pipelines.testMeshId = m_caches.meshCache.loadMeshFromFile("./model.glb");
+
+        m_mainDeletionQueue.pushFunction([&] {
+            destroyBuffer(m_pipelines.sceneDataBuffer);
+            m_pipelines.meshPipeline.destroy();
         });
     }
 

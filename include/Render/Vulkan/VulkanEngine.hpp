@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
+#include "Render/Vulkan/VulkanMaterialCache.hpp"
+#include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 #include "Render/Vulkan/VulkanImageCache.hpp"
@@ -74,6 +77,8 @@ namespace moe {
 
         struct {
             VulkanImageCache imageCache;
+            VulkanMeshCache meshCache;
+            VulkanMaterialCache materialCache;
         } m_caches;
 
         struct {
@@ -84,6 +89,12 @@ namespace moe {
             VkSampler nearestSampler;
             VkSampler linearSampler;
         } m_defaultData;
+
+        struct {
+            Pipeline::VulkanMeshPipeline meshPipeline;
+            VulkanAllocatedBuffer sceneDataBuffer;
+            MeshId testMeshId;
+        } m_pipelines;
 
         static VulkanEngine& get();
 
@@ -170,6 +181,8 @@ namespace moe {
         void initCaches();
 
         void initDefaultResources();
+
+        void initPipelines();
 
         void drawBackground(VkCommandBuffer commandBuffer);
 

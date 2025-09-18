@@ -43,6 +43,13 @@ namespace moe {
     }
 
     void VulkanMeshCache::destroy() {
+        for (auto& mesh: m_meshes) {
+            for (auto& submesh: mesh.second.meshes) {
+                m_engine->destroyBuffer(submesh->gpuBuffer.vertexBuffer);
+                m_engine->destroyBuffer(submesh->gpuBuffer.indexBuffer);
+            }
+        }
+
         m_idAllocator.reset();
         m_meshes.clear();
 

@@ -17,7 +17,7 @@ namespace moe {
             std::filesystem::path path = filename;
 
             fastgltf::GltfDataBuffer buf;
-            buf.FromPath(path);
+            buf = std::move(buf.FromPath(path).get());
             constexpr auto options = fastgltf::Options::LoadExternalBuffers;
 
 
