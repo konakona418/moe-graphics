@@ -10,8 +10,6 @@ namespace moe {
     struct VulkanScene;
 
     namespace VkLoaders {
-        Optional<VulkanMeshAsset> loadGLTFMeshFromFile(VulkanEngine& engine, StringView filename);
-
         struct StbiImageDeleter {
             void operator()(uint8_t* ptr) const {
                 stbi_image_free(ptr);

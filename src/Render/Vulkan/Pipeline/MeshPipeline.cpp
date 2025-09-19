@@ -61,7 +61,7 @@ namespace moe {
                 VkCommandBuffer cmdBuffer,
                 VulkanMeshCache& meshCache,
                 VulkanMaterialCache& materialCache,
-                Span<VulkanMeshDrawCommand> drawCommands,
+                Span<VulkanRenderPacket> drawCommands,
                 VulkanAllocatedBuffer& sceneDataBuffer) {
             MOE_ASSERT(m_initialized, "VulkanMeshPipeline not initialized");
 
@@ -103,7 +103,7 @@ namespace moe {
                         .transform = cmd.transform,
                         .vertexBufferAddr = meshAsset.gpuBuffer.vertexBufferAddr,
                         .sceneDataAddress = sceneDataBuffer.address,
-                        .materialId = cmd.overrideMaterial,
+                        .materialId = cmd.materialId,
                 };
 
                 vkCmdPushConstants(

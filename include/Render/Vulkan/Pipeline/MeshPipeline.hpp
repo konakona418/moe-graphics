@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Render/Vulkan/VulkanMeshDrawCommand.hpp"
+#include "Render/Vulkan/VulkanIdTypes.hpp"
+#include "Render/Vulkan/VulkanRenderable.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 
@@ -24,7 +25,7 @@ namespace moe {
                     VkCommandBuffer cmdBuffer,
                     VulkanMeshCache& meshCache,
                     VulkanMaterialCache& materialCache,
-                    Span<VulkanMeshDrawCommand> drawCommands,
+                    Span<VulkanRenderPacket> drawCommands,
                     VulkanAllocatedBuffer& sceneDataBuffer);
 
             void destroy();

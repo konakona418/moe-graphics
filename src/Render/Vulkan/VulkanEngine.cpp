@@ -413,21 +413,11 @@ namespace moe {
         Vector<VulkanRenderPacket> packets;
         m_pipelines.testScene.gatherRenderPackets(packets);
 
-        Vector<VulkanMeshDrawCommand> drawCmds;
-        drawCmds.reserve(packets.size());
-        for (auto& packet: packets) {
-            drawCmds.push_back(VulkanMeshDrawCommand{
-                    .meshId = packet.meshId,
-                    .transform = packet.transform,
-                    .overrideMaterial = packet.materialId,
-            });
-        }
-
         m_pipelines.meshPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
                 m_caches.materialCache,
-                drawCmds,
+                packets,
                 m_pipelines.sceneDataBuffer);
         vkCmdEndRendering(commandBuffer);
 

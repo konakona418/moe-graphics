@@ -18,10 +18,6 @@ namespace moe {
         uint32_t vertexCount;
     };
 
-    struct VulkanGPUMeshBufferSet {
-        Vector<VulkanGPUMeshBuffer> buffers;
-    };
-
     struct VulkanCPUMesh {
         Vector<Vertex> vertices;
         Vector<uint32_t> indices;
@@ -35,15 +31,5 @@ namespace moe {
 
         glm::vec3 min;
         glm::vec3 max;
-    };
-
-    struct VulkanMesh {
-        String name;
-        Vector<VulkanMeshGeoSurface> surfaces;
-        VulkanGPUMeshBuffer gpuBuffer;
-    };
-
-    struct VulkanMeshAsset {
-        Vector<SharedPtr<VulkanMesh>> meshes;
     };
 }// namespace moe

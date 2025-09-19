@@ -2,10 +2,6 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 
-#include <fastgltf/core.hpp>
-#include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/util.hpp>
-
 #include <tiny_gltf.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -14,109 +10,6 @@
 
 namespace moe {
     namespace VkLoaders {
-        Optional<VulkanMeshAsset> loadGLTFMeshFromFile(VulkanEngine& engine, StringView filename) {
-            std::filesystem::path path = filename;
-
-            fastgltf::GltfDataBuffer buf;
-            buf = std::move(buf.FromPath(path).get());
-            constexpr auto options = fastgltf::Options::LoadExternalBuffers;
-
-
-            fastgltf::Asset asset;
-            fastgltf::Parser parser{};
-
-            auto load = parser.loadGltfBinary(buf, path.parent_path(), options);
-
-            if (!load) {
-                Logger::warn("GLTF file not found");
-                return std::nullopt;
-            }
-
-            asset = std::move(load.get());
-            Vector<SharedPtr<VulkanMesh>> meshes;
-
-            Vector<uint32_t> indices;
-            Vector<Vertex> vertices;
-
-            for (auto& mesh: asset.meshes) {
-                VulkanMesh meshAsset;
-                meshAsset.name = mesh.name;
-
-                indices.clear();
-                vertices.clear();
-
-                for (auto&& prim: mesh.primitives) {
-                    VulkanMeshGeoSurface surface;
-                    surface.beginIndex = indices.size();
-                    surface.indexCount = asset.accessors[prim.indicesAccessor.value()].count;
-
-                    size_t initVertex = vertices.size();
-
-                    {
-                        fastgltf::Accessor& indexAccessor = asset.accessors[prim.indicesAccessor.value()];
-                        indices.reserve(indexAccessor.count + indices.size());
-                        fastgltf::iterateAccessor<uint32_t>(
-                                asset, indexAccessor,
-                                [&](auto&& index) {
-                                    indices.push_back(static_cast<uint32_t>(index));
-                                });
-                    }
-
-                    {
-                        fastgltf::Accessor& vertexAccessor = asset.accessors[prim.findAttribute("POSITION")->accessorIndex];
-                        vertices.resize(vertexAccessor.count + vertices.size());
-                        fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                                asset, vertexAccessor,
-                                [&](auto&& vertex, size_t index) {
-                                    Vertex vtx;
-                                    vtx.pos = vertex;
-                                    vtx.normal = {1.0f, 0.0f, 0.0f};
-                                    vtx.tangent = glm::vec4(1.0f);
-                                    vtx.uv_x = 0;
-                                    vtx.uv_y = 0;
-
-                                    vertices[index + initVertex] = vtx;
-                                });
-                    }
-
-                    auto normals = prim.findAttribute("NORMAL");
-                    if (normals != prim.attributes.end()) {
-                        fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                                asset, asset.accessors[normals->accessorIndex],
-                                [&](auto&& normal, size_t index) {
-                                    vertices[index + initVertex].normal = normal;
-                                });
-                    }
-
-                    auto uv = prim.findAttribute("TEXCOORD_0");
-                    if (uv != prim.attributes.end()) {
-                        fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                                asset, asset.accessors[uv->accessorIndex],
-                                [&](auto&& texCoord, size_t index) {
-                                    vertices[index + initVertex].uv_x = texCoord.x;
-                                    vertices[index + initVertex].uv_y = texCoord.y;
-                                });
-                    }
-
-                    /*auto color = prim.findAttribute("COLOR_0");
-                    if (color != prim.attributes.end()) {
-                        fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                                asset, asset.accessors[color->accessorIndex],
-                                [&](auto&& col, size_t index) {
-                                    vertices[index + initVertex].color = col;
-                                });
-                    }*/
-
-                    meshAsset.surfaces.push_back(surface);
-                }
-
-                meshAsset.gpuBuffer = engine.uploadMesh(indices, vertices);
-                meshes.emplace_back(std::make_shared<VulkanMesh>(std::move(meshAsset)));
-            }
-
-            return VulkanMeshAsset{std::move(meshes)};
-        }
-
         UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels) {
             auto* buf = stbi_load(filename.data(), width, height, channels, 0);
             //MOE_ASSERT(*channels == 4, "Only 4-channel images are supported");
@@ -480,10 +373,10 @@ namespace moe {
 
                 if (isMesh(gltfNode)) {
                     node.resourceInternalId = static_cast<GLTFInternalId>(gltfNode.mesh);
-                    Logger::debug("Loaded mesh: {}", gltfNode.name);
+                    //Logger::debug("Loaded mesh: {}", gltfNode.name);
                 } else {
                     node.resourceInternalId = NULL_SCENE_RESOURCE_INTERNAL_ID;
-                    Logger::debug("Loaded empty node: {}", gltfNode.name);
+                    //Logger::debug("Loaded empty node: {}", gltfNode.name);
                 }
 
                 node.children.reserve(gltfNode.children.size());
@@ -509,7 +402,7 @@ namespace moe {
                 tinygltf::Model model;
                 loadGltfFile(model, path);
 
-                Logger::debug("GLTF file contains {} scenes", model.scenes.size());
+                //Logger::debug("GLTF file contains {} scenes", model.scenes.size());
                 auto& scene = model.scenes[model.defaultScene];
                 UnorderedMap<GLTFInternalId, MaterialId> materialMap;
 
