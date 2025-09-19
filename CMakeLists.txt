@@ -19,6 +19,7 @@ set(SPDLOG_FMT_EXTERNAL ON)
 add_subdirectory(vendors/spdlog)
 
 add_subdirectory(vendors/fastgltf)
+add_subdirectory(vendors/tinygltf)
 
 include_directories(include)
 
@@ -51,6 +52,7 @@ target_link_libraries(moe-graphics PRIVATE
   vk-bootstrap::vk-bootstrap VulkanMemoryAllocator volk_headers
   spdlog::spdlog fmt::fmt
   fastgltf::fastgltf
+  tinygltf
 )
 
 target_include_directories(moe-graphics PRIVATE
