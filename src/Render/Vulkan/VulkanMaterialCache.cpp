@@ -14,7 +14,7 @@ namespace moe {
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                 VMA_MEMORY_USAGE_AUTO);
 
-        // todo: load default textures
+        initDefaults();
     }
 
     Optional<VulkanCPUMaterial> VulkanMaterialCache::getMaterial(MaterialId id) {
@@ -45,6 +45,8 @@ namespace moe {
                         .metallicRoughnessTexture = material.metallicRoughnessTexture,
                         .emissiveTexture = material.emissiveTexture,
                 };
+
+        Logger::debug("Loaded material with id {}", id);
 
         return id;
     }
@@ -79,5 +81,34 @@ namespace moe {
 
     bool VulkanMaterialCache::isMaterialIdValid(MaterialId id) {
         return m_idAllocator.isIdValid(id);
+    }
+
+    void VulkanMaterialCache::initDefaults() {
+        Logger::debug("Initializing default materials...");
+
+        {
+            MOE_ASSERT(m_defaults.whiteMaterial == NULL_MATERIAL_ID, "Default materials already initialized");
+            MOE_ASSERT(m_defaults.blackMaterial == NULL_MATERIAL_ID, "Default materials already initialized");
+            MOE_ASSERT(m_defaults.checkerboardMaterial == NULL_MATERIAL_ID, "Default materials already initialized");
+        }
+
+        {
+            VulkanCPUMaterial material{};
+            material.baseColor = glm::vec4(1.0f);
+            material.diffuseTexture = m_engine->m_caches.imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+            m_defaults.whiteMaterial = loadMaterial(material);
+        }
+        {
+            VulkanCPUMaterial material{};
+            material.baseColor = glm::vec4(1.0f);
+            material.diffuseTexture = m_engine->m_caches.imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::Black);
+            m_defaults.blackMaterial = loadMaterial(material);
+        }
+        {
+            VulkanCPUMaterial material{};
+            material.baseColor = glm::vec4(1.0f);
+            material.diffuseTexture = m_engine->m_caches.imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::Checkerboard);
+            m_defaults.checkerboardMaterial = loadMaterial(material);
+        }
     }
 }// namespace moe

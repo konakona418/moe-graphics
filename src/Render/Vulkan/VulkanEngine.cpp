@@ -1,6 +1,7 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
-#include "Render/Vulkan/VulkanGPUMesh.hpp"
 #include "Render/Vulkan/VulkanInitializers.hpp"
+#include "Render/Vulkan/VulkanLoaders.hpp"
+#include "Render/Vulkan/VulkanMesh.hpp"
 #include "Render/Vulkan/VulkanUtils.hpp"
 
 
@@ -48,10 +49,9 @@ namespace moe {
         initCommands();
         initSyncPrimitives();
         initDescriptors();
-        initCaches();
-        initBindlessSet();
 
-        initDefaultResources();
+        initBindlessSet();
+        initCaches();
 
         initPipelines();
 
@@ -250,6 +250,25 @@ namespace moe {
         return image;
     }
 
+    Optional<VulkanAllocatedImage> VulkanEngine::loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        int width, height, channels;
+        auto rawImage = VkLoaders::loadImage(filename, &width, &height, &channels);
+
+        if (!rawImage) {
+            Logger::error("Failed to open image: {}", filename);
+            return {std::nullopt};
+        }
+
+        VulkanAllocatedImage image = allocateImage(
+                rawImage.get(),
+                {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                format,
+                usage,
+                mipmap);
+
+        return image;
+    }
+
     void VulkanEngine::destroyImage(VulkanAllocatedImage& image) {
         vkDestroyImageView(m_device, image.imageView, nullptr);
         vmaDestroyImage(m_allocator, image.image, image.vmaAllocation);
@@ -389,18 +408,26 @@ namespace moe {
         auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, &depthAttachment);
         vkCmdBeginRendering(commandBuffer, &renderInfo);
 
-        auto drawCmd = Vector<VulkanMeshDrawCommand>{
-                {
-                        .meshId = m_pipelines.testMeshId,
-                        .transform = glm::mat4(1.0f),
-                        .overrideMaterial = m_pipelines.testMaterialId,
-                },
-        };
+        m_pipelines.testScene.updateTransform(glm::mat4(1.0f));
+
+        Vector<VulkanRenderPacket> packets;
+        m_pipelines.testScene.gatherRenderPackets(packets);
+
+        Vector<VulkanMeshDrawCommand> drawCmds;
+        drawCmds.reserve(packets.size());
+        for (auto& packet: packets) {
+            drawCmds.push_back(VulkanMeshDrawCommand{
+                    .meshId = packet.meshId,
+                    .transform = packet.transform,
+                    .overrideMaterial = packet.materialId,
+            });
+        }
+
         m_pipelines.meshPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
                 m_caches.materialCache,
-                drawCmd,
+                drawCmds,
                 m_pipelines.sceneDataBuffer);
         vkCmdEndRendering(commandBuffer);
 
@@ -929,48 +956,6 @@ namespace moe {
         });
     }
 
-    void VulkanEngine::initDefaultResources() {
-        {
-            uint32_t color = glm::packUnorm4x8(glm::vec4(1.0f));
-            auto image = allocateImage(
-                    &color,
-                    {1, 1, 1},
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT);
-
-            m_defaultData.whiteMaterialId = m_caches.imageCache.addImage(std::move(image));
-        }
-        {
-            uint32_t color = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            auto image = allocateImage(
-                    &color,
-                    {1, 1, 1},
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT);
-
-            m_defaultData.blackMaterialId = m_caches.imageCache.addImage(std::move(image));
-        }
-        {
-            uint32_t magenta = glm::packUnorm4x8(glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-            uint32_t black = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-
-            Array<uint32_t, 16 * 16> checkerboard{};
-            for (int x = 0; x < 16; ++x) {
-                for (int y = 0; y < 16; ++y) {
-                    checkerboard[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-                }
-            }
-
-            auto image = allocateImage(
-                    checkerboard.data(),
-                    {16, 16, 1},
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT);
-
-            m_defaultData.checkerboardMaterialId = m_caches.imageCache.addImage(std::move(image));
-        }
-    }
-
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
 
@@ -981,24 +966,19 @@ namespace moe {
                         VMA_MEMORY_USAGE_AUTO);
 
         auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
-        sceneData->view = sceneData->view = glm::lookAt(
-                glm::vec3(5.f, 5.f, 5.f),
-                glm::vec3(0.f, 0.f, 0.f),
+        sceneData->view = glm::lookAt(
+                glm::vec3(-1.f, 2.f, 1.f),
+                glm::vec3(0.f, 1.f, 0.f),
                 glm::vec3(0.f, 1.f, 0.f));
         sceneData->projection = glm::perspective(
                 glm::radians(45.f),
                 (float) m_drawExtent.width / (float) m_drawExtent.height,
-                0.1f, 100.f);
+                0.1f, 10000.f);
         sceneData->projection[1][1] *= -1;
         sceneData->viewProjection = sceneData->projection * sceneData->view;
         sceneData->materialBuffer = m_caches.materialCache.getMaterialBufferAddress();
 
-        m_pipelines.testMeshId = m_caches.meshCache.loadMeshFromFile("./model.glb");
-        m_pipelines.testMaterialId = m_caches.materialCache.loadMaterial(
-                VulkanCPUMaterial{
-                        .baseColor = glm::vec4(1.0f),
-                        .diffuseTexture = m_defaultData.checkerboardMaterialId,
-                });
+        m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
 
         m_mainDeletionQueue.pushFunction([&] {
             destroyBuffer(m_pipelines.sceneDataBuffer);

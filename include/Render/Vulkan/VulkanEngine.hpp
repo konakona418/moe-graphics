@@ -6,6 +6,7 @@
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
+#include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 
@@ -86,16 +87,9 @@ namespace moe {
         } m_caches;
 
         struct {
-            ImageId whiteMaterialId{NULL_IMAGE_ID};
-            ImageId blackMaterialId{NULL_IMAGE_ID};
-            ImageId checkerboardMaterialId{NULL_IMAGE_ID};
-        } m_defaultData;
-
-        struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
             VulkanAllocatedBuffer sceneDataBuffer;
-            MeshId testMeshId;
-            MaterialId testMaterialId;
+            VulkanScene testScene;
         } m_pipelines;
 
         static VulkanEngine& get();
@@ -120,6 +114,8 @@ namespace moe {
         VulkanAllocatedImage allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         VulkanAllocatedImage allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
+        Optional<VulkanAllocatedImage> loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         void destroyImage(VulkanAllocatedImage& image);
 
@@ -186,8 +182,6 @@ namespace moe {
         void initDescriptors();
 
         void initCaches();
-
-        void initDefaultResources();
 
         void initBindlessSet();
 

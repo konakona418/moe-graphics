@@ -83,40 +83,38 @@ namespace moe {
                 }
 
                 auto& meshAsset = mesh.value();
-                for (auto& submesh: meshAsset.meshes) {
-                    MOE_ASSERT(sceneDataBuffer.address != 0, "Invalid scene data buffer");
+                MOE_ASSERT(sceneDataBuffer.address != 0, "Invalid scene data buffer");
 
-                    const auto viewport = VkViewport{
-                            .x = 0,
-                            .y = 0,
-                            .width = (float) m_engine->m_drawExtent.width,
-                            .height = (float) m_engine->m_drawExtent.height,
-                            .minDepth = 0.f,
-                            .maxDepth = 1.f,
-                    };
-                    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+                const auto viewport = VkViewport{
+                        .x = 0,
+                        .y = 0,
+                        .width = (float) m_engine->m_drawExtent.width,
+                        .height = (float) m_engine->m_drawExtent.height,
+                        .minDepth = 0.f,
+                        .maxDepth = 1.f,
+                };
+                vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
-                    VkRect2D scissor = {.offset = {0, 0}, .extent = m_engine->m_drawExtent};
-                    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+                VkRect2D scissor = {.offset = {0, 0}, .extent = m_engine->m_drawExtent};
+                vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-                    vkCmdBindIndexBuffer(cmdBuffer, submesh->gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-                    const auto pushConstants = PushConstants{
-                            .transform = cmd.transform,
-                            .vertexBufferAddr = submesh->gpuBuffer.vertexBufferAddr,
-                            .sceneDataAddress = sceneDataBuffer.address,
-                            .materialId = cmd.overrideMaterial,
-                    };
+                vkCmdBindIndexBuffer(cmdBuffer, meshAsset.gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+                const auto pushConstants = PushConstants{
+                        .transform = cmd.transform,
+                        .vertexBufferAddr = meshAsset.gpuBuffer.vertexBufferAddr,
+                        .sceneDataAddress = sceneDataBuffer.address,
+                        .materialId = cmd.overrideMaterial,
+                };
 
-                    vkCmdPushConstants(
-                            cmdBuffer,
-                            m_pipelineLayout,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                            0,
-                            sizeof(PushConstants),
-                            &pushConstants);
+                vkCmdPushConstants(
+                        cmdBuffer,
+                        m_pipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                        0,
+                        sizeof(PushConstants),
+                        &pushConstants);
 
-                    vkCmdDrawIndexed(cmdBuffer, submesh->gpuBuffer.indexCount, 1, 0, 0, 0);
-                }
+                vkCmdDrawIndexed(cmdBuffer, meshAsset.gpuBuffer.indexCount, 1, 0, 0, 0);
             }
         }
 

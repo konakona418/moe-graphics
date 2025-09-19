@@ -22,6 +22,21 @@ namespace moe {
         Vector<VulkanGPUMeshBuffer> buffers;
     };
 
+    struct VulkanCPUMesh {
+        Vector<Vertex> vertices;
+        Vector<uint32_t> indices;
+
+        glm::vec3 min;
+        glm::vec3 max;
+    };
+
+    struct VulkanGPUMesh {
+        VulkanGPUMeshBuffer gpuBuffer;
+
+        glm::vec3 min;
+        glm::vec3 max;
+    };
+
     struct VulkanMesh {
         String name;
         Vector<VulkanMeshGeoSurface> surfaces;

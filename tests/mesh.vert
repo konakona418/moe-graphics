@@ -23,6 +23,6 @@ void main() {
 
     gl_Position = PushConstants.sceneData.viewProjection * PushConstants.transform * vec4(inVertex.position, 1.0);
     outNormal = (PushConstants.transform * vec4(inVertex.normal, 0.0)).xyz;
-    outColor = inVertex.color.xyz;
+    outColor = vec3(1.0, 1.0, 1.0);
     outUV = vec2(inVertex.uv_x, inVertex.uv_y);
 }

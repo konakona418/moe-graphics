@@ -24,7 +24,7 @@ struct Vertex {
     float uv_x;
     vec3 normal;
     float uv_y;
-    vec4 color;
+    vec4 tangent;
 };
 
 layout(buffer_reference, std430) readonly buffer VertexBuffer {
