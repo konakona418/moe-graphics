@@ -2,12 +2,16 @@
 
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
+#include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
+
+#include "Core/Input.hpp"
 
 
 #include <GLFW/glfw3.h>
@@ -51,6 +55,8 @@ namespace moe {
         VkExtent2D m_windowExtent{1280, 720};
 
         GLFWwindow* m_window{nullptr};
+        std::pair<float, float> m_lastMousePos{0.0f, 0.0f};
+        bool m_firstMouse{true};
 
         VkInstance m_instance;
         VkDebugUtilsMessengerEXT m_debugMessenger;
@@ -77,8 +83,17 @@ namespace moe {
         VkCommandBuffer m_immediateModeCommandBuffer;
         VkCommandPool m_immediateModeCommandPool;
 
-
         VulkanBindlessSet m_bindlessSet;
+
+        VulkanCamera m_defaultCamera{
+                glm::vec3(0.0f, 0.0f, 0.0f),
+                glm::vec3(0.0f, 0.0f, -1.0f),
+                0.f,
+                0.f,
+                45.0f,
+                0.1f,
+                100.0f,
+        };
 
         struct {
             VulkanImageCache imageCache;
@@ -101,6 +116,16 @@ namespace moe {
         void draw();
 
         void run();
+
+        void beginFrame();
+
+        void endFrame();
+
+        Optional<WindowEvent> pollEvent();
+
+        Optional<WindowEvent> peekEvent();
+
+        bool isKeyPressed(int key) const;
 
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
@@ -125,43 +150,14 @@ namespace moe {
 
         FrameData& getCurrentFrame() { return m_frames[m_frameNumber % FRAMES_IN_FLIGHT]; }
 
+        VulkanCamera& getDefaultCamera() { return m_defaultCamera; }
+
     private:
-        struct WindowEvent {
-
-            struct Close {};
-            struct Minimize {};
-            struct RestoreFromMinimize {};
-            struct Resize {
-                uint32_t width;
-                uint32_t height;
-            };
-
-            Variant<std::monostate,
-                    Close,
-                    Minimize,
-                    RestoreFromMinimize,
-                    Resize>
-                    args;
-
-            template<typename T>
-            bool is() { return std::holds_alternative<T>(args); }
-
-            template<typename T>
-            auto getIf() {
-                if (std::holds_alternative<T>(args)) {
-                    return Optional<T>{std::get<T>(args)};
-                }
-                return Optional<T>{std::nullopt};
-            }
-        };
-
-        Queue<WindowEvent> m_pollingEvents;
+        Deque<WindowEvent> m_pollingEvents;
 
         void initWindow();
 
         void queueEvent(WindowEvent event);
-
-        Optional<WindowEvent> pollEvent();
 
         void initVulkanInstance();
 

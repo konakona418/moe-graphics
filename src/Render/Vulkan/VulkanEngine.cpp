@@ -115,6 +115,57 @@ namespace moe {
         }
     }
 
+    void VulkanEngine::beginFrame() {
+        glfwPollEvents();
+
+        std::pair<uint32_t, uint32_t> newMetric;
+
+        for (auto& e: m_pollingEvents) {
+            if (e.is<WindowEvent::Minimize>()) {
+                Logger::debug("window minimized");
+                m_stopRendering = true;
+            } else if (e.is<WindowEvent::RestoreFromMinimize>()) {
+                Logger::debug("window restored from minimize");
+                m_stopRendering = false;
+            }
+
+            if (auto resize = e.getIf<WindowEvent::Resize>()) {
+                if (resize->width && resize->height) {
+                    m_resizeRequested = true;
+                    newMetric = {resize->width, resize->height};
+                }
+            }
+        }
+
+        if (m_resizeRequested) {
+            Logger::debug("resize args: {}x{}", newMetric.first, newMetric.second);
+            recreateSwapchain(newMetric.first, newMetric.second);
+
+            m_resizeRequested = false;
+        }
+
+        if (m_stopRendering) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            return;
+        }
+    }
+
+    void VulkanEngine::endFrame() {
+        if (m_stopRendering) {
+            return;
+        }
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
+
+        draw();
+    }
+
     void VulkanEngine::immediateSubmit(Function<void(VkCommandBuffer)>&& fn) {
         MOE_VK_CHECK(vkResetFences(m_device, 1, &m_immediateModeFence));
         MOE_VK_CHECK(vkResetCommandBuffer(m_immediateModeCommandBuffer, 0));
@@ -345,6 +396,12 @@ namespace moe {
     }
 
     void VulkanEngine::draw() {
+        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
+        sceneData->view = m_defaultCamera.viewMatrix();
+        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
+        sceneData->projection[1][1] *= -1;
+        sceneData->viewProjection = sceneData->projection * sceneData->view;
+
         auto& currentFrame = getCurrentFrame();
 
         MOE_VK_CHECK_MSG(
@@ -551,6 +608,12 @@ namespace moe {
             MOE_LOG_AND_THROW("Fail to create GLFWwindow");
         }
 
+        // mouse configuration - disable cursor, raw mouse motion if available
+        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        }
+
         glfwSetWindowUserPointer(m_window, this);
 
         glfwSetWindowCloseCallback(m_window, [](auto* window) {
@@ -570,9 +633,47 @@ namespace moe {
         glfwSetWindowSizeCallback(m_window, [](auto* window, int width, int height) {
             auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
 
-            engine->queueEvent({WindowEvent::Resize{
-                    static_cast<uint32_t>(width),
-                    static_cast<uint32_t>(height)}});
+            auto event =
+                    WindowEvent::Resize{
+                            static_cast<uint32_t>(width),
+                            static_cast<uint32_t>(height),
+                    };
+
+            if (!engine->m_pollingEvents.empty()) {
+                if (engine->m_pollingEvents.back().is<WindowEvent::Resize>()) {
+                    // remove previous resize event to avoid flooding
+                    engine->m_pollingEvents.back() = {event};
+                }
+            }
+
+            engine->queueEvent({event});
+        });
+
+        glfwSetKeyCallback(m_window, [](auto* window, int key, int scancode, int action, int mods) {
+            auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+
+            if (action == GLFW_PRESS) {
+                engine->queueEvent({WindowEvent::KeyDown{(uint32_t) key}});
+            } else if (action == GLFW_REPEAT) {
+                engine->queueEvent({WindowEvent::KeyRepeat{(uint32_t) key}});
+            } else if (action == GLFW_RELEASE) {
+                engine->queueEvent({WindowEvent::KeyUp{(uint32_t) key}});
+            }
+        });
+
+        glfwSetCursorPosCallback(m_window, [](auto* window, double xpos, double ypos) {
+            auto* engine = static_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+
+            if (engine->m_firstMouse) {
+                engine->m_lastMousePos = {static_cast<float>(xpos), static_cast<float>(ypos)};
+                engine->m_firstMouse = false;
+            }
+
+            float dx = static_cast<float>(xpos - engine->m_lastMousePos.first);
+            float dy = static_cast<float>(ypos - engine->m_lastMousePos.second);
+            engine->queueEvent({WindowEvent::MouseMove{dx, dy}});
+
+            engine->m_lastMousePos = {static_cast<float>(xpos), static_cast<float>(ypos)};
         });
     }
 
@@ -959,14 +1060,8 @@ namespace moe {
                         VMA_MEMORY_USAGE_AUTO);
 
         auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
-        sceneData->view = glm::lookAt(
-                glm::vec3(-1.f, 2.f, 1.f),
-                glm::vec3(0.f, 1.f, 0.f),
-                glm::vec3(0.f, 1.f, 0.f));
-        sceneData->projection = glm::perspective(
-                glm::radians(45.f),
-                (float) m_drawExtent.width / (float) m_drawExtent.height,
-                0.1f, 10000.f);
+        sceneData->view = m_defaultCamera.viewMatrix();
+        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
         sceneData->projection[1][1] *= -1;
         sceneData->viewProjection = sceneData->projection * sceneData->view;
         sceneData->materialBuffer = m_caches.materialCache.getMaterialBufferAddress();
@@ -981,17 +1076,33 @@ namespace moe {
     }
 
     void VulkanEngine::queueEvent(WindowEvent event) {
-        m_pollingEvents.push(event);
+        m_pollingEvents.push_back(event);
     }
 
-    Optional<VulkanEngine::WindowEvent> VulkanEngine::pollEvent() {
+    Optional<WindowEvent> VulkanEngine::pollEvent() {
+        glfwPollEvents();
+
         if (m_pollingEvents.empty()) {
             return {};
         }
 
         Optional<WindowEvent> ret = {m_pollingEvents.back()};
-        m_pollingEvents.pop();
+        m_pollingEvents.pop_front();
         return ret;
+    }
+
+    Optional<WindowEvent> VulkanEngine::peekEvent() {
+        glfwPollEvents();
+
+        if (m_pollingEvents.empty()) {
+            return {};
+        }
+
+        return {m_pollingEvents.front()};
+    }
+
+    bool VulkanEngine::isKeyPressed(int key) const {
+        return glfwGetKey(m_window, key) == GLFW_PRESS;
     }
 
 }// namespace moe
