@@ -238,11 +238,14 @@ namespace moe {
                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     1,
                     &copyRegion);
-
-            VkUtils::transitionImage(
-                    cmd, image.image,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            if (mipmap) {
+                VkUtils::generateMipmaps(cmd, image.image, VkExtent2D{extent.width, extent.height});
+            } else {
+                VkUtils::transitionImage(
+                        cmd, image.image,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
         });
 
         destroyBuffer(stagingBuffer);

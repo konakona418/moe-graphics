@@ -222,19 +222,19 @@ namespace moe {
                 if (hasDiffuseTexture(gltfMaterial)) {
                     const auto diffusePath = getDiffuseTexturePath(gltfModel, gltfMaterial, parentPath);
                     material.diffuseTexture =
-                            imageCache.loadImageFromFile(diffusePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
+                            imageCache.loadImageFromFile(diffusePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 }
 
                 if (hasNormalMapTexture(gltfMaterial)) {
                     const auto normalMapPath = getNormalMapTexturePath(gltfModel, gltfMaterial, parentPath);
                     material.normalTexture =
-                            imageCache.loadImageFromFile(normalMapPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
+                            imageCache.loadImageFromFile(normalMapPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 }
 
                 if (hasMetallicRoughnessTexture(gltfMaterial)) {
                     const auto metalRoughnessPath =
                             getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
-                    imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+                    imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 }
 
                 if (hasEmissiveTexture(gltfMaterial)) {
@@ -242,7 +242,7 @@ namespace moe {
 
                     const auto emissivePath =
                             getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
-                    imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+                    imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 }
 
                 return material;
