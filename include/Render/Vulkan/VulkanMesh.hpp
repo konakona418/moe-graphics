@@ -24,6 +24,19 @@ namespace moe {
 
         glm::vec3 min;
         glm::vec3 max;
+
+        bool isDataDiscarded() const { return discarded; }
+
+        void discard() {
+            vertices.clear();
+            vertices.shrink_to_fit();
+            indices.clear();
+            indices.shrink_to_fit();
+            discarded = true;
+        }
+
+    private:
+        bool discarded{false};
     };
 
     struct VulkanGPUMesh {

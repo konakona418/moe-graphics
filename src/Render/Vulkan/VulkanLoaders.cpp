@@ -428,6 +428,8 @@ namespace moe {
                         }
 
                         auto meshId = meshCache.loadMesh(cpuMesh);
+                        cpuMesh.discard();
+                        // discard the data to prevent extra memory usage
 
                         MaterialId materialId = materialCache.getDefaultMaterial(VulkanMaterialCache::DefaultResourceType::White);
 
