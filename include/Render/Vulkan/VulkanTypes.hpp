@@ -63,21 +63,4 @@ namespace moe {
 
 #include <fmt/format.h>
 
-#include "Core/Logger.hpp"
-
-#define MOE_ASSERT(_cond, _msg) (assert(_cond&& _msg))
-
-#define MOE_LOG_AND_THROW(_msg) \
-    Logger::critical(_msg);     \
-    throw std::runtime_error(_msg);
-
-#define MOE_VK_CHECK_MSG(expr, msg)                     \
-    do {                                                \
-        VkResult result = expr;                         \
-        if (result != VK_SUCCESS) {                     \
-            Logger::critical(msg);                      \
-            throw std::runtime_error(std::string(msg)); \
-        }                                               \
-    } while (false)
-
 #define MOE_VK_CHECK(expr) MOE_VK_CHECK_MSG(expr, "Vulkan error")

@@ -66,7 +66,7 @@ int main() {
     engine.init();
     auto& camera = engine.getDefaultCamera();
     camera.setPosition(glm::vec3(0.0f, 0.0f, 3.0f));
-    camera.setFront(glm::vec3(0.0f, 0.0f, -1.0f));
+    camera.setYaw(-90.0f);
     constexpr float cameraRotDampening = 0.1f;
     constexpr float cameraMoveSpeed = 2.f;
     CameraMovementMask movementMask;
@@ -76,13 +76,16 @@ int main() {
     bool running = true;
     glm::vec3 cameraMovement = glm::vec3(0.0f);
 
+    auto& inputBus = engine.getInputBus();
+    inputBus.setMouseValid(false);
+
     while (running) {
         engine.beginFrame();
         auto now = std::chrono::high_resolution_clock::now();
         auto deltaTime = (float) std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count() / 1000.0f;
         lastTime = now;
 
-        while (auto e = engine.pollEvent()) {
+        while (auto e = inputBus.pollEvent()) {
             if (e->is<moe::WindowEvent::Close>()) {
                 running = false;
             }
@@ -94,32 +97,32 @@ int main() {
             }
         }
 
-        if (engine.isKeyPressed(GLFW_KEY_W)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_W)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Forward, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Forward, false);
         }
-        if (engine.isKeyPressed(GLFW_KEY_S)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_S)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Backward, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Backward, false);
         }
-        if (engine.isKeyPressed(GLFW_KEY_A)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_A)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Left, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Left, false);
         }
-        if (engine.isKeyPressed(GLFW_KEY_D)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_D)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Right, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Right, false);
         }
-        if (engine.isKeyPressed(GLFW_KEY_Q)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_Q)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Up, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Up, false);
         }
-        if (engine.isKeyPressed(GLFW_KEY_E)) {
+        if (inputBus.isKeyPressed(GLFW_KEY_E)) {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Down, true);
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Down, false);

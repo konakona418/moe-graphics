@@ -5,8 +5,8 @@
 namespace moe {
     struct VulkanCamera {
         static constexpr float PITCH_LIMIT = 89.0f;
-        VulkanCamera(glm::vec3 pos, glm::vec3 front, float pitch = 0.0f, float yaw = 0.0f, float fovDeg = 45.0f, float nearZ = 0.1f, float farZ = 100.0f)
-            : pos(pos), front(front), pitch(pitch), yaw(yaw), fovDeg(fovDeg), nearZ(nearZ), farZ(farZ) {
+        VulkanCamera(glm::vec3 pos, float pitch = 0.0f, float yaw = 0.0f, float fovDeg = 45.0f, float nearZ = 0.1f, float farZ = 100.0f)
+            : pos(pos), pitch(pitch), yaw(yaw), fovDeg(fovDeg), nearZ(nearZ), farZ(farZ) {
             updateVectors();
         }
 
@@ -20,7 +20,6 @@ namespace moe {
         void setPosition(const glm::vec3& newPos) { pos = newPos; }
         const glm::vec3& getPosition() const { return pos; }
 
-        void setFront(const glm::vec3& newFront) { front = newFront; }
         const glm::vec3& getFront() const { return front; }
 
         const glm::vec3& getUp() const { return up; }

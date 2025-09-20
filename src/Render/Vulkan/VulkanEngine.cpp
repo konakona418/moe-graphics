@@ -68,7 +68,7 @@ namespace moe {
         while (!shouldQuit) {
             glfwPollEvents();
 
-            while (auto e = pollEvent()) {
+            while (auto e = m_inputBus.pollEvent()) {
                 if (e->is<WindowEvent::Close>()) {
                     Logger::debug("window closing...");
                     shouldQuit = true;
@@ -120,7 +120,7 @@ namespace moe {
 
         std::pair<uint32_t, uint32_t> newMetric;
 
-        for (auto& e: m_pollingEvents) {
+        for (auto& e: m_inputBus.m_pollingEvents) {
             if (e.is<WindowEvent::Minimize>()) {
                 Logger::debug("window minimized");
                 m_stopRendering = true;
@@ -608,11 +608,23 @@ namespace moe {
             MOE_LOG_AND_THROW("Fail to create GLFWwindow");
         }
 
-        // mouse configuration - disable cursor, raw mouse motion if available
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        if (glfwRawMouseMotionSupported()) {
-            glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-        }
+        m_inputBus.m_isKeyPressedFunc = [this](int key) -> bool {
+            return isKeyPressed(key);
+        };
+
+        m_inputBus.m_setMouseValidFunc = [this](bool valid) {
+            if (!valid) {
+                glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                if (glfwRawMouseMotionSupported()) {
+                    glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+                }
+            } else {
+                glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                if (glfwRawMouseMotionSupported()) {
+                    glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+                }
+            }
+        };
 
         glfwSetWindowUserPointer(m_window, this);
 
@@ -639,10 +651,10 @@ namespace moe {
                             static_cast<uint32_t>(height),
                     };
 
-            if (!engine->m_pollingEvents.empty()) {
-                if (engine->m_pollingEvents.back().is<WindowEvent::Resize>()) {
+            if (!engine->m_inputBus.m_pollingEvents.empty()) {
+                if (engine->m_inputBus.m_pollingEvents.back().is<WindowEvent::Resize>()) {
                     // remove previous resize event to avoid flooding
-                    engine->m_pollingEvents.back() = {event};
+                    engine->m_inputBus.m_pollingEvents.back() = {event};
                 }
             }
 
@@ -1076,29 +1088,7 @@ namespace moe {
     }
 
     void VulkanEngine::queueEvent(WindowEvent event) {
-        m_pollingEvents.push_back(event);
-    }
-
-    Optional<WindowEvent> VulkanEngine::pollEvent() {
-        glfwPollEvents();
-
-        if (m_pollingEvents.empty()) {
-            return {};
-        }
-
-        Optional<WindowEvent> ret = {m_pollingEvents.back()};
-        m_pollingEvents.pop_front();
-        return ret;
-    }
-
-    Optional<WindowEvent> VulkanEngine::peekEvent() {
-        glfwPollEvents();
-
-        if (m_pollingEvents.empty()) {
-            return {};
-        }
-
-        return {m_pollingEvents.front()};
+        m_inputBus.pushEvent(event);
     }
 
     bool VulkanEngine::isKeyPressed(int key) const {

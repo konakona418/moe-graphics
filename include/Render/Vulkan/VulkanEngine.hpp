@@ -85,9 +85,10 @@ namespace moe {
 
         VulkanBindlessSet m_bindlessSet;
 
+        InputBus m_inputBus{};
+
         VulkanCamera m_defaultCamera{
                 glm::vec3(0.0f, 0.0f, 0.0f),
-                glm::vec3(0.0f, 0.0f, -1.0f),
                 0.f,
                 0.f,
                 45.0f,
@@ -121,12 +122,6 @@ namespace moe {
 
         void endFrame();
 
-        Optional<WindowEvent> pollEvent();
-
-        Optional<WindowEvent> peekEvent();
-
-        bool isKeyPressed(int key) const;
-
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
             return m_bindlessSet;
@@ -152,9 +147,9 @@ namespace moe {
 
         VulkanCamera& getDefaultCamera() { return m_defaultCamera; }
 
-    private:
-        Deque<WindowEvent> m_pollingEvents;
+        InputBus& getInputBus() { return m_inputBus; }
 
+    private:
         void initWindow();
 
         void queueEvent(WindowEvent event);
@@ -186,6 +181,8 @@ namespace moe {
         void drawBackground(VkCommandBuffer commandBuffer);
 
         void drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget);
+
+        bool isKeyPressed(int key) const;
     };
 
 }// namespace moe
