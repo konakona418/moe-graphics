@@ -4,9 +4,13 @@
 #include "light.glsl"
 #include "pbr_forward.glsl"
 
+#define DISTANCE_ATTENUATION_POWER 2.0
+
+// ! fixme: use a more smooth falloff
 float calculateDistanceAttenuation(float dist, float range) {
-    float d = clamp(1.0 - pow((dist / range), 4.0), 0.0, 1.0);
-    return d / (dist * dist);
+    float d = clamp(1.0 - pow((dist / range), DISTANCE_ATTENUATION_POWER), 0.0, 1.0);
+    //return d / (dist * dist);
+    return d;
 }
 
 /*float calculateAngularAttenuation(
