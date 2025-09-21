@@ -52,11 +52,13 @@ namespace moe {
         glm::mat4 viewProjection;
         glm::vec4 cameraPosition;
 
-        glm::vec4 ambientColor;
+        glm::vec4 ambientColor;// color(3), intensity(1)
         glm::vec4 sunlightDirection;
         glm::vec4 sunlightColor;
 
         VkDeviceAddress materialBuffer;
+        VkDeviceAddress lightBuffer;
+        uint32_t numLights;
     };
 
 }// namespace moe

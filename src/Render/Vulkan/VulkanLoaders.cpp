@@ -204,7 +204,7 @@ namespace moe {
                             .Get(GLTF_EMISSIVE_STRENGTH_PARAM_NAME)
                             .GetNumberAsDouble();
                 }
-                return 1.f;
+                return 1.0f;
             }
 
             VulkanCPUMaterial loadMaterial(
@@ -217,32 +217,39 @@ namespace moe {
                 material.metallic = static_cast<float>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
                 material.roughness = static_cast<float>(gltfMaterial.pbrMetallicRoughness.roughnessFactor);
 
-                // ! fixme: use no mipmap here. fix it after implementing mipmapping
-
                 if (hasDiffuseTexture(gltfMaterial)) {
                     const auto diffusePath = getDiffuseTexturePath(gltfModel, gltfMaterial, parentPath);
                     material.diffuseTexture =
                             imageCache.loadImageFromFile(diffusePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                } else {
+                    material.diffuseTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
 
                 if (hasNormalMapTexture(gltfMaterial)) {
                     const auto normalMapPath = getNormalMapTexturePath(gltfModel, gltfMaterial, parentPath);
                     material.normalTexture =
                             imageCache.loadImageFromFile(normalMapPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                } else {
+                    material.normalTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::FlatNormal);
                 }
 
                 if (hasMetallicRoughnessTexture(gltfMaterial)) {
                     const auto metalRoughnessPath =
                             getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
-                    imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.metallicRoughnessTexture = imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                } else {
+                    material.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
 
+                material.emissive = getEmissiveStrength(gltfMaterial);
+                material.emissiveColor = cvtTinyGltfVec4(gltfMaterial.emissiveFactor);
                 if (hasEmissiveTexture(gltfMaterial)) {
-                    material.emmissive = getEmissiveStrength(gltfMaterial);
-
                     const auto emissivePath =
                             getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
-                    imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.emissiveTexture = imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                } else {
+                    // if the object is not emissive, use white texture
+                    material.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
 
                 return material;

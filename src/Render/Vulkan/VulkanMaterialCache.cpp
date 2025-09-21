@@ -39,7 +39,8 @@ namespace moe {
         gpuMaterial[id] =
                 VulkanGPUMaterial{
                         .baseColor = material.baseColor,
-                        .metallicRoughnessEmissive = glm::vec4(material.metallic, material.roughness, material.emmissive, 0.0f),
+                        .metallicRoughnessEmissive = glm::vec4(material.metallic, material.roughness, material.emissive, 0.0f),
+                        .emissiveColor = material.emissiveColor,
                         .diffuseTexture = material.diffuseTexture,
                         .normalTexture = material.normalTexture,
                         .metallicRoughnessTexture = material.metallicRoughnessTexture,

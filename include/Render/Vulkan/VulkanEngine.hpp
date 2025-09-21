@@ -104,6 +104,7 @@ namespace moe {
 
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
+            VulkanAllocatedBuffer lightBuffer;
             VulkanAllocatedBuffer sceneDataBuffer;
             VulkanScene testScene;
         } m_pipelines;

@@ -15,7 +15,8 @@ namespace moe {
         enum class DefaultResourceType {
             White,
             Black,
-            Checkerboard
+            Checkerboard,
+            FlatNormal,
         };
 
         VulkanImageCache() = default;
@@ -40,6 +41,8 @@ namespace moe {
                     return m_defaults.blackImage;
                 case DefaultResourceType::Checkerboard:
                     return m_defaults.checkerboardImage;
+                case DefaultResourceType::FlatNormal:
+                    return m_defaults.flatNormalImage;
             }
             MOE_ASSERT(false, "Invalid default image type");
             return NULL_IMAGE_ID;//make linter happy
@@ -53,6 +56,7 @@ namespace moe {
             ImageId whiteImage{NULL_IMAGE_ID};
             ImageId blackImage{NULL_IMAGE_ID};
             ImageId checkerboardImage{NULL_IMAGE_ID};
+            ImageId flatNormalImage{NULL_IMAGE_ID};
         } m_defaults;
 
         UnorderedMap<ImageId, VulkanAllocatedImage> m_images;

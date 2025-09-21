@@ -9,7 +9,8 @@ namespace moe {
         glm::vec4 baseColor{glm::vec4(1.0f)};
         float metallic{0.0f};
         float roughness{1.0f};
-        float emmissive{0.0f};
+        float emissive{0.0f};
+        glm::vec4 emissiveColor{glm::vec4(1.0f)};
 
         ImageId diffuseTexture{NULL_IMAGE_ID};
         ImageId normalTexture{NULL_IMAGE_ID};
@@ -24,6 +25,7 @@ namespace moe {
     struct VulkanGPUMaterial {
         glm::vec4 baseColor;
         glm::vec4 metallicRoughnessEmissive;
+        glm::vec4 emissiveColor;
         // .r = metallic, .g = roughness, .b = emmissive
 
         ImageId diffuseTexture;

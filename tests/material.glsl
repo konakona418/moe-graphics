@@ -6,12 +6,13 @@
 
 struct Material {
     vec4 baseColor;
-    vec4 metalicRoughnessEmmissive;
+    vec4 metallicRoughnessEmissive;
+    vec4 emissiveColor;
 
     uint diffuseImageIndex;
     uint normalImageIndex;
     uint metallicRoughnessImageIndex;
-    uint emmissiveImageIndex;
+    uint emissiveImageIndex;
 };
 
 layout(buffer_reference, std430) readonly buffer MaterialBuffer {

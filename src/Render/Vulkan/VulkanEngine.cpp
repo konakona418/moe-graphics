@@ -1,5 +1,6 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
 #include "Render/Vulkan/VulkanInitializers.hpp"
+#include "Render/Vulkan/VulkanLight.hpp"
 #include "Render/Vulkan/VulkanLoaders.hpp"
 #include "Render/Vulkan/VulkanMesh.hpp"
 #include "Render/Vulkan/VulkanUtils.hpp"
@@ -1065,6 +1066,11 @@ namespace moe {
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
 
+        m_pipelines.lightBuffer = allocateBuffer(
+                sizeof(VulkanGPULight) * MAX_LIGHTS,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_MEMORY_USAGE_AUTO);
+
         m_pipelines.sceneDataBuffer =
                 allocateBuffer(
                         sizeof(VulkanGPUSceneData),
@@ -1072,16 +1078,29 @@ namespace moe {
                         VMA_MEMORY_USAGE_AUTO);
 
         auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
+        sceneData->ambientColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.1f);
         sceneData->view = m_defaultCamera.viewMatrix();
         sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
         sceneData->projection[1][1] *= -1;
         sceneData->viewProjection = sceneData->projection * sceneData->view;
         sceneData->materialBuffer = m_caches.materialCache.getMaterialBufferAddress();
+        sceneData->lightBuffer = m_pipelines.lightBuffer.address;
+        sceneData->numLights = 0;
+
+        auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
+        VulkanCPULight cpuLight;
+        cpuLight.color = glm::vec4(1.0f);
+        cpuLight.intensity = 10.0f;
+        cpuLight.position = glm::vec3(0.0f, 2.0f, -2.0f);
+        cpuLight.radius = 5.0f;
+        cpuLight.type = LightType::Point;
+        lights[sceneData->numLights++] = cpuLight.toGPU();
 
         m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
 
         m_mainDeletionQueue.pushFunction([&] {
             destroyBuffer(m_pipelines.sceneDataBuffer);
+            destroyBuffer(m_pipelines.lightBuffer);
 
             m_pipelines.meshPipeline.destroy();
         });

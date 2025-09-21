@@ -6,7 +6,9 @@
 
 #extension GL_GOOGLE_include_directive : require
 
+#include "light.glsl"
 #include "material.glsl"
+
 
 layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     mat4 view;
@@ -19,6 +21,8 @@ layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     vec4 sunlightColor;
 
     MaterialBuffer materialBuffer;
+    LightBuffer lightBuffer;
+    uint numLights;
 };
 
 #endif// MOE_SCENE_DATA_GLSL

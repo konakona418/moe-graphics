@@ -110,5 +110,15 @@ namespace moe {
 
             m_defaults.checkerboardImage = addImage(std::move(image));
         }
+        {
+            uint32_t flatNormal = glm::packUnorm4x8(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
+            auto image = m_engine->allocateImage(
+                    &flatNormal,
+                    {1, 1, 1},
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT);
+
+            m_defaults.flatNormalImage = addImage(std::move(image));
+        }
     }
 }// namespace moe
