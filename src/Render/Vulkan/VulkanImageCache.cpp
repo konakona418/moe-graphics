@@ -10,6 +10,17 @@ namespace moe {
         initDefaults();
     }
 
+    Optional<VulkanAllocatedImage*> VulkanImageCache::getImage(ImageId id) {
+        MOE_ASSERT(m_initialized, "VulkanImageCache not initialized");
+
+        if (m_images.find(id) != m_images.end()) {
+            return &m_images[id];
+        }
+
+        Logger::warn("ImageId {} not found in image cache", id);
+        return {std::nullopt};
+    }
+
     ImageId VulkanImageCache::addImage(VulkanAllocatedImage&& image) {
         MOE_ASSERT(m_initialized, "VulkanImageCache not initialized");
 

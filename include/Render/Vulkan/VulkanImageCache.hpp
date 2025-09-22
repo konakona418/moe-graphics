@@ -24,6 +24,8 @@ namespace moe {
 
         void init(VulkanEngine& engine);
 
+        Optional<VulkanAllocatedImage*> getImage(ImageId id);
+
         ImageId addImage(VulkanAllocatedImage&& image);
 
         ImageId loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
