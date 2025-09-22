@@ -36,6 +36,8 @@ namespace moe {
         // todo: multisampling
         VulkanPipelineBuilder& disableMultisampling();
 
+        VulkanPipelineBuilder& enableMultisampling(VkSampleCountFlagBits samples);
+
         VulkanPipelineBuilder& disableBlending();
 
         VulkanPipelineBuilder& enableBlending(

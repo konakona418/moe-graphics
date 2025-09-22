@@ -123,6 +123,17 @@ namespace moe {
         return *this;
     }
 
+    VulkanPipelineBuilder& VulkanPipelineBuilder::enableMultisampling(VkSampleCountFlagBits samples) {
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = samples;
+        multisampling.minSampleShading = 1.0f;
+        multisampling.pSampleMask = nullptr;
+        multisampling.alphaToCoverageEnable = VK_FALSE;
+        multisampling.alphaToOneEnable = VK_FALSE;
+
+        return *this;
+    }
+
     VulkanPipelineBuilder& VulkanPipelineBuilder::disableBlending() {
         colorBlendAttachment.blendEnable = VK_FALSE;
         colorBlendAttachment.colorWriteMask =
