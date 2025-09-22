@@ -1,0 +1,53 @@
+#pragma once
+
+#include "Render/Vulkan/VulkanIdTypes.hpp"
+#include "Render/Vulkan/VulkanTypes.hpp"
+
+
+// fwd decl
+namespace moe {
+    class VulkanEngine;
+    class VulkanMeshCache;
+    class VulkanMaterialCache;
+    class VulkanRenderPacket;
+    class VulkanCamera;
+}// namespace moe
+
+namespace moe {
+    namespace Pipeline {
+        struct CSMPipeline {
+        public:
+            static constexpr uint32_t SHADOW_CASCADE_COUNT = 4;
+
+            CSMPipeline() = default;
+            ~CSMPipeline() = default;
+
+            void init(VulkanEngine& engine, Array<float, SHADOW_CASCADE_COUNT> cascadeSplitRatios = {0.05f, 0.15f, 0.3f, 1.0f});
+
+            void draw(
+                    VkCommandBuffer cmdBuffer,
+                    VulkanMeshCache& meshCache,
+                    VulkanMaterialCache& materialCache,
+                    Span<VulkanRenderPacket> drawCommands,
+                    VulkanAllocatedBuffer& sceneDataBuffer,
+                    const VulkanCamera& camera);
+
+            void destroy();
+
+        private:
+            struct PushConstants {};
+
+            bool m_initialized{false};
+            uint32_t m_csmShadowMapSize{2048};
+            VulkanEngine* m_engine{nullptr};
+
+            VkPipelineLayout m_pipelineLayout;
+            VkPipeline m_pipeline;
+
+            ImageId m_shadowMapImageId;
+            Array<VkImageView, SHADOW_CASCADE_COUNT> m_shadowMapImageViews;
+
+            Array<float, SHADOW_CASCADE_COUNT> m_cascadeSplitRatios;
+        };
+    }// namespace Pipeline
+}// namespace moe
