@@ -26,6 +26,12 @@ namespace moe {
 
         const glm::vec3& getRight() const { return right; }
 
+        const float getFovDeg() const { return fovDeg; }
+
+        const float getNearZ() const { return nearZ; }
+
+        const float getFarZ() const { return farZ; }
+
         void setPitch(float newPitch) {
             pitch = glm::clamp(newPitch, -PITCH_LIMIT, PITCH_LIMIT);
             updateVectors();
