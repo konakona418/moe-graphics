@@ -90,5 +90,22 @@ void main() {
     // todo: ambient intensity not defined, use alpha
     fragColor += baseColor * u_meshPushConstants.sceneData.ambientColor.rgb * u_meshPushConstants.sceneData.ambientColor.a;
 
-    outFragColor = vec4(fragColor, 1.0);
+    float intensity = luminance(fragColor);
+
+    float toonLevel = 0.0;
+    if (intensity > 0.8)
+        toonLevel = 1.0;
+    else if (intensity > 0.4)
+        toonLevel = 0.7;
+    else if (intensity > 0.1)
+        toonLevel = 0.4;
+    else
+        toonLevel = 0.1;
+
+    vec3 toonColor = fragColor * toonLevel;
+
+    toonColor += emissive;
+    toonColor += baseColor * u_meshPushConstants.sceneData.ambientColor.rgb * u_meshPushConstants.sceneData.ambientColor.a;
+
+    outFragColor = vec4(toonColor, 1.0);
 }

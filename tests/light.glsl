@@ -17,10 +17,11 @@ struct Light {
     vec3 color;     // 12
     float intensity;// 4
 
+    vec3 direction;// 12
     float radius;  // 4
-    uint available;// 4
-    uint _padding1;// 4
-    uint _padding2;// 4
+
+    vec3 spotParams;// 12 (x = lightAngleScale, y = lightAngleOffset, z = unused)
+    uint available; // 4
 };
 
 layout(buffer_reference, std430) readonly buffer LightBuffer {

@@ -403,6 +403,11 @@ namespace moe {
         sceneData->projection[1][1] *= -1;
         sceneData->viewProjection = sceneData->projection * sceneData->view;
 
+        /*auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
+
+        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
+        lights[1].position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));*/
+
         auto& currentFrame = getCurrentFrame();
 
         MOE_VK_CHECK_MSG(
@@ -1089,12 +1094,34 @@ namespace moe {
 
         auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
         VulkanCPULight cpuLight;
-        cpuLight.color = glm::vec4(1.0f);
-        cpuLight.intensity = 10.0f;
-        cpuLight.position = glm::vec3(0.0f, 2.0f, -2.0f);
-        cpuLight.radius = 5.0f;
+        /*cpuLight.color = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f);
+        cpuLight.intensity = 5.0f;
+        cpuLight.position = glm::vec3(2.0f, 2.0f, -2.0f);
+        cpuLight.radius = 8.0f;
         cpuLight.type = LightType::Point;
         lights[sceneData->numLights++] = cpuLight.toGPU();
+        cpuLight.color = glm::vec4(0.0f, 0.5f, 1.0f, 1.0f);
+        cpuLight.intensity = 5.0f;
+        cpuLight.position = glm::vec3(-2.0f, 2.0f, -2.0f);
+        cpuLight.radius = 10.0f;
+        cpuLight.type = LightType::Point;
+        lights[sceneData->numLights++] = cpuLight.toGPU();*/
+        cpuLight.type = LightType::Spot;
+        cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        cpuLight.intensity = 5.0f;
+        cpuLight.position = glm::vec3(0.0f, 1.0f, -4.0f);
+        cpuLight.direction = glm::vec3(0.0f, 0.0f, 1.0f);
+        cpuLight.radius = 10.0f;
+        cpuLight.innerConeAngleRad = glm::radians(1.0f);
+        cpuLight.outerConeAngleRad = glm::radians(10.0f);
+        lights[sceneData->numLights++] = cpuLight.toGPU();
+        cpuLight.type = LightType::Directional;
+        cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        cpuLight.intensity = 5.0f;
+        cpuLight.position = glm::vec3(0.0f, 0.0f, 4.0f);
+        cpuLight.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+        lights[sceneData->numLights++] = cpuLight.toGPU();
+
 
         m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
 

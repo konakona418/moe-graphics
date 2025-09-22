@@ -23,29 +23,52 @@ namespace moe {
         glm::vec3 color;// 12
         float intensity;// 4
 
-        float radius;      // 4
-        uint32_t available;// 4
-        uint64_t _padding; // 8
+        glm::vec3 direction;// 12
+        float radius;       // 4
+
+        glm::vec3 spotParams;// 12 (x = lightAngleScale, y = lightAngleOffset, z = unused)
+        uint32_t available;  // 4
     };
 
     struct VulkanCPULight {
-        glm::vec3 position;
-        glm::vec3 color;
-        LightType type;
-        float radius;
-        float intensity;
+        glm::vec3 position; // shared
+        glm::vec3 color;    // shared
+        glm::vec3 direction;// for directional and spot light
+        LightType type;     // shared
+        float radius;       // for point and spot light
+        float intensity;    // shared
+
+        // the inner cone angle and outer cone angle are in radians
+        // as specified in glTF 2.0
+        // spec: https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_lights_punctual#spot
+        float innerConeAngleRad;// for spot light
+        float outerConeAngleRad;// for spot light
 
         VulkanCPULight() = default;
 
         VulkanGPULight toGPU() const {
             VulkanGPULight gpuLight{};
             gpuLight.position = position;
-            gpuLight.color = color;
             gpuLight.type = static_cast<uint32_t>(type);
-            gpuLight.radius = radius;
+
+            gpuLight.color = color;
             gpuLight.intensity = intensity;
+
+            gpuLight.direction = direction;
+            gpuLight.radius = radius;
+
+            gpuLight.spotParams = cvtConeAngleToSpotParams(innerConeAngleRad, outerConeAngleRad);
             gpuLight.available = 1;
             return gpuLight;
+        }
+
+    private:
+        static glm::vec3 cvtConeAngleToSpotParams(float innerAngle, float outerAngle) {
+            // https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_lights_punctual#inner-and-outer-cone-angles
+            float lightAngleScale =
+                    1.0f / std::max(0.001f, std::cos(innerAngle) - std::cos(outerAngle));
+            float lightAngleOffset = -std::cos(outerAngle) * lightAngleScale;
+            return glm::vec3(lightAngleScale, lightAngleOffset, 0.0f);
         }
     };
 }// namespace moe

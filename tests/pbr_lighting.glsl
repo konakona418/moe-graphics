@@ -13,22 +13,32 @@ float calculateDistanceAttenuation(float dist, float range) {
     return d;
 }
 
-/*float calculateAngularAttenuation(
-        vec3 lightDir, vec3 l,
-        vec2 scaleOffset) {
-    float cd = dot(lightDir, l);
-    float angularAttenuation = clamp(cd * scaleOffset.x + scaleOffset.y, 0.0, 1.0);
-    angularAttenuation *= angularAttenuation;
-    return angularAttenuation;
-}*/
+// in spec: attenuation = max( min( 1.0 - ( current_distance / range )^4, 1 ), 0 ) / current_distance^2
 
-// todo: spot light
+float calculateAngularAttenuation(
+        vec3 lightDir, vec3 l,
+        vec2 spotParams) {
+    // ! fixme: no idea whether this is correct, double check
+    // ! but it seems to work anyway
+    // l: direction from fragment to light
+    // lightVec : direction from light to fragment (should be normalized)
+    vec3 lightVec = -l;
+    float cd = dot(lightDir, lightVec);
+    // spotParams : (lightAngleScale, lightAngleOffset)
+    float angularAttenuation = clamp(cd * spotParams.x + spotParams.y, 0.0, 1.0);
+    angularAttenuation *= angularAttenuation;
+
+    //debugPrintfEXT("cd: %f, spotParams: %f, %f, angularAttenuation: %f\n", cd, spotParams.x, spotParams.y, angularAttenuation);
+
+    return angularAttenuation;
+}
+
 float calculateAttenuation(vec3 pos, vec3 l, Light light) {
     float dist = length(light.position - pos);
     float atten = calculateDistanceAttenuation(dist, light.radius);
-    /*if (light.type == LIGHT_TYPE_SPOT) {
-        atten *= calculateAngularAttenuation(light.direction, l, light.scaleOffset);
-    }*/
+    if (light.type == LIGHT_TYPE_SPOT) {
+        atten *= calculateAngularAttenuation(light.direction, l, light.spotParams.xy);
+    }
     return atten;
 }
 
@@ -38,6 +48,9 @@ vec3 calculateLight(Light light, vec3 fragPos, vec3 n, vec3 v, vec3 l,
     float NoL = clamp(dot(n, l), 0.0, 1.0);
 
     float atten = 1.0;
+    // Point lights - attenuation by distance
+    // Directional lights - no attenuation
+    // Spot lights - attenuation by angle and distance
     if (light.type != LIGHT_TYPE_DIRECTIONAL) {
         atten = calculateAttenuation(fragPos, l, light);
     }
