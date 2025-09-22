@@ -226,6 +226,31 @@ namespace moe {
         return buffer;
     }
 
+    VulkanAllocatedImage VulkanEngine::allocateImage(VkImageCreateInfo imageInfo) {
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        allocInfo.flags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VulkanAllocatedImage image{};
+        image.imageExtent = imageInfo.extent;
+        image.imageFormat = imageInfo.format;
+
+        VkImageAspectFlags aspect =
+                imageInfo.format == VK_FORMAT_D32_SFLOAT
+                        ? VK_IMAGE_ASPECT_DEPTH_BIT
+                        : VK_IMAGE_ASPECT_COLOR_BIT;
+
+        MOE_VK_CHECK(
+                vmaCreateImage(g_engineInstance->m_allocator, &imageInfo, &allocInfo, &image.image, &image.vmaAllocation, nullptr));
+
+        VkImageViewCreateInfo imageViewInfo = VkInit::imageViewCreateInfo(image.imageFormat, image.image, aspect);
+        imageViewInfo.subresourceRange.levelCount = imageInfo.mipLevels;
+
+        MOE_VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &image.imageView));
+
+        return image;
+    }
+
     VulkanAllocatedImage VulkanEngine::allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
         VkImageCreateInfo imageInfo = VkInit::imageCreateInfo(format, usage, extent);
 
@@ -1117,7 +1142,7 @@ namespace moe {
         lights[sceneData->numLights++] = cpuLight.toGPU();
         cpuLight.type = LightType::Directional;
         cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        cpuLight.intensity = 5.0f;
+        cpuLight.intensity = 2.0f;
         cpuLight.position = glm::vec3(0.0f, 0.0f, 4.0f);
         cpuLight.direction = glm::vec3(0.0f, 0.0f, -1.0f);
         lights[sceneData->numLights++] = cpuLight.toGPU();

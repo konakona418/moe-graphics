@@ -132,6 +132,8 @@ namespace moe {
 
         VulkanAllocatedBuffer allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 
+        VulkanAllocatedImage allocateImage(VkImageCreateInfo imageInfo);
+
         VulkanAllocatedImage allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         VulkanAllocatedImage allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
