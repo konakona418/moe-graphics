@@ -89,6 +89,41 @@ namespace moe {
             vkCmdBlitImage2(cmdBuffer, &blitInfo);
         }
 
+        void resolveImage(VkCommandBuffer cmdBuffer, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize) {
+            VkImageResolve2 resolveRgn{};
+            resolveRgn.sType = VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2;
+            resolveRgn.pNext = nullptr;
+
+            resolveRgn.srcOffset = {0, 0, 0};
+            resolveRgn.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            resolveRgn.srcSubresource.baseArrayLayer = 0;
+            resolveRgn.srcSubresource.layerCount = 1;
+            resolveRgn.srcSubresource.mipLevel = 0;
+
+            resolveRgn.dstOffset = {0, 0, 0};
+            resolveRgn.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            resolveRgn.dstSubresource.baseArrayLayer = 0;
+            resolveRgn.dstSubresource.layerCount = 1;
+            resolveRgn.dstSubresource.mipLevel = 0;
+
+            resolveRgn.extent = {std::min(srcSize.width, dstSize.width), std::min(srcSize.height, dstSize.height), 1};
+
+            VkResolveImageInfo2 resolveInfo{};
+            resolveInfo.sType = VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2;
+            resolveInfo.pNext = nullptr;
+
+            resolveInfo.srcImage = src;
+            resolveInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+            resolveInfo.dstImage = dst;
+            resolveInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+            resolveInfo.regionCount = 1;
+            resolveInfo.pRegions = &resolveRgn;
+
+            vkCmdResolveImage2(cmdBuffer, &resolveInfo);
+        }
+
         VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename) {
             std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
 

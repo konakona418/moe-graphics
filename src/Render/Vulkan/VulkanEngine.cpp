@@ -422,17 +422,6 @@ namespace moe {
     }
 
     void VulkanEngine::draw() {
-        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
-        sceneData->view = m_defaultCamera.viewMatrix();
-        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
-        sceneData->projection[1][1] *= -1;
-        sceneData->viewProjection = sceneData->projection * sceneData->view;
-
-        /*auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
-
-        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
-        lights[1].position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));*/
-
         auto& currentFrame = getCurrentFrame();
 
         MOE_VK_CHECK_MSG(
@@ -450,6 +439,19 @@ namespace moe {
         MOE_VK_CHECK_MSG(
                 vkResetFences(m_device, 1, &currentFrame.inFlightFence),
                 "Failed to reset fence");
+
+        // ! Important: all shared resources (e.g. scene data buffer) must be updated with synchronization.
+        // ! Otherwise, GPU may read incomplete or corrupted data, causing glitches or crashes.
+        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
+        sceneData->view = m_defaultCamera.viewMatrix();
+        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
+        sceneData->projection[1][1] *= -1;
+        sceneData->viewProjection = sceneData->projection * sceneData->view;
+
+        auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
+
+        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
+        lights[1].position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
 
         uint32_t swapchainImageIndex;
         VkResult acquireResult = vkAcquireNextImageKHR(
@@ -490,11 +492,20 @@ namespace moe {
                 commandBuffer, m_depthImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
+        VkUtils::transitionImage(
+                commandBuffer, m_finalColorImage.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
         //drawBackground(commandBuffer);
 
         VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
         VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
         auto colorAttachment = VkInit::renderingAttachmentInfo(m_drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        colorAttachment.resolveImageView = m_finalColorImage.imageView;
+        colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+        colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;// ! msaa x4
+        // resolve msaa x4 image -> final image
+
         auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, &depthClearValue, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, &depthAttachment);
         vkCmdBeginRendering(commandBuffer, &renderInfo);
@@ -510,11 +521,14 @@ namespace moe {
                 m_caches.materialCache,
                 packets,
                 m_pipelines.sceneDataBuffer);
+
         vkCmdEndRendering(commandBuffer);
 
         VkUtils::transitionImage(
-                commandBuffer, m_drawImage.image,
+                commandBuffer,
+                m_finalColorImage.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
         VkUtils::transitionImage(
                 commandBuffer,
                 m_swapchainImages[swapchainImageIndex],
@@ -522,7 +536,7 @@ namespace moe {
 
         VkUtils::copyImage(
                 commandBuffer,
-                m_drawImage.image, m_swapchainImages[swapchainImageIndex],
+                m_finalColorImage.image, m_swapchainImages[swapchainImageIndex],
                 m_drawExtent, m_swapchainExtent);
 
         VkUtils::transitionImage(
@@ -769,6 +783,7 @@ namespace moe {
                 .geometryShader = VK_TRUE,
                 .depthClamp = VK_TRUE,
                 .samplerAnisotropy = VK_TRUE,
+                .shaderStorageImageMultisample = VK_TRUE,
         };
 
         VkPhysicalDeviceVulkan13Features vkPhysicalDeviceVulkan13Features = {
@@ -913,6 +928,9 @@ namespace moe {
         m_depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
         m_depthImage.imageExtent = drawExtent;
 
+        m_finalColorImage.imageFormat = m_drawImage.imageFormat;
+        m_finalColorImage.imageExtent = drawExtent;
+
         VkImageUsageFlags drawImageUsage{};
         drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -922,9 +940,20 @@ namespace moe {
         VkImageUsageFlags depthImageUsage{};
         depthImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
+        VkImageUsageFlags finalColorImageUsage{};
+        finalColorImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        finalColorImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        finalColorImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        finalColorImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
+
         VkImageCreateInfo drawImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, drawImageUsage, drawExtent);
+        drawImageInfo.samples = VK_SAMPLE_COUNT_4_BIT;// ! msaa x4
 
         VkImageCreateInfo depthImageInfo = VkInit::imageCreateInfo(m_depthImage.imageFormat, depthImageUsage, drawExtent);
+        depthImageInfo.samples = VK_SAMPLE_COUNT_4_BIT;// ! msaa x4
+
+        VkImageCreateInfo finalColorImageInfo = VkInit::imageCreateInfo(m_finalColorImage.imageFormat, finalColorImageUsage, drawExtent);
+        finalColorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;// ! msaa x4
 
         VmaAllocationCreateInfo allocCreateInfo{};
         allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -932,14 +961,20 @@ namespace moe {
 
         vmaCreateImage(m_allocator, &drawImageInfo, &allocCreateInfo, &m_drawImage.image, &m_drawImage.vmaAllocation, nullptr);
         vmaCreateImage(m_allocator, &depthImageInfo, &allocCreateInfo, &m_depthImage.image, &m_depthImage.vmaAllocation, nullptr);
+        vmaCreateImage(m_allocator, &finalColorImageInfo, &allocCreateInfo, &m_finalColorImage.image, &m_finalColorImage.vmaAllocation, nullptr);
 
         VkImageViewCreateInfo drawImageViewInfo = VkInit::imageViewCreateInfo(m_drawImage.imageFormat, m_drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
         VkImageViewCreateInfo depthImageViewInfo = VkInit::imageViewCreateInfo(m_depthImage.imageFormat, m_depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+        VkImageViewCreateInfo finalColorImageViewInfo = VkInit::imageViewCreateInfo(m_finalColorImage.imageFormat, m_finalColorImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
         MOE_VK_CHECK(vkCreateImageView(m_device, &drawImageViewInfo, nullptr, &m_drawImage.imageView));
         MOE_VK_CHECK(vkCreateImageView(m_device, &depthImageViewInfo, nullptr, &m_depthImage.imageView));
+        MOE_VK_CHECK(vkCreateImageView(m_device, &finalColorImageViewInfo, nullptr, &m_finalColorImage.imageView));
 
         m_mainDeletionQueue.pushFunction([=] {
+            vkDestroyImageView(m_device, m_finalColorImage.imageView, nullptr);
+            vmaDestroyImage(m_allocator, m_finalColorImage.image, m_finalColorImage.vmaAllocation);
+
             vkDestroyImageView(m_device, m_drawImage.imageView, nullptr);
             vmaDestroyImage(m_allocator, m_drawImage.image, m_drawImage.vmaAllocation);
 
@@ -1119,7 +1154,7 @@ namespace moe {
 
         auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
         VulkanCPULight cpuLight;
-        /*cpuLight.color = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f);
+        cpuLight.color = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f);
         cpuLight.intensity = 5.0f;
         cpuLight.position = glm::vec3(2.0f, 2.0f, -2.0f);
         cpuLight.radius = 8.0f;
@@ -1130,8 +1165,8 @@ namespace moe {
         cpuLight.position = glm::vec3(-2.0f, 2.0f, -2.0f);
         cpuLight.radius = 10.0f;
         cpuLight.type = LightType::Point;
-        lights[sceneData->numLights++] = cpuLight.toGPU();*/
-        cpuLight.type = LightType::Spot;
+        lights[sceneData->numLights++] = cpuLight.toGPU();
+        /*cpuLight.type = LightType::Spot;
         cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
         cpuLight.intensity = 5.0f;
         cpuLight.position = glm::vec3(0.0f, 1.0f, -4.0f);
@@ -1145,7 +1180,7 @@ namespace moe {
         cpuLight.intensity = 2.0f;
         cpuLight.position = glm::vec3(0.0f, 0.0f, 4.0f);
         cpuLight.direction = glm::vec3(0.0f, 0.0f, -1.0f);
-        lights[sceneData->numLights++] = cpuLight.toGPU();
+        lights[sceneData->numLights++] = cpuLight.toGPU();*/
 
 
         m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");

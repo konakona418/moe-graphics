@@ -10,6 +10,8 @@ namespace moe {
 
         void copyImage(VkCommandBuffer cmdBuffer, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize);
 
+        void resolveImage(VkCommandBuffer cmdBuffer, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize);
+
         VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename);
 
         void generateMipmaps(VkCommandBuffer cmdBuffer, VkImage image, VkExtent2D imageExtent);

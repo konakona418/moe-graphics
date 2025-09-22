@@ -77,6 +77,7 @@ namespace moe {
 
         VulkanAllocatedImage m_drawImage;
         VulkanAllocatedImage m_depthImage;
+        VulkanAllocatedImage m_finalColorImage;
         VkExtent2D m_drawExtent;
 
         VkFence m_immediateModeFence;
