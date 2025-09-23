@@ -352,20 +352,24 @@ namespace moe {
                     return transform;
                 }
 
+                glm::mat4 T(1.0f), R(1.0f), S(1.0f);
                 if (!node.scale.empty()) {
                     glm::vec3 scale = cvtTinyGltfVec3(node.scale);
-                    transform = glm::scale(transform, scale);
+                    S = glm::scale(S, scale);
                 }
 
                 if (!node.rotation.empty()) {
                     glm::quat rotation = cvtTinyGltfQuat(node.rotation);
-                    transform *= glm::toMat4(rotation);
+                    R *= glm::toMat4(rotation);
                 }
 
                 if (!node.translation.empty()) {
                     glm::vec3 translation = cvtTinyGltfVec3(node.translation);
-                    transform = glm::translate(transform, translation);
+                    T = glm::translate(T, translation);
                 }
+
+                // ! glTF spec
+                transform = T * R * S;
 
                 return transform;
             }
