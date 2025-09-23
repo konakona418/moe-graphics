@@ -584,7 +584,7 @@ namespace moe {
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
         VkUtils::transitionImage(
-                commandBuffer, m_finalColorImage.image,
+                commandBuffer, m_msaaResolveImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
         //drawBackground(commandBuffer);
@@ -592,10 +592,12 @@ namespace moe {
         VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
         VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
         auto colorAttachment = VkInit::renderingAttachmentInfo(m_drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        colorAttachment.resolveImageView = m_finalColorImage.imageView;
-        colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-        colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;// ! msaa x4
-        // resolve msaa x4 image -> final image
+        if (isMultisamplingEnabled()) {
+            colorAttachment.resolveImageView = m_msaaResolveImage.imageView;
+            colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+            colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;// ! msaa x4
+            // resolve msaa x4 image -> 1 sample resolved image
+        }
 
         auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, &depthClearValue, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, &depthAttachment);
@@ -619,18 +621,32 @@ namespace moe {
 
         VkUtils::transitionImage(
                 commandBuffer,
-                m_finalColorImage.image,
-                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-        VkUtils::transitionImage(
-                commandBuffer,
                 m_swapchainImages[swapchainImageIndex],
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-        VkUtils::copyImage(
-                commandBuffer,
-                m_finalColorImage.image, m_swapchainImages[swapchainImageIndex],
-                m_drawExtent, m_swapchainExtent);
+        if (isMultisamplingEnabled()) {
+            // blit from resolved image to swapchain image
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_msaaResolveImage.image,
+                    VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            VkUtils::copyImage(
+                    commandBuffer,
+                    m_msaaResolveImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_drawExtent, m_swapchainExtent);
+        } else {
+            // blit from draw image to swapchain image
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_drawImage.image,
+                    VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            VkUtils::copyImage(
+                    commandBuffer,
+                    m_drawImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_drawExtent, m_swapchainExtent);
+        }
 
         VkUtils::transitionImage(
                 commandBuffer, m_swapchainImages[swapchainImageIndex],
@@ -1021,8 +1037,8 @@ namespace moe {
         m_depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
         m_depthImage.imageExtent = drawExtent;
 
-        m_finalColorImage.imageFormat = m_drawImage.imageFormat;
-        m_finalColorImage.imageExtent = drawExtent;
+        m_msaaResolveImage.imageFormat = m_drawImage.imageFormat;
+        m_msaaResolveImage.imageExtent = drawExtent;
 
         VkImageUsageFlags drawImageUsage{};
         drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1040,13 +1056,13 @@ namespace moe {
         finalColorImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
         VkImageCreateInfo drawImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, drawImageUsage, drawExtent);
-        drawImageInfo.samples = VK_SAMPLE_COUNT_4_BIT;// ! msaa x4
+        drawImageInfo.samples = isMultisamplingEnabled() ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
 
         VkImageCreateInfo depthImageInfo = VkInit::imageCreateInfo(m_depthImage.imageFormat, depthImageUsage, drawExtent);
-        depthImageInfo.samples = VK_SAMPLE_COUNT_4_BIT;// ! msaa x4
+        depthImageInfo.samples = isMultisamplingEnabled() ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
 
-        VkImageCreateInfo finalColorImageInfo = VkInit::imageCreateInfo(m_finalColorImage.imageFormat, finalColorImageUsage, drawExtent);
-        finalColorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;// ! msaa x4
+        VkImageCreateInfo finalColorImageInfo = VkInit::imageCreateInfo(m_msaaResolveImage.imageFormat, finalColorImageUsage, drawExtent);
+        finalColorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
         VmaAllocationCreateInfo allocCreateInfo{};
         allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -1054,19 +1070,19 @@ namespace moe {
 
         vmaCreateImage(m_allocator, &drawImageInfo, &allocCreateInfo, &m_drawImage.image, &m_drawImage.vmaAllocation, nullptr);
         vmaCreateImage(m_allocator, &depthImageInfo, &allocCreateInfo, &m_depthImage.image, &m_depthImage.vmaAllocation, nullptr);
-        vmaCreateImage(m_allocator, &finalColorImageInfo, &allocCreateInfo, &m_finalColorImage.image, &m_finalColorImage.vmaAllocation, nullptr);
+        vmaCreateImage(m_allocator, &finalColorImageInfo, &allocCreateInfo, &m_msaaResolveImage.image, &m_msaaResolveImage.vmaAllocation, nullptr);
 
         VkImageViewCreateInfo drawImageViewInfo = VkInit::imageViewCreateInfo(m_drawImage.imageFormat, m_drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
         VkImageViewCreateInfo depthImageViewInfo = VkInit::imageViewCreateInfo(m_depthImage.imageFormat, m_depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-        VkImageViewCreateInfo finalColorImageViewInfo = VkInit::imageViewCreateInfo(m_finalColorImage.imageFormat, m_finalColorImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+        VkImageViewCreateInfo finalColorImageViewInfo = VkInit::imageViewCreateInfo(m_msaaResolveImage.imageFormat, m_msaaResolveImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
         MOE_VK_CHECK(vkCreateImageView(m_device, &drawImageViewInfo, nullptr, &m_drawImage.imageView));
         MOE_VK_CHECK(vkCreateImageView(m_device, &depthImageViewInfo, nullptr, &m_depthImage.imageView));
-        MOE_VK_CHECK(vkCreateImageView(m_device, &finalColorImageViewInfo, nullptr, &m_finalColorImage.imageView));
+        MOE_VK_CHECK(vkCreateImageView(m_device, &finalColorImageViewInfo, nullptr, &m_msaaResolveImage.imageView));
 
         m_mainDeletionQueue.pushFunction([=] {
-            vkDestroyImageView(m_device, m_finalColorImage.imageView, nullptr);
-            vmaDestroyImage(m_allocator, m_finalColorImage.image, m_finalColorImage.vmaAllocation);
+            vkDestroyImageView(m_device, m_msaaResolveImage.imageView, nullptr);
+            vmaDestroyImage(m_allocator, m_msaaResolveImage.image, m_msaaResolveImage.vmaAllocation);
 
             vkDestroyImageView(m_device, m_drawImage.imageView, nullptr);
             vmaDestroyImage(m_allocator, m_drawImage.image, m_drawImage.vmaAllocation);

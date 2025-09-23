@@ -55,6 +55,9 @@ namespace moe {
         bool m_resizeRequested{false};
         VkExtent2D m_windowExtent{1280, 720};
 
+        VkSampleCountFlagBits m_msaaSamples{VK_SAMPLE_COUNT_4_BIT};
+        // ! msaa x4; disable this if deferred rendering is implemented; use fxaa then
+
         GLFWwindow* m_window{nullptr};
         std::pair<float, float> m_lastMousePos{0.0f, 0.0f};
         bool m_firstMouse{true};
@@ -78,7 +81,7 @@ namespace moe {
 
         VulkanAllocatedImage m_drawImage;
         VulkanAllocatedImage m_depthImage;
-        VulkanAllocatedImage m_finalColorImage;
+        VulkanAllocatedImage m_msaaResolveImage;
         VkExtent2D m_drawExtent;
 
         VkFence m_immediateModeFence;
@@ -159,6 +162,8 @@ namespace moe {
         VulkanCamera& getDefaultCamera() { return m_defaultCamera; }
 
         InputBus& getInputBus() { return m_inputBus; }
+
+        bool isMultisamplingEnabled() const { return m_msaaSamples != VK_SAMPLE_COUNT_1_BIT; }
 
     private:
         void initWindow();

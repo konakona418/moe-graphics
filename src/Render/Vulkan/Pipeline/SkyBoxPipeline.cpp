@@ -34,17 +34,23 @@ namespace moe {
             auto pipelineLayoutInfo = VkInit::pipelineLayoutCreateInfo(descriptorLayouts, pushRanges);
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-            m_pipeline = VulkanPipelineBuilder(m_pipelineLayout)
-                                 .addShader(vert, frag)
-                                 .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                                 .setPolygonMode(VK_POLYGON_MODE_FILL)
-                                 .setCullMode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                 .enableMultisampling(VK_SAMPLE_COUNT_4_BIT)
-                                 .disableBlending()
-                                 .enableDepthTesting(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                                 .setColorAttachmentFormat(engine.m_drawImage.imageFormat)
-                                 .setDepthFormat(engine.m_depthImage.imageFormat)
-                                 .build(engine.m_device);
+            auto builder = VulkanPipelineBuilder(m_pipelineLayout)
+                                   .addShader(vert, frag)
+                                   .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                                   .setPolygonMode(VK_POLYGON_MODE_FILL)
+                                   .setCullMode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                                   .disableBlending()
+                                   .enableDepthTesting(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                                   .setColorAttachmentFormat(engine.m_drawImage.imageFormat)
+                                   .setDepthFormat(engine.m_depthImage.imageFormat);
+
+            if (engine.isMultisamplingEnabled()) {
+                builder.enableMultisampling(engine.m_msaaSamples);
+            } else {
+                builder.disableMultisampling();
+            }
+
+            m_pipeline = builder.build(engine.m_device);
 
             vkDestroyShaderModule(engine.m_device, vert, nullptr);
             vkDestroyShaderModule(engine.m_device, frag, nullptr);
