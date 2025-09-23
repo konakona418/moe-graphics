@@ -284,7 +284,7 @@ namespace moe {
     }
 
     VulkanAllocatedImage VulkanEngine::allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
-        size_t imageSize = extent.width * extent.height * extent.depth * 4;// rgba8
+        size_t imageSize = extent.width * extent.height * extent.depth * VkUtils::getChannelsFromFormat(format);
         VulkanAllocatedBuffer stagingBuffer = allocateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         std::memcpy(stagingBuffer.vmaAllocation->GetMappedData(), data, imageSize);
 
@@ -330,9 +330,100 @@ namespace moe {
         return image;
     }
 
+    VulkanAllocatedImage VulkanEngine::allocateCubeMapImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        VkImageCreateInfo imageInfo = VkInit::imageCreateInfo(format, usage, extent);
+        imageInfo.arrayLayers = 6;
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+
+        if (mipmap) {
+            imageInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+        } else {
+            imageInfo.mipLevels = 1;
+        }
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        allocInfo.flags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VulkanAllocatedImage image{};
+        image.imageExtent = extent;
+        image.imageFormat = format;
+
+        MOE_VK_CHECK(
+                vmaCreateImage(m_allocator, &imageInfo, &allocInfo, &image.image, &image.vmaAllocation, nullptr));
+
+        VkImageAspectFlags aspect =
+                format == VK_FORMAT_D32_SFLOAT
+                        ? VK_IMAGE_ASPECT_DEPTH_BIT
+                        : VK_IMAGE_ASPECT_COLOR_BIT;
+        VkImageViewCreateInfo imageViewInfo = VkInit::imageViewCreateInfo(format, image.image, aspect);
+        imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        imageViewInfo.subresourceRange.levelCount = imageInfo.mipLevels;
+        imageViewInfo.subresourceRange.layerCount = 6;
+
+        MOE_VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &image.imageView));
+
+        return image;
+    }
+
+    VulkanAllocatedImage VulkanEngine::allocateCubeMapImage(Array<void*, 6> data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        size_t imageSize = extent.width * extent.height * extent.depth * VkUtils::getChannelsFromFormat(format);
+        VulkanAllocatedBuffer stagingBuffer = allocateBuffer(imageSize * 6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        MOE_ASSERT(stagingBuffer.vmaAllocation->GetMappedData() != nullptr, "Failed to map staging buffer");
+        for (size_t i = 0; i < 6; ++i) {
+            std::memcpy(static_cast<uint8_t*>(stagingBuffer.vmaAllocation->GetMappedData()) + imageSize * i, data[i], imageSize);
+        }
+
+        VulkanAllocatedImage image = allocateCubeMapImage(
+                extent, format,
+                usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                mipmap);
+        immediateSubmit([&](VkCommandBuffer cmd) {
+            VkUtils::transitionImage(
+                    cmd, image.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            Array<VkBufferImageCopy, 6> copyRegions{};
+            for (uint32_t i = 0; i < 6; ++i) {
+                copyRegions[i].bufferOffset = imageSize * i;
+                copyRegions[i].bufferRowLength = 0;
+                copyRegions[i].bufferImageHeight = 0;
+
+                copyRegions[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                copyRegions[i].imageSubresource.mipLevel = 0;
+                copyRegions[i].imageSubresource.baseArrayLayer = i;
+                copyRegions[i].imageSubresource.layerCount = 1;
+                copyRegions[i].imageExtent = extent;
+            }
+
+            vkCmdCopyBufferToImage(
+                    cmd,
+                    stagingBuffer.buffer,
+                    image.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    static_cast<uint32_t>(copyRegions.size()),
+                    copyRegions.data());
+            if (mipmap) {
+                VkUtils::generateMipmaps(cmd, image.image, VkExtent2D{extent.width, extent.height});
+            } else {
+                VkUtils::transitionImage(
+                        cmd, image.image,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+        });
+
+        destroyBuffer(stagingBuffer);
+
+        return image;
+    }
+
     Optional<VulkanAllocatedImage> VulkanEngine::loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
         int width, height, channels;
         auto rawImage = VkLoaders::loadImage(filename, &width, &height, &channels);
+
+        MOE_ASSERT(channels == VkUtils::getChannelsFromFormat(format), "Image channels does not match format channels");
 
         if (!rawImage) {
             Logger::error("Failed to open image: {}", filename);
@@ -450,7 +541,7 @@ namespace moe {
 
         auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
 
-        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
+        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
         lights[1].position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
 
         uint32_t swapchainImageIndex;
@@ -521,6 +612,8 @@ namespace moe {
                 m_caches.materialCache,
                 packets,
                 m_pipelines.sceneDataBuffer);
+
+        m_pipelines.skyBoxPipeline.draw(commandBuffer, getDefaultCamera());
 
         vkCmdEndRendering(commandBuffer);
 
@@ -1130,6 +1223,17 @@ namespace moe {
 
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
+        m_pipelines.skyBoxPipeline.init(*this);
+
+        m_pipelines.skyBoxImageId = m_caches.imageCache.loadCubeMapFromFiles(
+                {"skybox/right.jpg",
+                 "skybox/left.jpg",
+                 "skybox/top.jpg",
+                 "skybox/bottom.jpg",
+                 "skybox/front.jpg",
+                 "skybox/back.jpg"},
+                VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
+        m_pipelines.skyBoxPipeline.setSkyBoxImage(m_pipelines.skyBoxImageId);
 
         m_pipelines.lightBuffer = allocateBuffer(
                 sizeof(VulkanGPULight) * MAX_LIGHTS,
@@ -1189,6 +1293,7 @@ namespace moe {
             destroyBuffer(m_pipelines.sceneDataBuffer);
             destroyBuffer(m_pipelines.lightBuffer);
 
+            m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
         });
     }

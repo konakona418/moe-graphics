@@ -10,8 +10,8 @@
 
 namespace moe {
     namespace VkLoaders {
-        UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels) {
-            auto* buf = stbi_load(filename.data(), width, height, channels, 0);
+        UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels, int desiredChannels) {
+            auto* buf = stbi_load(filename.data(), width, height, channels, desiredChannels);
             //MOE_ASSERT(*channels == 4, "Only 4-channel images are supported");
 
             // todo: implement more robust image loading

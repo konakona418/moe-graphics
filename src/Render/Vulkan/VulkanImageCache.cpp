@@ -1,5 +1,7 @@
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanEngine.hpp"
+#include "Render/Vulkan/VulkanLoaders.hpp"
+#include "Render/Vulkan/VulkanUtils.hpp"
 
 
 namespace moe {
@@ -43,6 +45,46 @@ namespace moe {
         }
 
         return addImage(std::move(image.value()));
+    }
+
+    ImageId VulkanImageCache::loadCubeMapFromFiles(Array<StringView, 6> filenames, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        MOE_ASSERT(m_initialized, "VulkanImageCache not initialized");
+
+        Array<void*, 6> rawImages;
+        Array<VkLoaders::UniqueRawImage, 6> _rawImageRefs;
+        int width, height, channels;
+
+        std::pair<Array<int, 6>, Array<int, 6>> imageDimensions;
+
+        int desiredChannels = VkUtils::getChannelsFromFormat(format);
+        Logger::debug("Loading cubemap with desired channels: {}", desiredChannels);
+
+        for (int i = 0; i < 6; ++i) {
+            auto rawImage = VkLoaders::loadImage(filenames[i], &width, &height, &channels, desiredChannels);
+            if (!rawImage) {
+                Logger::error("Failed to load cubemap image from file: {}", filenames[i]);
+                return NULL_IMAGE_ID;
+            }
+            _rawImageRefs[i] = std::move(rawImage);// lifetime
+            rawImages[i] = _rawImageRefs[i].get();
+
+            imageDimensions.first[i] = width;
+            imageDimensions.second[i] = height;
+        }
+
+        if (channels != VkUtils::getChannelsFromFormat(format)) {
+            Logger::warn("Image channels does not match format channels");
+        }
+
+        for (int i = 1; i < 6; ++i) {
+            if (imageDimensions.first[i] != imageDimensions.first[0] || imageDimensions.second[i] != imageDimensions.second[0]) {
+                Logger::error("Cubemap images have different dimensions");
+                return NULL_IMAGE_ID;
+            }
+        }
+
+        return addImage(m_engine->allocateCubeMapImage(
+                rawImages, {(uint32_t) width, (uint32_t) height, 1}, format, usage, mipmap));
     }
 
     void VulkanImageCache::disposeImage(ImageId id) {

@@ -15,5 +15,9 @@ namespace moe {
         VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename);
 
         void generateMipmaps(VkCommandBuffer cmdBuffer, VkImage image, VkExtent2D imageExtent);
+
+        size_t getBytesPerPixelFromFormat(VkFormat format);
+
+        size_t getChannelsFromFormat(VkFormat format);
     }// namespace VkUtils
 }// namespace moe

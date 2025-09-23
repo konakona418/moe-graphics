@@ -18,7 +18,7 @@ namespace moe {
 
         using UniqueRawImage = std::unique_ptr<uint8_t, StbiImageDeleter>;
 
-        UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels);
+        UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels, int desiredChannels = 0);
 
         namespace GLTF {
             Optional<VulkanScene> loadSceneFromFile(VulkanEngine& engine, StringView filename);

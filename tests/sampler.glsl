@@ -7,6 +7,8 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 layout(set = 0, binding = 0) uniform texture2D u_textures[];
+layout(set = 0, binding = 0) uniform textureCube u_textureCubes[];
+
 layout(set = 0, binding = 1) uniform sampler u_samplers[];
 
 #define SAMPLER_NEAREST_ID 0
@@ -18,6 +20,14 @@ vec4 sampleTextureLinear(uint index, vec2 uv) {
 
 vec4 sampleTextureNearest(uint index, vec2 uv) {
     return texture(nonuniformEXT(sampler2D(u_textures[index], u_samplers[SAMPLER_NEAREST_ID])), uv);
+}
+
+vec4 sampleTextureCubeLinear(uint index, vec3 direction) {
+    return texture(nonuniformEXT(samplerCube(u_textureCubes[index], u_samplers[SAMPLER_LINEAR_ID])), direction);
+}
+
+vec4 sampleTextureCubeNearest(uint index, vec3 direction) {
+    return texture(nonuniformEXT(samplerCube(u_textureCubes[index], u_samplers[SAMPLER_NEAREST_ID])), direction);
 }
 
 #endif// MOE_SAMPLER_GLSL

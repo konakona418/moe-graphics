@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
+#include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
@@ -105,6 +106,8 @@ namespace moe {
 
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
+            Pipeline::SkyBoxPipeline skyBoxPipeline;
+            ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanAllocatedBuffer lightBuffer;
             VulkanAllocatedBuffer sceneDataBuffer;
             VulkanScene testScene;
@@ -138,6 +141,10 @@ namespace moe {
         VulkanAllocatedImage allocateImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         VulkanAllocatedImage allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
+        VulkanAllocatedImage allocateCubeMapImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
+        VulkanAllocatedImage allocateCubeMapImage(Array<void*, 6> data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         Optional<VulkanAllocatedImage> loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
