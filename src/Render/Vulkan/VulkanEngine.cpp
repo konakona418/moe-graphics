@@ -514,6 +514,7 @@ namespace moe {
 
     void VulkanEngine::draw() {
         auto& currentFrame = getCurrentFrame();
+        auto currentFrameIndex = getCurrentFrameIndex();
 
         MOE_VK_CHECK_MSG(
                 vkWaitForFences(
@@ -530,20 +531,6 @@ namespace moe {
         MOE_VK_CHECK_MSG(
                 vkResetFences(m_device, 1, &currentFrame.inFlightFence),
                 "Failed to reset fence");
-
-        // ! Fixme
-        // ! Important: all shared resources (e.g. scene data buffer) must be updated with synchronization.
-        // ! Otherwise, GPU may read incomplete or corrupted data, causing glitches or crashes.
-        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
-        sceneData->view = m_defaultCamera.viewMatrix();
-        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
-        sceneData->projection[1][1] *= -1;
-        sceneData->viewProjection = sceneData->projection * sceneData->view;
-
-        auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
-
-        lights[0].position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
-        lights[1].position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
 
         uint32_t swapchainImageIndex;
         VkResult acquireResult = vkAcquireNextImageKHR(
@@ -575,11 +562,61 @@ namespace moe {
 
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
-        // load scene render packets
+        // ! load scene render packets
         m_pipelines.testScene.updateTransform(glm::mat4(1.0f));
 
         Vector<VulkanRenderPacket> packets;
         m_pipelines.testScene.gatherRenderPackets(packets);
+
+        // ! initialize scene data
+
+        auto cameraView = m_defaultCamera.viewMatrix();
+        auto cameraProjection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
+        cameraProjection[1][1] *= -1;
+        auto cameraViewProjection = cameraProjection * cameraView;
+        auto cameraPosition = glm::vec4(m_defaultCamera.getPosition(), 1.0f);
+        VulkanGPUSceneData sceneData{
+                .view = cameraView,
+                .projection = cameraProjection,
+                .viewProjection = cameraViewProjection,
+                .invView = glm::inverse(cameraView),
+                .invProjection = glm::inverse(cameraProjection),
+                .invViewProjection = glm::inverse(cameraViewProjection),
+                .cameraPosition = cameraPosition,
+                .ambientColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f),
+                .materialBuffer = m_caches.materialCache.getMaterialBufferAddress(),
+                .lightBuffer = m_pipelines.lightBuffer.getBuffer().address,
+                .numLights = 0,
+                .skyboxId = m_pipelines.skyBoxImageId,
+        };
+
+        Vector<VulkanGPULight> sceneLights;
+        {
+            VulkanCPULight light{};
+            light.type = LightType::Point;
+            light.position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
+            light.color = glm::vec3(1.0f, 0.5f, 0.0f);
+            light.intensity = 5.0f;
+            light.radius = 8.0f;
+            sceneLights.push_back(light.toGPU());
+        }
+        {
+            VulkanCPULight light{};
+            light.type = LightType::Point;
+            light.position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
+            light.color = glm::vec3(0.0f, 0.5f, 1.0f);
+            light.intensity = 5.0f;
+            light.radius = 8.0f;
+            sceneLights.push_back(light.toGPU());
+        }
+
+        sceneData.numLights = static_cast<uint32_t>(sceneLights.size());
+
+        m_pipelines.sceneDataBuffer.upload(commandBuffer, &sceneData, currentFrameIndex, sizeof(VulkanGPUSceneData));
+
+        m_pipelines.lightBuffer.upload(commandBuffer, sceneLights.data(), currentFrameIndex, sizeof(VulkanGPULight) * sceneLights.size());
+
+        // ! begin of main render pass
 
         //! fixme: general image layout is not an optimal choice.
         VkUtils::transitionImage(
@@ -598,7 +635,7 @@ namespace moe {
         m_pipelines.gBufferPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache, m_caches.materialCache,
-                packets, m_pipelines.sceneDataBuffer);
+                packets, m_pipelines.sceneDataBuffer.getBuffer());
 
         VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
         //VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
@@ -610,7 +647,7 @@ namespace moe {
             // resolve msaa x4 image -> 1 sample resolved image
         }
 
-        auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        //auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, &depthClearValue, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, nullptr);
         vkCmdBeginRendering(commandBuffer, &renderInfo);
 
@@ -625,7 +662,7 @@ namespace moe {
 
         m_pipelines.deferredLightingPipeline.draw(
                 commandBuffer,
-                m_pipelines.sceneDataBuffer,
+                m_pipelines.sceneDataBuffer.getBuffer(),
                 m_pipelines.gBufferPipeline.gDepthId,
                 m_pipelines.gBufferPipeline.gAlbedoId,
                 m_pipelines.gBufferPipeline.gNormalId,
@@ -1255,7 +1292,7 @@ namespace moe {
 
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
-        m_pipelines.skyBoxPipeline.init(*this);
+        //m_pipelines.skyBoxPipeline.init(*this);
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
 
@@ -1267,69 +1304,29 @@ namespace moe {
                  "skybox/front.jpg",
                  "skybox/back.jpg"},
                 VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
-        m_pipelines.skyBoxPipeline.setSkyBoxImage(m_pipelines.skyBoxImageId);
+        //m_pipelines.skyBoxPipeline.setSkyBoxImage(m_pipelines.skyBoxImageId);
 
-        m_pipelines.lightBuffer = allocateBuffer(
-                sizeof(VulkanGPULight) * MAX_LIGHTS,
+        m_pipelines.sceneDataBuffer.init(
+                *this,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                VMA_MEMORY_USAGE_AUTO);
+                sizeof(VulkanGPUSceneData),
+                FRAMES_IN_FLIGHT);
 
-        m_pipelines.sceneDataBuffer =
-                allocateBuffer(
-                        sizeof(VulkanGPUSceneData),
-                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                        VMA_MEMORY_USAGE_AUTO);
-
-        auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
-        sceneData->ambientColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.1f);
-        sceneData->view = m_defaultCamera.viewMatrix();
-        sceneData->projection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
-        sceneData->projection[1][1] *= -1;
-        sceneData->viewProjection = sceneData->projection * sceneData->view;
-        sceneData->materialBuffer = m_caches.materialCache.getMaterialBufferAddress();
-        sceneData->lightBuffer = m_pipelines.lightBuffer.address;
-        sceneData->numLights = 0;
-
-        auto* lights = static_cast<VulkanGPULight*>(m_pipelines.lightBuffer.vmaAllocation->GetMappedData());
-        VulkanCPULight cpuLight;
-        cpuLight.color = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f);
-        cpuLight.intensity = 5.0f;
-        cpuLight.position = glm::vec3(2.0f, 2.0f, -2.0f);
-        cpuLight.radius = 8.0f;
-        cpuLight.type = LightType::Point;
-        lights[sceneData->numLights++] = cpuLight.toGPU();
-        cpuLight.color = glm::vec4(0.0f, 0.5f, 1.0f, 1.0f);
-        cpuLight.intensity = 5.0f;
-        cpuLight.position = glm::vec3(-2.0f, 2.0f, -2.0f);
-        cpuLight.radius = 10.0f;
-        cpuLight.type = LightType::Point;
-        lights[sceneData->numLights++] = cpuLight.toGPU();
-        /*cpuLight.type = LightType::Spot;
-        cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        cpuLight.intensity = 5.0f;
-        cpuLight.position = glm::vec3(0.0f, 1.0f, -4.0f);
-        cpuLight.direction = glm::vec3(0.0f, 0.0f, 1.0f);
-        cpuLight.radius = 10.0f;
-        cpuLight.innerConeAngleRad = glm::radians(1.0f);
-        cpuLight.outerConeAngleRad = glm::radians(10.0f);
-        lights[sceneData->numLights++] = cpuLight.toGPU();
-        cpuLight.type = LightType::Directional;
-        cpuLight.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        cpuLight.intensity = 2.0f;
-        cpuLight.position = glm::vec3(0.0f, 0.0f, 4.0f);
-        cpuLight.direction = glm::vec3(0.0f, 0.0f, -1.0f);
-        lights[sceneData->numLights++] = cpuLight.toGPU();*/
-
+        m_pipelines.lightBuffer.init(
+                *this,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                sizeof(VulkanGPULight) * MAX_LIGHTS,
+                FRAMES_IN_FLIGHT);
 
         m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
 
         m_mainDeletionQueue.pushFunction([&] {
-            destroyBuffer(m_pipelines.sceneDataBuffer);
-            destroyBuffer(m_pipelines.lightBuffer);
+            m_pipelines.lightBuffer.destroy();
+            m_pipelines.sceneDataBuffer.destroy();
 
             m_pipelines.deferredLightingPipeline.destroy();
             m_pipelines.gBufferPipeline.destroy();
-            m_pipelines.skyBoxPipeline.destroy();
+            //m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
         });
     }

@@ -11,6 +11,7 @@
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
+#include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 
@@ -111,13 +112,13 @@ namespace moe {
 
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
-            Pipeline::SkyBoxPipeline skyBoxPipeline;
+            //Pipeline::SkyBoxPipeline skyBoxPipeline;
             Pipeline::GBufferPipeline gBufferPipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
-            VulkanAllocatedBuffer lightBuffer;
-            VulkanAllocatedBuffer sceneDataBuffer;
+            VulkanSwapBuffer sceneDataBuffer;
+            VulkanSwapBuffer lightBuffer;
             VulkanScene testScene;
         } m_pipelines;
 
@@ -163,6 +164,8 @@ namespace moe {
         VulkanGPUMeshBuffer uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices);
 
         FrameData& getCurrentFrame() { return m_frames[m_frameNumber % FRAMES_IN_FLIGHT]; }
+
+        size_t getCurrentFrameIndex() const { return m_frameNumber % FRAMES_IN_FLIGHT; }
 
         VulkanCamera& getDefaultCamera() { return m_defaultCamera; }
 

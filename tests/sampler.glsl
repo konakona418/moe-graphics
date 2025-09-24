@@ -14,6 +14,12 @@ layout(set = 0, binding = 1) uniform sampler u_samplers[];
 #define SAMPLER_NEAREST_ID 0
 #define SAMPLER_LINEAR_ID 1
 
+#ifndef UINT_MAX
+#define UINT_MAX 0xffffffff
+#endif
+
+#define INVALID_TEXTURE_ID UINT_MAX
+
 vec4 sampleTextureLinear(uint index, vec2 uv) {
     return texture(nonuniformEXT(sampler2D(u_textures[index], u_samplers[SAMPLER_LINEAR_ID])), uv);
 }

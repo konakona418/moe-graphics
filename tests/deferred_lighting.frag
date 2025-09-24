@@ -30,6 +30,20 @@ vec3 fromUVDepthToWorld(vec2 uv, float depth, mat4 invProj, mat4 invView) {
     return world.xyz;
 }
 
+vec4 sampleSkyBox(vec2 uv) {
+    uint skyboxId = u_deferredPCS.sceneData.skyboxId;
+    if (skyboxId == INVALID_TEXTURE_ID) {
+        return vec4(0.0);
+    }
+
+    vec2 ndc = uv * 2.0 - vec2(1.0);
+
+    vec4 worldPos = u_deferredPCS.sceneData.invViewProjection * vec4(ndc, 1.0, 1.0);
+    vec3 samplePos = normalize(worldPos.xyz / worldPos.w - u_deferredPCS.sceneData.cameraPosition.xyz);
+
+    return sampleTextureCubeLinear(skyboxId, samplePos);
+}
+
 void main() {
     vec2 uv = inUV;
 
@@ -39,14 +53,19 @@ void main() {
     vec4 orma = sampleTextureLinear(u_deferredPCS.gORMATexture, uv);
     vec3 emissive = sampleTextureLinear(u_deferredPCS.gEmissiveTexture, uv).xyz;
 
+    if (depth.r == 1.0) {
+        // no geometry, sample skybox
+        outFragColor = sampleSkyBox(uv);
+        return;
+    }
+
     float occlusion = orma.x;
     float roughness = orma.y;
     float metallic = orma.z;
     float ambientOcclusion = orma.w;
 
-    // ! fixme: this is extremely slow
-    mat4 invProj = inverse(u_deferredPCS.sceneData.projection);
-    mat4 invView = inverse(u_deferredPCS.sceneData.view);
+    mat4 invView = u_deferredPCS.sceneData.invView;
+    mat4 invProj = u_deferredPCS.sceneData.invProjection;
 
     vec3 dialectricSpecular = vec3(0.04);
     vec3 diffuseColor = mix(albedo * (1.0 - dialectricSpecular.r), albedo, metallic);

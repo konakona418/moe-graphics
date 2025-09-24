@@ -50,6 +50,11 @@ namespace moe {
         glm::mat4 view;
         glm::mat4 projection;
         glm::mat4 viewProjection;
+
+        glm::mat4 invView;
+        glm::mat4 invProjection;
+        glm::mat4 invViewProjection;
+
         glm::vec4 cameraPosition;
 
         glm::vec4 ambientColor;// color(3), intensity(1)
@@ -59,6 +64,8 @@ namespace moe {
         VkDeviceAddress materialBuffer;
         VkDeviceAddress lightBuffer;
         uint32_t numLights;
+
+        uint32_t skyboxId;
     };
 
 }// namespace moe

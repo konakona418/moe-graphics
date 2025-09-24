@@ -14,6 +14,11 @@ layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     mat4 view;
     mat4 projection;
     mat4 viewProjection;
+
+    mat4 invView;
+    mat4 invProjection;
+    mat4 invViewProjection;
+
     vec4 cameraPosition;
 
     vec4 ambientColor;
@@ -23,6 +28,8 @@ layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     MaterialBuffer materialBuffer;
     LightBuffer lightBuffer;
     uint numLights;
+
+    uint skyboxId;
 };
 
 #endif// MOE_SCENE_DATA_GLSL

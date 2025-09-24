@@ -4,7 +4,7 @@
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
-    constexpr uint32_t MAX_LIGHTS = 16;
+    constexpr uint32_t MAX_LIGHTS = 1024;
 
     constexpr uint32_t LIGHT_TYPE_POINT = 0;
     constexpr uint32_t LIGHT_TYPE_DIRECTIONAL = 1;
