@@ -43,7 +43,7 @@ namespace moe {
                                    .setPolygonMode(VK_POLYGON_MODE_FILL)
                                    .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                                    .disableBlending()
-                                   .enableDepthTesting(VK_TRUE, VK_COMPARE_OP_LESS)
+                                   .disableDepthTesting()
                                    .setColorAttachmentFormat(engine.m_drawImage.imageFormat)
                                    .disableMultisampling();
 
