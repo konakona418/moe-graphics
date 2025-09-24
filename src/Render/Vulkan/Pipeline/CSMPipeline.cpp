@@ -65,12 +65,12 @@ namespace moe {
             auto image = engine.allocateImage(csmImageInfo);
             m_shadowMapImageId = engine.m_caches.imageCache.addImage(std::move(image));
 
-            auto* csmImageRef = engine.m_caches.imageCache.getImage(m_shadowMapImageId).value();
+            auto csmImageRef = engine.m_caches.imageCache.getImage(m_shadowMapImageId).value();
 
             for (uint32_t i = 0; i < SHADOW_CASCADE_COUNT; ++i) {
                 VkImageViewCreateInfo viewInfo = VkInit::imageViewCreateInfo(
                         VK_FORMAT_D32_SFLOAT,
-                        csmImageRef->image,
+                        csmImageRef.image,
                         VK_IMAGE_ASPECT_DEPTH_BIT);
                 viewInfo.subresourceRange.baseArrayLayer = i;
                 viewInfo.subresourceRange.layerCount = 1;
@@ -103,11 +103,11 @@ namespace moe {
 
             auto csmShadowMapResult = m_engine->m_caches.imageCache.getImage(m_shadowMapImageId);
             MOE_ASSERT(csmShadowMapResult.has_value(), "Invalid CSM shadow map image id");
-            auto* csmShadowMap = csmShadowMapResult.value();
+            auto csmShadowMap = csmShadowMapResult.value();
 
             VkUtils::transitionImage(
                     cmdBuffer,
-                    csmShadowMap->image,
+                    csmShadowMap.image,
                     VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 

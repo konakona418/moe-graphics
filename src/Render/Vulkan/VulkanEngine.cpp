@@ -531,6 +531,7 @@ namespace moe {
                 vkResetFences(m_device, 1, &currentFrame.inFlightFence),
                 "Failed to reset fence");
 
+        // ! Fixme
         // ! Important: all shared resources (e.g. scene data buffer) must be updated with synchronization.
         // ! Otherwise, GPU may read incomplete or corrupted data, causing glitches or crashes.
         auto* sceneData = static_cast<VulkanGPUSceneData*>(m_pipelines.sceneDataBuffer.vmaAllocation->GetMappedData());
@@ -574,6 +575,12 @@ namespace moe {
 
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
+        // load scene render packets
+        m_pipelines.testScene.updateTransform(glm::mat4(1.0f));
+
+        Vector<VulkanRenderPacket> packets;
+        m_pipelines.testScene.gatherRenderPackets(packets);
+
         //! fixme: general image layout is not an optimal choice.
         VkUtils::transitionImage(
                 commandBuffer, m_drawImage.image,
@@ -587,10 +594,14 @@ namespace moe {
                 commandBuffer, m_msaaResolveImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-        //drawBackground(commandBuffer);
+        // todo: sync with last read
+        m_pipelines.gBufferPipeline.draw(
+                commandBuffer,
+                m_caches.meshCache, m_caches.materialCache,
+                packets, m_pipelines.sceneDataBuffer);
 
         VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
-        VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
+        //VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
         auto colorAttachment = VkInit::renderingAttachmentInfo(m_drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         if (isMultisamplingEnabled()) {
             colorAttachment.resolveImageView = m_msaaResolveImage.imageView;
@@ -599,23 +610,28 @@ namespace moe {
             // resolve msaa x4 image -> 1 sample resolved image
         }
 
-        auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, &depthClearValue, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-        auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, &depthAttachment);
+        auto depthAttachment = VkInit::renderingAttachmentInfo(m_depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, nullptr);
         vkCmdBeginRendering(commandBuffer, &renderInfo);
 
-        m_pipelines.testScene.updateTransform(glm::mat4(1.0f));
-
-        Vector<VulkanRenderPacket> packets;
-        m_pipelines.testScene.gatherRenderPackets(packets);
-
-        m_pipelines.meshPipeline.draw(
+        /*m_pipelines.meshPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
                 m_caches.materialCache,
                 packets,
                 m_pipelines.sceneDataBuffer);
 
-        m_pipelines.skyBoxPipeline.draw(commandBuffer, getDefaultCamera());
+        m_pipelines.skyBoxPipeline.draw(commandBuffer, getDefaultCamera());*/
+
+        m_pipelines.deferredLightingPipeline.draw(
+                commandBuffer,
+                m_pipelines.sceneDataBuffer,
+                m_pipelines.gBufferPipeline.gDepthId,
+                m_pipelines.gBufferPipeline.gAlbedoId,
+                m_pipelines.gBufferPipeline.gNormalId,
+                m_pipelines.gBufferPipeline.gORMAId,
+                m_pipelines.gBufferPipeline.gEmissiveId);
+
 
         vkCmdEndRendering(commandBuffer);
 
@@ -1240,6 +1256,8 @@ namespace moe {
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
         m_pipelines.skyBoxPipeline.init(*this);
+        m_pipelines.gBufferPipeline.init(*this);
+        m_pipelines.deferredLightingPipeline.init(*this);
 
         m_pipelines.skyBoxImageId = m_caches.imageCache.loadCubeMapFromFiles(
                 {"skybox/right.jpg",
@@ -1309,6 +1327,8 @@ namespace moe {
             destroyBuffer(m_pipelines.sceneDataBuffer);
             destroyBuffer(m_pipelines.lightBuffer);
 
+            m_pipelines.deferredLightingPipeline.destroy();
+            m_pipelines.gBufferPipeline.destroy();
             m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
         });

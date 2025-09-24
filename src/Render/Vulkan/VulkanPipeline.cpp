@@ -34,8 +34,14 @@ namespace moe {
 
         colorBlendState.logicOpEnable = VK_FALSE;
         colorBlendState.logicOp = VK_LOGIC_OP_COPY;
-        colorBlendState.attachmentCount = 1;
-        colorBlendState.pAttachments = &colorBlendAttachment;
+
+        Vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+        for (size_t i = 0; i < colorAttachmentCount; i++) {
+            colorBlendAttachments.push_back(colorBlendAttachment);
+        }
+
+        colorBlendState.attachmentCount = colorAttachmentCount;
+        colorBlendState.pAttachments = colorBlendAttachments.data();
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -165,9 +171,21 @@ namespace moe {
     }
 
     VulkanPipelineBuilder& VulkanPipelineBuilder::setColorAttachmentFormat(VkFormat format) {
-        colorAttachmentFormat = format;
+        colorAttachmentFormats = {format};
         rendering.colorAttachmentCount = 1;
-        rendering.pColorAttachmentFormats = &colorAttachmentFormat;
+        rendering.pColorAttachmentFormats = colorAttachmentFormats.data();
+
+        colorAttachmentCount = 1;
+
+        return *this;
+    }
+
+    VulkanPipelineBuilder& VulkanPipelineBuilder::addColorAttachmentFormat(VkFormat format) {
+        MOE_ASSERT(colorAttachmentCount < colorAttachmentFormats.size(), "Exceeded maximum number of color attachments");
+
+        colorAttachmentFormats[colorAttachmentCount++] = format;
+        rendering.colorAttachmentCount = colorAttachmentCount;
+        rendering.pColorAttachmentFormats = colorAttachmentFormats.data();
 
         return *this;
     }

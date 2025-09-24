@@ -14,7 +14,8 @@ namespace moe {
         VkPipelineLayout pipelineLayout;
         VkPipelineDepthStencilStateCreateInfo depthStencil;
         VkPipelineRenderingCreateInfo rendering;
-        VkFormat colorAttachmentFormat;
+        Array<VkFormat, 16> colorAttachmentFormats;
+        size_t colorAttachmentCount{0};
 
         explicit VulkanPipelineBuilder(VkPipelineLayout layout) {
             clear();
@@ -51,6 +52,8 @@ namespace moe {
                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
 
         VulkanPipelineBuilder& setColorAttachmentFormat(VkFormat format);
+
+        VulkanPipelineBuilder& addColorAttachmentFormat(VkFormat format);
 
         VulkanPipelineBuilder& setDepthFormat(VkFormat format);
 

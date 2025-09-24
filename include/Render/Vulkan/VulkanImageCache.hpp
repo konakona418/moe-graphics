@@ -24,7 +24,7 @@ namespace moe {
 
         void init(VulkanEngine& engine);
 
-        Optional<VulkanAllocatedImage*> getImage(ImageId id);
+        Optional<VulkanAllocatedImage> getImage(ImageId id);
 
         ImageId addImage(VulkanAllocatedImage&& image);
 

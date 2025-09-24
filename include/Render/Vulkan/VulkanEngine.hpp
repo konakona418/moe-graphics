@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Render/Vulkan/Pipeline/DeferredLightingPipeline.hpp"
+#include "Render/Vulkan/Pipeline/GBufferPipeline.hpp"
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
@@ -55,7 +57,7 @@ namespace moe {
         bool m_resizeRequested{false};
         VkExtent2D m_windowExtent{1280, 720};
 
-        VkSampleCountFlagBits m_msaaSamples{VK_SAMPLE_COUNT_4_BIT};
+        VkSampleCountFlagBits m_msaaSamples{VK_SAMPLE_COUNT_1_BIT};
         // ! msaa x4; disable this if deferred rendering is implemented; use fxaa then
 
         GLFWwindow* m_window{nullptr};
@@ -110,6 +112,9 @@ namespace moe {
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
             Pipeline::SkyBoxPipeline skyBoxPipeline;
+            Pipeline::GBufferPipeline gBufferPipeline;
+            Pipeline::DeferredLightingPipeline deferredLightingPipeline;
+
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanAllocatedBuffer lightBuffer;
             VulkanAllocatedBuffer sceneDataBuffer;
