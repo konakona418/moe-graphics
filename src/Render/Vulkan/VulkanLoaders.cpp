@@ -262,8 +262,34 @@ namespace moe {
 
                 if (primitive.indices != -1) {// load indices
                     const auto& indexAccessor = model.accessors[primitive.indices];
-                    const auto indices = getPackedBufferSpan<std::uint16_t>(model, indexAccessor);
-                    mesh.indices.assign(indices.begin(), indices.end());
+                    switch (indexAccessor.componentType) {
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                            MOE_ASSERT(indexAccessor.type == TINYGLTF_TYPE_SCALAR, "Invalid index accessor type");
+                            {
+                                const auto indices = getPackedBufferSpan<std::uint32_t>(model, indexAccessor);
+                                mesh.indices.assign(indices.begin(), indices.end());
+                            }
+                            break;
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                            MOE_ASSERT(indexAccessor.type == TINYGLTF_TYPE_SCALAR, "Invalid index accessor type");
+                            {
+                                const auto indices = getPackedBufferSpan<std::uint16_t>(model, indexAccessor);
+                                mesh.indices.assign(indices.begin(), indices.end());
+                            }
+                            break;
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                            MOE_ASSERT(indexAccessor.type == TINYGLTF_TYPE_SCALAR, "Invalid index accessor type");
+                            {
+                                const auto indices = getPackedBufferSpan<std::uint8_t>(model, indexAccessor);
+                                mesh.indices.reserve(indices.size());
+                                for (auto i: indices) {
+                                    mesh.indices.push_back(i);
+                                }
+                            }
+                            break;
+                        default:
+                            MOE_ASSERT(false, "Unsupported index component type");
+                    }
                 }
 
                 // load positions
