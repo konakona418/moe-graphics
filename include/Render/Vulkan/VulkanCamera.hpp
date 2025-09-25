@@ -14,7 +14,9 @@ namespace moe {
             return glm::lookAt(pos, pos + front, up);
         }
         glm::mat4 projectionMatrix(float aspectRatio) const {
-            return glm::perspective(glm::radians(fovDeg), aspectRatio, nearZ, farZ);
+            auto proj = glm::perspective(glm::radians(fovDeg), aspectRatio, nearZ, farZ);
+            proj[1][1] *= -1;// vulkan NDC
+            return proj;
         }
 
         void setPosition(const glm::vec3& newPos) { pos = newPos; }
@@ -44,6 +46,72 @@ namespace moe {
             updateVectors();
         }
 
+        Array<glm::vec3, 8> getFrustumCornersWorldSpace(float aspectRatio) const {
+            Array<glm::vec3, 8> corners;
+
+            glm::mat4 inv = glm::inverse(projectionMatrix(aspectRatio) * viewMatrix());
+
+            int index = 0;
+            for (int x = -1; x <= 1; x += 2) {
+                for (int y = -1; y <= 1; y += 2) {
+                    for (int z = -1; z <= 1; z += 2) {
+                        glm::vec4 pt = inv * glm::vec4((float) x, (float) y, (float) z, 1.0f);
+                        pt /= pt.w;
+                        corners[index++] = glm::vec3(pt);
+                    }
+                }
+            }
+
+            return corners;
+        }
+
+        struct CSMCameraTransform {
+            glm::mat4 view;
+            glm::mat4 proj;
+            glm::mat4 viewProj;
+        };
+
+        static CSMCameraTransform getCSMCamera(Array<glm::vec3, 8> corners, glm::vec3 lightDir, int textureSize) {
+            glm::vec3 center(0.0f);
+            for (auto& c: corners) {
+                center += c;
+            }
+            center /= 8.0f;
+
+            glm::vec3 lightDirNorm = glm::normalize(lightDir);
+            glm::vec3 lightPos = center - lightDirNorm * 100.0f;
+
+            glm::mat4 lightView = glm::lookAt(lightPos, center, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            glm::vec3 minBounds(FLT_MAX);
+            glm::vec3 maxBounds(-FLT_MAX);
+            for (auto& c: corners) {
+                glm::vec4 ls = lightView * glm::vec4(c, 1.0f);
+                minBounds = glm::min(minBounds, glm::vec3(ls));
+                maxBounds = glm::max(maxBounds, glm::vec3(ls));
+            }
+
+            float worldUnitsPerTexel = (maxBounds.x - minBounds.x) / float(textureSize);
+            minBounds.x = floor(minBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
+            minBounds.y = floor(minBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
+            maxBounds.x = floor(maxBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
+            maxBounds.y = floor(maxBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
+
+            glm::mat4 lightProj = glm::ortho(
+                    minBounds.x, maxBounds.x,
+                    minBounds.y, maxBounds.y,
+                    -maxBounds.z - 50.0f, -minBounds.z + 50.0f);
+            lightProj[1][1] *= -1;// vulkan NDC
+
+            CSMCameraTransform transform{
+                    .view = lightView,
+                    .proj = lightProj,
+                    .viewProj = lightProj * lightView,
+            };
+
+            return transform;
+        }
+
     private:
         glm::vec3 pos{0.0f};
         glm::vec3 front{0.0f, 0.0f, -1.0f};
@@ -56,6 +124,8 @@ namespace moe {
         float fovDeg{45.0f};
         float nearZ{0.1f};
         float farZ{100.0f};
+
+        VulkanCamera() = default;
 
         void updateVectors() {
             glm::vec3 newFront;
