@@ -568,13 +568,15 @@ namespace moe {
         Vector<VulkanRenderPacket> packets;
         m_pipelines.testScene.gatherRenderPackets(packets);
 
+        auto& defaultCamera = getDefaultCamera();
+
         // ! initialize scene data
 
-        auto cameraView = m_defaultCamera.viewMatrix();
-        auto cameraProjection = m_defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
-        cameraProjection[1][1] *= -1;
+        auto cameraView = defaultCamera.viewMatrix();
+        auto cameraProjection = defaultCamera.projectionMatrix((float) m_drawExtent.width / (float) m_drawExtent.height);
+        //cameraProjection[1][1] *= -1;
         auto cameraViewProjection = cameraProjection * cameraView;
-        auto cameraPosition = glm::vec4(m_defaultCamera.getPosition(), 1.0f);
+        auto cameraPosition = glm::vec4(defaultCamera.getPosition(), 1.0f);
         VulkanGPUSceneData sceneData{
                 .view = cameraView,
                 .projection = cameraProjection,
@@ -594,7 +596,7 @@ namespace moe {
         {
             VulkanCPULight light{};
             light.type = LightType::Point;
-            light.position = glm::vec3(2.0f * std::cos(glfwGetTime()), 2.0f, -2.0f * std::sin(glfwGetTime()));
+            light.position = glm::vec3(2.0f, 2.0f, -2.0f);
             light.color = glm::vec3(1.0f, 0.5f, 0.0f);
             light.intensity = 5.0f;
             light.radius = 8.0f;
@@ -603,7 +605,7 @@ namespace moe {
         {
             VulkanCPULight light{};
             light.type = LightType::Point;
-            light.position = glm::vec3(-2.0f * std::cos(glfwGetTime()), 2.0f, 2.0f * std::sin(glfwGetTime()));
+            light.position = glm::vec3(-2.0f, 2.0f, 2.0f);
             light.color = glm::vec3(0.0f, 0.5f, 1.0f);
             light.intensity = 5.0f;
             light.radius = 8.0f;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Render/Vulkan/Pipeline/CSMPipeline.hpp"
 #include "Render/Vulkan/Pipeline/DeferredLightingPipeline.hpp"
 #include "Render/Vulkan/Pipeline/GBufferPipeline.hpp"
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"

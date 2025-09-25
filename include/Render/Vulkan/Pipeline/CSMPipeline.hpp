@@ -29,13 +29,21 @@ namespace moe {
                     VulkanMeshCache& meshCache,
                     VulkanMaterialCache& materialCache,
                     Span<VulkanRenderPacket> drawCommands,
-                    VulkanAllocatedBuffer& sceneDataBuffer,
-                    const VulkanCamera& camera);
+                    const VulkanCamera& camera,
+                    glm::vec3 lightDir);
 
             void destroy();
 
+            ImageId getShadowMapImageId() const { return m_shadowMapImageId; }
+
+            glm::mat4 m_cascadeLightTransforms[SHADOW_CASCADE_COUNT];
+            float m_cascadeFarPlaneZs[SHADOW_CASCADE_COUNT];
+
         private:
-            struct PushConstants {};
+            struct PushConstants {
+                glm::mat4 mvp;
+                VkDeviceAddress vertexBufferAddr;
+            };
 
             bool m_initialized{false};
             uint32_t m_csmShadowMapSize{2048};

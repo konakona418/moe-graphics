@@ -15,15 +15,22 @@ namespace moe {
             MOE_ASSERT(!m_initialized, "CSMPipeline is already initialized");
 
             m_engine = &engine;
+            // Ensure cascadeSplitRatios are monotonic and normalized (values between 0 and 1, increasing)
+            for (size_t i = 0; i < SHADOW_CASCADE_COUNT; ++i) {
+                MOE_ASSERT(cascadeSplitRatios[i] > 0.0f && cascadeSplitRatios[i] <= 1.0f, "cascadeSplitRatios must be in (0, 1]");
+                if (i > 0) {
+                    MOE_ASSERT(cascadeSplitRatios[i] > cascadeSplitRatios[i - 1], "cascadeSplitRatios must be strictly increasing");
+                }
+            }
             m_cascadeSplitRatios = cascadeSplitRatios;
             m_initialized = true;
 
             auto vert =
                     VkUtils::createShaderModuleFromFile(
-                            m_engine->m_device, "shaders/mesh_depth.vert.spv");
+                            m_engine->m_device, "shaders/csm_depth.vert.spv");
             auto frag =
                     VkUtils::createShaderModuleFromFile(
-                            m_engine->m_device, "shaders/mesh_depth.frag.spv");
+                            m_engine->m_device, "shaders/csm_depth.frag.spv");
 
             auto pushRange = VkPushConstantRange{
                     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -81,6 +88,9 @@ namespace moe {
                 MOE_VK_CHECK(vkCreateImageView(engine.m_device, &viewInfo, nullptr, &imageView));
                 m_shadowMapImageViews[i] = imageView;
             }
+
+            vkDestroyShaderModule(engine.m_device, vert, nullptr);
+            vkDestroyShaderModule(engine.m_device, frag, nullptr);
         }
 
         void CSMPipeline::draw(
@@ -88,8 +98,8 @@ namespace moe {
                 VulkanMeshCache& meshCache,
                 VulkanMaterialCache& materialCache,
                 Span<VulkanRenderPacket> drawCommands,
-                VulkanAllocatedBuffer& sceneDataBuffer,
-                const VulkanCamera& camera) {
+                const VulkanCamera& camera,
+                glm::vec3 lightDir) {
             MOE_ASSERT(m_initialized, "CSMPipeline is not initialized");
 
             vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
@@ -117,6 +127,7 @@ namespace moe {
             for (int i = 0; i < SHADOW_CASCADE_COUNT; ++i) {
                 float cascadeNearZ = i == 0 ? nearZ : nearZ * m_cascadeSplitRatios[i - 1];
                 float cascadeFarZ = farZ * m_cascadeSplitRatios[i];
+                m_cascadeFarPlaneZs[i] = cascadeFarZ;
 
                 VulkanCamera subFrustumCamera{
                         camera.getPosition(),
@@ -126,8 +137,66 @@ namespace moe {
                         cascadeNearZ,
                         cascadeFarZ,
                 };
+
+                float aspect = (float) m_engine->m_drawExtent.width / (float) m_engine->m_drawExtent.height;
+                auto corners = subFrustumCamera.getFrustumCornersWorldSpace(aspect);
+                m_cascadeLightTransforms[i] = VulkanCamera::getCSMCamera(corners, lightDir, m_csmShadowMapSize).viewProj;
+
+                auto depthClearValue = VkClearValue{.depthStencil = {1.0f, 0}};
+                auto depthAttachment = VkInit::renderingAttachmentInfo(
+                        m_shadowMapImageViews[i],
+                        &depthClearValue,
+                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                auto renderingInfo = VkInit::renderingInfo(
+                        VkExtent2D{m_csmShadowMapSize, m_csmShadowMapSize},
+                        nullptr,
+                        &depthAttachment);
+
+                vkCmdBeginRendering(cmdBuffer, &renderingInfo);
+
+                vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+                auto bindlessSet = m_engine->getBindlessSet().getDescriptorSet();
+                vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &bindlessSet, 0, nullptr);
+
+                const auto viewport = VkViewport{
+                        .x = 0,
+                        .y = 0,
+                        .width = (float) m_csmShadowMapSize,
+                        .height = (float) m_csmShadowMapSize,
+                        .minDepth = 0.f,
+                        .maxDepth = 1.f,
+                };
+                vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+                const auto scissor = VkRect2D{
+                        .offset = {},
+                        .extent = {m_csmShadowMapSize, m_csmShadowMapSize},
+                };
+                vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+                for (auto& drawCommand: drawCommands) {
+                    auto mesh = m_engine->m_caches.meshCache.getMesh(drawCommand.meshId).value();
+                    vkCmdBindIndexBuffer(cmdBuffer, mesh.gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    auto pushConstants = PushConstants{
+                            .mvp = m_cascadeLightTransforms[i] * drawCommand.transform,
+                            .vertexBufferAddr = mesh.gpuBuffer.vertexBufferAddr,
+                    };
+
+                    vkCmdPushConstants(cmdBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pushConstants);
+                    vkCmdDrawIndexed(cmdBuffer, mesh.gpuBuffer.indexCount, 1, 0, 0, 0);
+                }
+
+
+                vkCmdEndRendering(cmdBuffer);
             }
-            // todo
+
+            VkUtils::transitionImage(
+                    cmdBuffer,
+                    csmShadowMap.image,
+                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
         void CSMPipeline::destroy() {

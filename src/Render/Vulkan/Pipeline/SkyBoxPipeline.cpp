@@ -75,7 +75,7 @@ namespace moe {
             float aspectRatio = (float) extent.width / (float) extent.height;
 
             glm::mat4 proj = camera.projectionMatrix(aspectRatio);
-            proj[1][1] *= -1;// vulkan clip space has inverted y and half z
+            //proj[1][1] *= -1;// vulkan clip space has inverted y and half z
 
             glm::mat4 viewProj = proj * view;
             glm::mat4 invViewProj = glm::inverse(viewProj);

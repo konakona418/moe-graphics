@@ -44,6 +44,39 @@ vec4 sampleSkyBox(vec2 uv) {
     return sampleTextureCubeLinear(skyboxId, samplePos);
 }
 
+bool screenSpaceShadowTestSpot(vec3 fragPosWorld, vec3 lightPosWorld, mat4 view, mat4 proj, uint depthTexture) {
+    // world to view space
+    vec3 fragPos = (view * vec4(fragPosWorld, 1.0)).xyz;
+    vec3 lightPos = (view * vec4(lightPosWorld, 1.0)).xyz;
+
+    vec3 L = normalize(lightPos - fragPos);
+    float distanceToLight = length(lightPos - fragPos);
+
+    const int maxSteps = 16;
+    const float bias = 0.01;
+    for (int i = 0; i < maxSteps; i++) {
+        float t = float(i) / float(maxSteps);
+        vec3 samplePos = fragPos + L * distanceToLight * t;
+
+        vec4 clip = proj * vec4(samplePos, 1.0);
+        vec3 ndc = clip.xyz / clip.w;
+        vec2 sampleUV = ndc.xy * 0.5 + 0.5;
+
+        if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) {
+            continue;
+        }
+
+        float sampleDepth = sampleTextureLinear(depthTexture, sampleUV).x;
+        float sampleDepthLinear = ndc.z * 0.5 + 0.5;
+
+        if (sampleDepth < sampleDepthLinear - bias) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void main() {
     vec2 uv = inUV;
 
@@ -80,6 +113,18 @@ void main() {
 
     for (int i = 0; i < u_deferredPCS.sceneData.numLights; i++) {
         Light light = u_deferredPCS.sceneData.lightBuffer.lights[i];
+
+        bool inShadow = false;
+
+#ifdef USE_SCREEN_SPACE_SHADOW
+        if (light.type == LIGHT_TYPE_POINT) {
+            inShadow = screenSpaceShadowTestSpot(fragPos, light.position, u_deferredPCS.sceneData.view, u_deferredPCS.sceneData.projection, u_deferredPCS.gDepthTexture);
+        }
+
+        if (inShadow) {
+            continue;
+        }
+#endif
 
         // for directional lights
         // this revert operation is to match the definition
