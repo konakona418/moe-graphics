@@ -15,14 +15,14 @@ namespace moe {
 
 namespace moe {
     namespace Pipeline {
-        struct CSMPipeline {
+        struct ShadowMapPipeline {
         public:
             static constexpr uint32_t SHADOW_CASCADE_COUNT = 4;
 
-            CSMPipeline() = default;
-            ~CSMPipeline() = default;
+            ShadowMapPipeline() = default;
+            ~ShadowMapPipeline() = default;
 
-            void init(VulkanEngine& engine, Array<float, SHADOW_CASCADE_COUNT> cascadeSplitRatios = {0.05f, 0.2f, 0.4f, 1.0f});
+            void init(VulkanEngine& engine);
 
             void draw(
                     VkCommandBuffer cmdBuffer,
@@ -35,8 +35,7 @@ namespace moe {
 
             ImageId getShadowMapImageId() const { return m_shadowMapImageId; }
 
-            glm::mat4 m_cascadeLightTransforms[SHADOW_CASCADE_COUNT];
-            float m_cascadeFarPlaneZs[SHADOW_CASCADE_COUNT];
+            glm::mat4 getShadowMapLightTransform() const { return m_shadowMapLightTransform; }
 
         private:
             struct PushConstants {
@@ -45,16 +44,16 @@ namespace moe {
             };
 
             bool m_initialized{false};
-            uint32_t m_csmShadowMapSize{2048};
+            uint32_t m_shadowMapSize{2048};
             VulkanEngine* m_engine{nullptr};
 
             VkPipelineLayout m_pipelineLayout;
             VkPipeline m_pipeline;
 
             ImageId m_shadowMapImageId;
-            Array<VkImageView, SHADOW_CASCADE_COUNT> m_shadowMapImageViews;
+            VkImageView m_shadowMapImageView;
 
-            Array<float, SHADOW_CASCADE_COUNT> m_cascadeSplitRatios;
+            glm::mat4 m_shadowMapLightTransform;
         };
     }// namespace Pipeline
 }// namespace moe

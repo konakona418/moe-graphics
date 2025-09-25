@@ -20,6 +20,61 @@ layout(location = 1) out vec4 outFragNormal;
 layout(location = 2) out vec4 outFragORMA;
 layout(location = 3) out vec4 outFragEmissive;
 
+#ifdef USE_SHADOW_MAP
+#define USE_CSM
+#ifndef USE_CSM
+float sampleShadow(mat4 lightViewProj, vec3 worldPos, uint shadowMapId) {
+    vec4 lightSpacePos = lightViewProj * vec4(worldPos, 1.0);
+    lightSpacePos /= lightSpacePos.w;
+
+    vec2 ndc = lightSpacePos.xy;
+    ndc = ndc * 0.5 + 0.5;
+
+    if (ndc.x < 0.0 || ndc.x > 1.0 || ndc.y < 0.0 || ndc.y > 1.0) return 0.0;
+
+    float closestDepth = sampleTextureLinear(shadowMapId, ndc).r;
+    float currentDepth = lightSpacePos.z;
+
+    float bias = 0.001;
+    return currentDepth - bias > closestDepth ? 1.0 : 0.0;
+}
+
+#else
+
+uint getCascadeIndex(vec3 worldPos, vec3 cameraPos, vec4 cascadeSplits) {
+    float d = distance(worldPos.xz, cameraPos.xz);
+    for (uint i = 0; i < CASCADED_SHADOW_MAPS - 1; i++) {
+        if (d < cascadeSplits[i]) {
+            return i;
+        }
+    }
+    return CASCADED_SHADOW_MAPS - 1;
+}
+
+float sampleShadow(vec3 worldPos, uint shadowMapId) {
+    vec3 cameraPos = u_meshPushConstants.sceneData.cameraPosition.xyz;
+    vec4 cascadeSplits = u_meshPushConstants.sceneData.shadowMapCascadeSplits;
+
+    uint cascadeIdx = getCascadeIndex(worldPos, cameraPos, cascadeSplits);
+
+    mat4 lightViewProj = u_meshPushConstants.sceneData.shadowMapLightTransform[cascadeIdx];
+    vec4 lightSpacePos = lightViewProj * vec4(worldPos, 1.0);
+    lightSpacePos /= lightSpacePos.w;
+
+    vec2 ndc = lightSpacePos.xy;
+    ndc = ndc * 0.5 + 0.5;
+
+    if (ndc.x < 0.0 || ndc.x > 1.0 || ndc.y < 0.0 || ndc.y > 1.0) return 0.0;
+
+    float closestDepth = sampleTextureArrayLinear(shadowMapId, ndc, cascadeIdx).r;
+    float currentDepth = lightSpacePos.z;
+
+    float bias = 0.001;
+    return currentDepth - bias > closestDepth ? 1.0 : 0.0;
+}
+#endif
+#endif// USE_SHADOW_MAP
+
 void main() {
     vec2 uv = inUV;
 
@@ -47,6 +102,17 @@ void main() {
     float roughness = roughnessF * sampledMetallicRoughness.g;
     roughness = clamp(roughness, 0.01, 1.0);
     vec3 emissive = emissiveF * sampledEmissive.rgb * material.emissiveColor.rgb;
+
+#ifdef USE_SHADOW_MAP
+#ifndef USE_CSM
+    float shadow = sampleShadow(
+            u_meshPushConstants.sceneData.shadowMapLightTransform,
+            inWorldPos,
+            u_meshPushConstants.sceneData.shadowMapId);
+#else
+    float shadow = sampleShadow(inWorldPos, u_meshPushConstants.sceneData.shadowMapId);
+#endif
+#endif// USE_SHADOW_MAP
 
     // todo: occlusion, AO
     float occlusion = 1.0;

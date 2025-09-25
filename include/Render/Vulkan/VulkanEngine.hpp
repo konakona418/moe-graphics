@@ -4,6 +4,7 @@
 #include "Render/Vulkan/Pipeline/DeferredLightingPipeline.hpp"
 #include "Render/Vulkan/Pipeline/GBufferPipeline.hpp"
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
+#include "Render/Vulkan/Pipeline/ShadowMapPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanCamera.hpp"
@@ -114,6 +115,8 @@ namespace moe {
         struct {
             Pipeline::VulkanMeshPipeline meshPipeline;
             //Pipeline::SkyBoxPipeline skyBoxPipeline;
+            //Pipeline::ShadowMapPipeline shadowMapPipeline;
+            //Pipeline::CSMPipeline csmPipeline;
             Pipeline::GBufferPipeline gBufferPipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
 

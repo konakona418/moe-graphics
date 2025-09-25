@@ -66,6 +66,18 @@ namespace moe {
         uint32_t numLights;
 
         uint32_t skyboxId;
+
+#ifdef MOE_USE_SHADOW_MAP
+#define MOE_USE_CSM
+#ifdef MOE_USE_CSM
+        uint32_t csmShadowMapId;
+        glm::mat4 csmShadowMapLightTransform[4];
+        glm::vec4 shadowMapCascadeSplits;
+#else
+        uint32_t shadowMapId;
+        glm::mat4 shadowMapLightTransform;
+#endif
+#endif
     };
 
 }// namespace moe

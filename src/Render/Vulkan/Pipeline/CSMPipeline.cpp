@@ -96,7 +96,6 @@ namespace moe {
         void CSMPipeline::draw(
                 VkCommandBuffer cmdBuffer,
                 VulkanMeshCache& meshCache,
-                VulkanMaterialCache& materialCache,
                 Span<VulkanRenderPacket> drawCommands,
                 const VulkanCamera& camera,
                 glm::vec3 lightDir) {

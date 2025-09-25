@@ -570,6 +570,14 @@ namespace moe {
 
         auto& defaultCamera = getDefaultCamera();
 
+        // ! shadow
+        /*m_pipelines.csmPipeline.draw(
+                commandBuffer,
+                m_caches.meshCache,
+                packets,
+                defaultCamera,
+                glm::vec3(-0.5, -1.0f, -0.5));*/
+
         // ! initialize scene data
 
         auto cameraView = defaultCamera.viewMatrix();
@@ -591,6 +599,19 @@ namespace moe {
                 .numLights = 0,
                 .skyboxId = m_pipelines.skyBoxImageId,
         };
+
+        /*{
+            sceneData.csmShadowMapId = m_pipelines.csmPipeline.getShadowMapImageId();
+            for (int i = 0; i < 4; ++i) {
+                sceneData.csmShadowMapLightTransform[i] = m_pipelines.csmPipeline.m_cascadeLightTransforms[i];
+            }
+            sceneData.shadowMapCascadeSplits = glm::vec4{
+                    m_pipelines.csmPipeline.m_cascadeFarPlaneZs[0],
+                    m_pipelines.csmPipeline.m_cascadeFarPlaneZs[1],
+                    m_pipelines.csmPipeline.m_cascadeFarPlaneZs[2],
+                    m_pipelines.csmPipeline.m_cascadeFarPlaneZs[3],
+            };
+        }*/
 
         Vector<VulkanGPULight> sceneLights;
         {
@@ -1295,6 +1316,8 @@ namespace moe {
     void VulkanEngine::initPipelines() {
         m_pipelines.meshPipeline.init(*this);
         //m_pipelines.skyBoxPipeline.init(*this);
+        //m_pipelines.shadowMapPipeline.init(*this);
+        //m_pipelines.csmPipeline.init(*this);
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
 
@@ -1328,6 +1351,8 @@ namespace moe {
 
             m_pipelines.deferredLightingPipeline.destroy();
             m_pipelines.gBufferPipeline.destroy();
+            //m_pipelines.csmPipeline.destroy();
+            //m_pipelines.shadowMapPipeline.destroy();
             //m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
         });

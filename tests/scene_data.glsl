@@ -9,6 +9,8 @@
 #include "light.glsl"
 #include "material.glsl"
 
+#define CASCADED_SHADOW_MAPS 4
+#define USE_CSM
 
 layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     mat4 view;
@@ -30,6 +32,16 @@ layout(buffer_reference, scalar) readonly buffer SceneDataBuffer {
     uint numLights;
 
     uint skyboxId;
+
+#ifdef USE_SHADOW_MAP
+    uint shadowMapId;
+#ifndef USE_CSM
+    mat4 shadowMapLightTransform;
+#else
+    mat4 shadowMapLightTransform[CASCADED_SHADOW_MAPS];
+    vec4 shadowMapCascadeSplits;
+#endif
+#endif// USE_SHADOW_MAP
 };
 
 #endif// MOE_SCENE_DATA_GLSL

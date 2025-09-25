@@ -8,6 +8,7 @@
 
 layout(set = 0, binding = 0) uniform texture2D u_textures[];
 layout(set = 0, binding = 0) uniform textureCube u_textureCubes[];
+layout(set = 0, binding = 0) uniform texture2DArray u_textureArrays[];
 
 layout(set = 0, binding = 1) uniform sampler u_samplers[];
 
@@ -34,6 +35,14 @@ vec4 sampleTextureCubeLinear(uint index, vec3 direction) {
 
 vec4 sampleTextureCubeNearest(uint index, vec3 direction) {
     return texture(nonuniformEXT(samplerCube(u_textureCubes[index], u_samplers[SAMPLER_NEAREST_ID])), direction);
+}
+
+vec4 sampleTextureArrayLinear(uint index, vec2 uv, uint layer) {
+    return texture(nonuniformEXT(sampler2DArray(u_textureArrays[index], u_samplers[SAMPLER_LINEAR_ID])), vec3(uv, layer));
+}
+
+vec4 sampleTextureArrayNearest(uint index, vec2 uv, uint layer) {
+    return texture(nonuniformEXT(sampler2DArray(u_textureArrays[index], u_samplers[SAMPLER_NEAREST_ID])), vec3(uv, layer));
 }
 
 #endif// MOE_SAMPLER_GLSL
