@@ -91,13 +91,17 @@ namespace moe {
                 maxBounds = glm::max(maxBounds, glm::vec3(ls));
             }
 
+            // adjust bounds to align with texel size
             float worldUnitsPerTexel = (maxBounds.x - minBounds.x) / float(textureSize);
             minBounds.x = floor(minBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
             minBounds.y = floor(minBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
             maxBounds.x = floor(maxBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
             maxBounds.y = floor(maxBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
 
-            //Logger::debug("CSM bounds: min({:.2f}, {:.2f}, {:.2f}), max({:.2f}, {:.2f}, {:.2f})", minBounds.x, minBounds.y, minBounds.z, maxBounds.x, maxBounds.y, maxBounds.z);
+            // it seems that with this the shadow quality is a little bit more stable
+            // but not much
+            maxBounds.z = floor(maxBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
+            minBounds.z = floor(minBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
 
             const auto boundExpand = [](float& boundMin, float& boundMax) {
                 MOE_ASSERT(boundMax >= boundMin, "Invalid bounds");
@@ -111,10 +115,14 @@ namespace moe {
             boundExpand(minBounds.x, maxBounds.x);
             boundExpand(minBounds.y, maxBounds.y);
 
+            // ! fixme: this value works pretty fine for the first cascade,
+            // ! but for the rest, it can be too large or too small
+            // ! maybe compute it based on the cascade range?
+            constexpr float zBound = 10.0f;
             glm::mat4 lightProj = glm::ortho(
                     minBounds.x, maxBounds.x,
                     minBounds.y, maxBounds.y,
-                    -maxBounds.z - 10.0f, -minBounds.z + 10.0f);
+                    -maxBounds.z - zBound, -minBounds.z + zBound);
             lightProj[1][1] *= -1;// vulkan NDC
 
             CSMCameraTransform transform{

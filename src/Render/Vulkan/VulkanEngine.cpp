@@ -621,23 +621,33 @@ namespace moe {
             };
         }
 
+        auto time = static_cast<float>(glfwGetTime());
+
         Vector<VulkanGPULight> sceneLights;
         {
             VulkanCPULight light{};
             light.type = LightType::Point;
-            light.position = glm::vec3(2.0f, 2.0f, -2.0f);
+            light.position = glm::vec3(2.0f, 2.0f, -2.0f) * glm::vec3(glm::cos(time), 1.0f, glm::sin(time));
             light.color = glm::vec3(1.0f, 0.5f, 0.0f);
-            light.intensity = 5.0f;
-            light.radius = 8.0f;
+            light.intensity = 4.0f;
+            light.radius = 3.0f;
             sceneLights.push_back(light.toGPU());
         }
         {
             VulkanCPULight light{};
             light.type = LightType::Point;
-            light.position = glm::vec3(-2.0f, 2.0f, 2.0f);
+            light.position = glm::vec3(-2.0f, 2.0f, 2.0f) * glm::vec3(glm::cos(time), 1.0f, glm::sin(time));
             light.color = glm::vec3(0.0f, 0.5f, 1.0f);
-            light.intensity = 5.0f;
-            light.radius = 8.0f;
+            light.intensity = 4.0f;
+            light.radius = 3.0f;
+            sceneLights.push_back(light.toGPU());
+        }
+        {
+            VulkanCPULight light{};
+            light.type = LightType::Directional;
+            light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+            light.intensity = 2.0f;
+            light.direction = glm::normalize(glm::vec3(0.5, -1.0f, -0.5));
             sceneLights.push_back(light.toGPU());
         }
 

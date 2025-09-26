@@ -103,7 +103,7 @@ namespace moe {
                 0.f,
                 45.0f,
                 0.1f,
-                10.0f,
+                100.0f,
         };
 
         struct {

@@ -136,7 +136,16 @@ void main() {
         }
         float NoL = clamp(dot(n, l), 0.0, 1.0);
 
-        fragColor += calculateLight(light, fragPos, n, v, l, diffuseColor, roughness, metallic, f0, occlusion);
+        // ! fixme: this is just a hack
+        const float noOcclusion = 1.0;
+        if (light.type == LIGHT_TYPE_DIRECTIONAL) {
+            // directional light, use CSM occlusion
+            occlusion = occlusion == 0.0 ? 0.2 : occlusion;
+            fragColor += calculateLight(light, fragPos, n, v, l, diffuseColor, roughness, metallic, f0, occlusion);
+        } else {
+            // other, use no occlusion
+            fragColor += calculateLight(light, fragPos, n, v, l, diffuseColor, roughness, metallic, f0, noOcclusion);
+        }
     }
 
     fragColor += emissive;
