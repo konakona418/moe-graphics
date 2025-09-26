@@ -103,7 +103,7 @@ namespace moe {
                 0.f,
                 45.0f,
                 0.1f,
-                100.0f,
+                10.0f,
         };
 
         struct {
@@ -116,7 +116,7 @@ namespace moe {
             Pipeline::VulkanMeshPipeline meshPipeline;
             //Pipeline::SkyBoxPipeline skyBoxPipeline;
             //Pipeline::ShadowMapPipeline shadowMapPipeline;
-            //Pipeline::CSMPipeline csmPipeline;
+            Pipeline::CSMPipeline csmPipeline;
             Pipeline::GBufferPipeline gBufferPipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
 

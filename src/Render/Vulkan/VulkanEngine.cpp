@@ -246,6 +246,14 @@ namespace moe {
         VkImageViewCreateInfo imageViewInfo = VkInit::imageViewCreateInfo(image.imageFormat, image.image, aspect);
         imageViewInfo.subresourceRange.levelCount = imageInfo.mipLevels;
 
+        // note: this is a bit hacky (designed solely for CSM shadow maps), but it works anyway
+        if (imageInfo.arrayLayers > 1) {
+            Logger::debug("creating image view for image with {} array layers, automatically using TYPE_2D_ARRAY", imageInfo.arrayLayers);
+            imageViewInfo.subresourceRange.baseArrayLayer = 0;
+            imageViewInfo.subresourceRange.layerCount = imageInfo.arrayLayers;
+            imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        }
+
         MOE_VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &image.imageView));
 
         return image;
@@ -571,12 +579,12 @@ namespace moe {
         auto& defaultCamera = getDefaultCamera();
 
         // ! shadow
-        /*m_pipelines.csmPipeline.draw(
+        m_pipelines.csmPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
                 packets,
                 defaultCamera,
-                glm::vec3(-0.5, -1.0f, -0.5));*/
+                glm::vec3(0.5, -1.0f, -0.5));
 
         // ! initialize scene data
 
@@ -600,7 +608,7 @@ namespace moe {
                 .skyboxId = m_pipelines.skyBoxImageId,
         };
 
-        /*{
+        {
             sceneData.csmShadowMapId = m_pipelines.csmPipeline.getShadowMapImageId();
             for (int i = 0; i < 4; ++i) {
                 sceneData.csmShadowMapLightTransform[i] = m_pipelines.csmPipeline.m_cascadeLightTransforms[i];
@@ -611,7 +619,7 @@ namespace moe {
                     m_pipelines.csmPipeline.m_cascadeFarPlaneZs[2],
                     m_pipelines.csmPipeline.m_cascadeFarPlaneZs[3],
             };
-        }*/
+        }
 
         Vector<VulkanGPULight> sceneLights;
         {
@@ -1317,7 +1325,7 @@ namespace moe {
         m_pipelines.meshPipeline.init(*this);
         //m_pipelines.skyBoxPipeline.init(*this);
         //m_pipelines.shadowMapPipeline.init(*this);
-        //m_pipelines.csmPipeline.init(*this);
+        m_pipelines.csmPipeline.init(*this);
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
 
@@ -1351,7 +1359,7 @@ namespace moe {
 
             m_pipelines.deferredLightingPipeline.destroy();
             m_pipelines.gBufferPipeline.destroy();
-            //m_pipelines.csmPipeline.destroy();
+            m_pipelines.csmPipeline.destroy();
             //m_pipelines.shadowMapPipeline.destroy();
             //m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();

@@ -4,6 +4,8 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_debug_printf : enable
 
+#define USE_SHADOW_MAP
+
 #include "mesh_pcs.glsl"
 #include "sampler.glsl"
 
@@ -42,7 +44,9 @@ float sampleShadow(mat4 lightViewProj, vec3 worldPos, uint shadowMapId) {
 #else
 
 uint getCascadeIndex(vec3 worldPos, vec3 cameraPos, vec4 cascadeSplits) {
-    float d = distance(worldPos.xz, cameraPos.xz);
+    float d = distance(worldPos.xyz, cameraPos.xyz);
+    // ! usually this should be the projection on the xOz plane,
+    // ! but it seems to break things, so just use the distance anyway
     for (uint i = 0; i < CASCADED_SHADOW_MAPS - 1; i++) {
         if (d < cascadeSplits[i]) {
             return i;
@@ -112,10 +116,12 @@ void main() {
 #else
     float shadow = sampleShadow(inWorldPos, u_meshPushConstants.sceneData.shadowMapId);
 #endif
+    float occlusion = 1.0 - shadow;
+#else
+    float occlusion = 1.0;
 #endif// USE_SHADOW_MAP
 
     // todo: occlusion, AO
-    float occlusion = 1.0;
     float ambientOcclusion = occlusion;
 
     outFragAlbedo = vec4(baseColor, 1.0);

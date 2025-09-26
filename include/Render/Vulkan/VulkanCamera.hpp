@@ -97,10 +97,24 @@ namespace moe {
             maxBounds.x = floor(maxBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
             maxBounds.y = floor(maxBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
 
+            //Logger::debug("CSM bounds: min({:.2f}, {:.2f}, {:.2f}), max({:.2f}, {:.2f}, {:.2f})", minBounds.x, minBounds.y, minBounds.z, maxBounds.x, maxBounds.y, maxBounds.z);
+
+            const auto boundExpand = [](float& boundMin, float& boundMax) {
+                MOE_ASSERT(boundMax >= boundMin, "Invalid bounds");
+                float extent = boundMax - boundMin;
+                float expand = extent * 0.5f;
+                boundMin -= expand;
+                boundMax += expand;
+            };
+
+            // ! hacky way. or some shadow can be clipped
+            boundExpand(minBounds.x, maxBounds.x);
+            boundExpand(minBounds.y, maxBounds.y);
+
             glm::mat4 lightProj = glm::ortho(
                     minBounds.x, maxBounds.x,
                     minBounds.y, maxBounds.y,
-                    -maxBounds.z - 50.0f, -minBounds.z + 50.0f);
+                    -maxBounds.z - 10.0f, -minBounds.z + 10.0f);
             lightProj[1][1] *= -1;// vulkan NDC
 
             CSMCameraTransform transform{

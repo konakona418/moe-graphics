@@ -67,6 +67,7 @@ namespace moe {
 
         uint32_t skyboxId;
 
+#define MOE_USE_SHADOW_MAP
 #ifdef MOE_USE_SHADOW_MAP
 #define MOE_USE_CSM
 #ifdef MOE_USE_CSM

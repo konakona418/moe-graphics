@@ -71,6 +71,12 @@ namespace moe {
 
             auto image = engine.allocateImage(csmImageInfo);
             m_shadowMapImageId = engine.m_caches.imageCache.addImage(std::move(image));
+            // ! fixme: this will add a independent 1-layer image view to the descriptor set,
+            // ! and the id is mapped to **THAT** image view,
+            // ! instead of the image views array we create below
+            // ! holy shit
+            // ! check if VK_IMAGE_VIEW_TYPE_2D_ARRAY works
+            // ! another way: use individual image views for cascade rendering, while creating a 2D_ARRAY view for sampling
 
             auto csmImageRef = engine.m_caches.imageCache.getImage(m_shadowMapImageId).value();
 
@@ -124,7 +130,7 @@ namespace moe {
             float farZ = camera.getFarZ();
 
             for (int i = 0; i < SHADOW_CASCADE_COUNT; ++i) {
-                float cascadeNearZ = i == 0 ? nearZ : nearZ * m_cascadeSplitRatios[i - 1];
+                float cascadeNearZ = i == 0 ? nearZ : m_cascadeFarPlaneZs[i - 1];
                 float cascadeFarZ = farZ * m_cascadeSplitRatios[i];
                 m_cascadeFarPlaneZs[i] = cascadeFarZ;
 
