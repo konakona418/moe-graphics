@@ -27,7 +27,9 @@ u_deferredPCS;
 layout(location = 0) out vec4 outFragColor;
 
 vec3 fromUVDepthToWorld(vec2 uv, float depth, mat4 invProj, mat4 invView) {
-    vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    // vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    // ! the depth is already in clip space
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
     vec4 view = invProj * clip;
     view /= view.w;
     vec4 world = invView * view;
