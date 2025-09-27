@@ -71,6 +71,8 @@ namespace moe {
             glm::mat4 viewProj;
         };
 
+#ifdef MOE_USE_LEGACY_CSM_CAMERA_IMPLEMENTATION
+        // legacy implementation. performance is not great
         static CSMCameraTransform getCSMCamera(Array<glm::vec3, 8> corners, glm::vec3 lightDir, int textureSize) {
             glm::vec3 center(0.0f);
             for (auto& c: corners) {
@@ -139,6 +141,64 @@ namespace moe {
 
             return transform;
         }
+#else
+        // new implementation, with more stable shadow quality
+        static CSMCameraTransform getCSMCamera(Array<glm::vec3, 8> corners, glm::vec3 lightDir, int textureSize) {
+            glm::vec3 minBounds(FLT_MAX);
+            glm::vec3 maxBounds(-FLT_MAX);
+
+            for (auto& c: corners) {
+                glm::vec4 ls = glm::vec4(c, 1.0f);
+                minBounds = glm::min(minBounds, glm::vec3(ls));
+                maxBounds = glm::max(maxBounds, glm::vec3(ls));
+            }
+
+            glm::vec3 lightDirNorm = glm::normalize(lightDir);
+
+            if (lightDirNorm.x == 0.0f && lightDirNorm.z == 0.0f) {
+                // ! fixme: this is too hacky
+                // avoid gimbal lock
+                lightDirNorm.x = 0.001f;
+            }
+
+            glm::mat4 view = glm::lookAt({}, lightDirNorm, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            float radius = glm::distance(minBounds, maxBounds) / 2.0f;
+            radius = std::floor(radius);
+
+            glm::vec3 center = (minBounds + maxBounds) * 0.5f;
+
+            glm::vec3 frustumCenter = glm::vec3{view * glm::vec4(center, 1.0f)};
+            float texelsPerUnit = textureSize / (radius * 2.0f);
+
+            float offsetX = std::fmod(frustumCenter.x, texelsPerUnit);
+            float offsetY = std::fmod(frustumCenter.y, texelsPerUnit);
+
+            frustumCenter -= glm::vec3{offsetX, offsetY, 0.0f};
+
+            glm::vec3 frustumCenterWorld = glm::vec3{glm::inverse(view) * glm::vec4(frustumCenter, 1.0f)};
+
+            glm::mat4 lightView = glm::lookAt(frustumCenterWorld, frustumCenterWorld + lightDirNorm, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // this can be tuned
+            // a value too small will clip some shadow
+            // however a value too large will cause shadow quality degradation and peter-panning
+            constexpr float zOffset = 10.0f;
+            glm::mat4 lightProj = glm::ortho(
+                    -radius, radius,
+                    -radius, radius,
+                    -(radius + zOffset), radius + zOffset);
+            lightProj[1][1] *= -1;// vulkan NDC
+
+            CSMCameraTransform transform{
+                    .view = lightView,
+                    .proj = lightProj,
+                    .viewProj = lightProj * lightView,
+            };
+
+            return transform;
+        }
+#endif
 
     private:
         glm::vec3 pos{0.0f};
