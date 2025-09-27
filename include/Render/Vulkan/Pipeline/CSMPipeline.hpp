@@ -45,7 +45,7 @@ namespace moe {
             };
 
             bool m_initialized{false};
-            uint32_t m_csmShadowMapSize{2048};
+            uint32_t m_csmShadowMapSize{4096};
             VulkanEngine* m_engine{nullptr};
 
             VkPipelineLayout m_pipelineLayout;

@@ -4,10 +4,6 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_debug_printf : enable
 
-#define USE_SHADOW_MAP
-#define USE_CSM
-#define USE_SMOOTH_SHADOW
-
 #include "mesh_pcs.glsl"
 #include "sampler.glsl"
 
@@ -23,90 +19,6 @@ layout(location = 0) out vec4 outFragAlbedo;
 layout(location = 1) out vec4 outFragNormal;
 layout(location = 2) out vec4 outFragORMA;
 layout(location = 3) out vec4 outFragEmissive;
-
-#ifdef USE_SHADOW_MAP
-#ifndef USE_CSM
-float sampleShadow(mat4 lightViewProj, vec3 worldPos, uint shadowMapId) {
-    vec4 lightSpacePos = lightViewProj * vec4(worldPos, 1.0);
-    lightSpacePos /= lightSpacePos.w;
-
-    vec2 ndc = lightSpacePos.xy;
-    ndc = ndc * 0.5 + 0.5;
-
-    if (ndc.x < 0.0 || ndc.x > 1.0 || ndc.y < 0.0 || ndc.y > 1.0) return 0.0;
-
-    float closestDepth = sampleTextureLinear(shadowMapId, ndc).r;
-    float currentDepth = lightSpacePos.z;
-
-    float bias = 0.001;
-    return currentDepth - bias > closestDepth ? 1.0 : 0.0;
-}
-
-#else
-
-uint getCascadeIndex(vec3 worldPos, vec3 cameraPos, vec4 cascadeSplits) {
-    float d = distance(worldPos.xyz, cameraPos.xyz);
-    // ! usually this should be the projection on the xOz plane,
-    // ! but it seems to break things, so just use the distance anyway
-    for (uint i = 0; i < CASCADED_SHADOW_MAPS - 1; i++) {
-        if (d < cascadeSplits[i]) {
-            return i;
-        }
-    }
-    return CASCADED_SHADOW_MAPS - 1;
-}
-
-float sampleShadow(vec3 worldPos, uint shadowMapId) {
-    vec3 cameraPos = u_meshPushConstants.sceneData.cameraPosition.xyz;
-    vec4 cascadeSplits = u_meshPushConstants.sceneData.shadowMapCascadeSplits;
-
-    uint cascadeIdx = getCascadeIndex(worldPos, cameraPos, cascadeSplits);
-
-    mat4 lightViewProj = u_meshPushConstants.sceneData.shadowMapLightTransform[cascadeIdx];
-    vec4 lightSpacePos = lightViewProj * vec4(worldPos, 1.0);
-    lightSpacePos /= lightSpacePos.w;
-
-    vec2 ndc = lightSpacePos.xy;
-    ndc = ndc * 0.5 + 0.5;
-
-    if (ndc.x < 0.0 || ndc.x > 1.0 || ndc.y < 0.0 || ndc.y > 1.0) return 0.0;
-
-#ifdef USE_SMOOTH_SHADOW
-    float shadow = 0.0;
-    const int numSamples = 8;
-
-    vec2 poissonDisk[8] = vec2[](
-            vec2(-0.326, -0.406), vec2(0.374, 0.415),
-            vec2(0.175, -0.312), vec2(-0.357, 0.283),
-            vec2(-0.011, -0.439), vec2(0.439, -0.139),
-            vec2(0.141, 0.141), vec2(-0.141, -0.141));
-
-    vec2 texelSize = 1.0 / textureSize2D(u_meshPushConstants.sceneData.shadowMapId);
-
-    // ! todo: add a falloff to sample radius if needed
-    float radius = 2.5;
-
-    for (int i = 0; i < numSamples; i++) {
-        vec2 offset = poissonDisk[i] * texelSize * radius;
-        vec2 sampleNDC = ndc + offset;
-        float closestDepth = sampleTextureArrayLinear(shadowMapId, sampleNDC, cascadeIdx).r;
-        float currentDepth = lightSpacePos.z;
-        float bias = 0.001;
-
-        shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
-    }
-    shadow /= float(numSamples);
-    return shadow;
-#else
-    float closestDepth = sampleTextureArrayLinear(shadowMapId, ndc, cascadeIdx).r;
-    float currentDepth = lightSpacePos.z;
-
-    float bias = 0.001;
-    return currentDepth - bias > closestDepth ? 1.0 : 0.0;
-#endif// USE_SMOOTH_SHADOW
-}
-#endif
-#endif// USE_SHADOW_MAP
 
 void main() {
     vec2 uv = inUV;
@@ -136,19 +48,7 @@ void main() {
     roughness = clamp(roughness, 0.01, 1.0);
     vec3 emissive = emissiveF * sampledEmissive.rgb * material.emissiveColor.rgb;
 
-#ifdef USE_SHADOW_MAP
-#ifndef USE_CSM
-    float shadow = sampleShadow(
-            u_meshPushConstants.sceneData.shadowMapLightTransform,
-            inWorldPos,
-            u_meshPushConstants.sceneData.shadowMapId);
-#else
-    float shadow = sampleShadow(inWorldPos, u_meshPushConstants.sceneData.shadowMapId);
-#endif
-    float occlusion = 1.0 - shadow;
-#else
     float occlusion = 1.0;
-#endif// USE_SHADOW_MAP
 
     // todo: occlusion, AO
     float ambientOcclusion = occlusion;
