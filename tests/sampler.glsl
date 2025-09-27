@@ -29,6 +29,10 @@ vec4 sampleTextureNearest(uint index, vec2 uv) {
     return texture(nonuniformEXT(sampler2D(u_textures[index], u_samplers[SAMPLER_NEAREST_ID])), uv);
 }
 
+vec2 textureSize2D(uint index) {
+    return textureSize(nonuniformEXT(sampler2D(u_textures[index], u_samplers[SAMPLER_NEAREST_ID])), 0);
+}
+
 vec4 sampleTextureCubeLinear(uint index, vec3 direction) {
     return texture(nonuniformEXT(samplerCube(u_textureCubes[index], u_samplers[SAMPLER_LINEAR_ID])), direction);
 }

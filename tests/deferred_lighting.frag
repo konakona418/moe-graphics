@@ -7,6 +7,10 @@
 #include "pbr_lighting.glsl"
 #include "sampler.glsl"
 #include "scene_data.glsl"
+#include "toon_shading.glsl"
+
+// enable toon shading
+// #define USE_TOON_SHADING
 
 layout(location = 0) in vec2 inUV;
 
@@ -140,7 +144,7 @@ void main() {
         const float noOcclusion = 1.0;
         if (light.type == LIGHT_TYPE_DIRECTIONAL) {
             // directional light, use CSM occlusion
-            occlusion = occlusion == 0.0 ? 0.2 : occlusion;
+            occlusion = clamp(occlusion, 0.1, 1.0);// clamp to avoid black
             fragColor += calculateLight(light, fragPos, n, v, l, diffuseColor, roughness, metallic, f0, occlusion);
         } else {
             // other, use no occlusion
@@ -152,6 +156,10 @@ void main() {
 
     // todo: ambient intensity not defined, use alpha
     fragColor += albedo * u_deferredPCS.sceneData.ambientColor.rgb * u_deferredPCS.sceneData.ambientColor.a;
+
+#ifdef USE_TOON_SHADING
+    fragColor = toonShade(fragColor);
+#endif
 
     outFragColor = vec4(fragColor, 1.0);
 }

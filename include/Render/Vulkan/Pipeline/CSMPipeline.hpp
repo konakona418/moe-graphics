@@ -22,7 +22,7 @@ namespace moe {
             CSMPipeline() = default;
             ~CSMPipeline() = default;
 
-            void init(VulkanEngine& engine, Array<float, SHADOW_CASCADE_COUNT> cascadeSplitRatios = {0.05f, 0.2f, 0.4f, 1.0f});
+            void init(VulkanEngine& engine, Array<float, SHADOW_CASCADE_COUNT> cascadeSplitRatios = {0.1f, 0.3f, 0.65f, 1.0f});
 
             void draw(
                     VkCommandBuffer cmdBuffer,

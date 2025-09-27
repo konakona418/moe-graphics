@@ -91,18 +91,6 @@ namespace moe {
                 maxBounds = glm::max(maxBounds, glm::vec3(ls));
             }
 
-            // adjust bounds to align with texel size
-            float worldUnitsPerTexel = (maxBounds.x - minBounds.x) / float(textureSize);
-            minBounds.x = floor(minBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
-            minBounds.y = floor(minBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
-            maxBounds.x = floor(maxBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
-            maxBounds.y = floor(maxBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
-
-            // it seems that with this the shadow quality is a little bit more stable
-            // but not much
-            maxBounds.z = floor(maxBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
-            minBounds.z = floor(minBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
-
             const auto boundExpand = [](float& boundMin, float& boundMax) {
                 MOE_ASSERT(boundMax >= boundMin, "Invalid bounds");
                 float extent = boundMax - boundMin;
@@ -115,14 +103,32 @@ namespace moe {
             boundExpand(minBounds.x, maxBounds.x);
             boundExpand(minBounds.y, maxBounds.y);
 
-            // ! fixme: this value works pretty fine for the first cascade,
-            // ! but for the rest, it can be too large or too small
-            // ! maybe compute it based on the cascade range?
+            // expand before aligning to texel size
+            // seem to work a little better
+
+            // adjust bounds to align with texel size
+            float worldUnitsPerTexel = (maxBounds.x - minBounds.x) / float(textureSize);
+            minBounds.x = floor(minBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
+            minBounds.y = floor(minBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
+            maxBounds.x = floor(maxBounds.x / worldUnitsPerTexel) * worldUnitsPerTexel;
+            maxBounds.y = floor(maxBounds.y / worldUnitsPerTexel) * worldUnitsPerTexel;
+
+            // it seems that with this the shadow quality is a little bit more stable
+            // but not much
+            maxBounds.z = floor(maxBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
+            minBounds.z = floor(minBounds.z / worldUnitsPerTexel) * worldUnitsPerTexel;
+
+            // ! fixme: this falloff does work well in some scenarios,
+            // ! but i don't think it's a robust solution
             constexpr float zBound = 10.0f;
+            float cascadeRange = std::max(0.001f, std::abs(minBounds.z - maxBounds.z));
+            float zBoundFalloff = zBound / (1.0f + cascadeRange);
+
             glm::mat4 lightProj = glm::ortho(
                     minBounds.x, maxBounds.x,
                     minBounds.y, maxBounds.y,
-                    -maxBounds.z - zBound, -minBounds.z + zBound);
+                    -maxBounds.z - zBoundFalloff,
+                    -minBounds.z + zBoundFalloff);
             lightProj[1][1] *= -1;// vulkan NDC
 
             CSMCameraTransform transform{
