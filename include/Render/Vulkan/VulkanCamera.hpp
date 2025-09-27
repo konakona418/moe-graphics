@@ -182,12 +182,16 @@ namespace moe {
 
             // this can be tuned
             // a value too small will clip some shadow
-            // however a value too large will cause shadow quality degradation and peter-panning
-            constexpr float zOffset = 10.0f;
+            // a value too large reduce shadow precision
+            // Testing results:
+            // - for smaller scenes, 1.0f ~ 2.0f works well
+            // - for larger scenes(dust2 test scene), 5.0f works well
+            // maybe we can make this value dynamic based on the cascade range
+            constexpr float zScale = 5.0f;
             glm::mat4 lightProj = glm::ortho(
-                    -radius, radius,
-                    -radius, radius,
-                    -(radius + zOffset), radius + zOffset);
+                    -radius * zScale, radius * zScale,
+                    -radius * zScale, radius * zScale,
+                    -radius * zScale, radius * zScale);
             lightProj[1][1] *= -1;// vulkan NDC
 
             CSMCameraTransform transform{
