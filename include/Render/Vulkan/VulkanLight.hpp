@@ -46,6 +46,43 @@ namespace moe {
 
         VulkanCPULight() = default;
 
+        static VulkanCPULight createPointLight(const glm::vec3& pos, const glm::vec3& color, float intensity, float radius) {
+            VulkanCPULight light{};
+            light.type = LightType::Point;
+            light.position = pos;
+            light.color = color;
+            light.intensity = intensity;
+            light.radius = radius;
+            return light;
+        }
+
+        static VulkanCPULight createDirectionalLight(const glm::vec3& direction, const glm::vec3& color, float intensity) {
+            VulkanCPULight light{};
+            light.type = LightType::Directional;
+            light.direction = direction;
+            light.color = color;
+            light.intensity = intensity;
+            return light;
+        }
+
+        static VulkanCPULight createSpotLight(
+                const glm::vec3& position, const glm::vec3& direction,
+                const glm::vec3& color,
+                float intensity,
+                float radius,
+                float innerConeAngleRad, float outerConeAngleRad) {
+            VulkanCPULight light{};
+            light.type = LightType::Spot;
+            light.position = position;
+            light.direction = direction;
+            light.color = color;
+            light.intensity = intensity;
+            light.radius = radius;
+            light.innerConeAngleRad = innerConeAngleRad;
+            light.outerConeAngleRad = outerConeAngleRad;
+            return light;
+        }
+
         VulkanGPULight toGPU() const {
             VulkanGPULight gpuLight{};
             gpuLight.position = position;

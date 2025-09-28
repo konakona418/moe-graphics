@@ -9,6 +9,7 @@
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
+#include "Render/Vulkan/VulkanEngineDrivers.hpp"
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
@@ -96,6 +97,7 @@ namespace moe {
         VulkanBindlessSet m_bindlessSet;
 
         InputBus m_inputBus{};
+        VulkanIlluminationBus m_illuminationBus{};
 
         VulkanCamera m_defaultCamera{
                 glm::vec3(0.0f, 0.0f, 0.0f),
@@ -122,7 +124,6 @@ namespace moe {
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
-            VulkanSwapBuffer lightBuffer;
             VulkanScene testScene;
         } m_pipelines;
 
