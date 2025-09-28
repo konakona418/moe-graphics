@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
@@ -28,5 +29,25 @@ namespace moe {
 
         VulkanAllocatedBuffer m_buffer;
         Vector<VulkanAllocatedBuffer> m_stagingBuffers;
+    };
+
+    struct VulkanSwapImage {
+    public:
+        VulkanSwapImage() = default;
+        ~VulkanSwapImage() = default;
+
+        void init(VulkanEngine& engine, VkImageUsageFlags usage, VkFormat format, VkExtent2D extent, size_t swapCount);
+
+        void destroy();
+
+        VulkanAllocatedImage& getNextImage();
+
+    private:
+        VulkanEngine* m_engine{nullptr};
+        bool m_initialized{false};
+
+        Vector<ImageId> m_images;
+        size_t m_currentImageIndex{0};
+        size_t m_swapCount{0};
     };
 }// namespace moe

@@ -109,4 +109,46 @@ namespace moe {
             // sync
         }
     }
+
+    void VulkanSwapImage::init(VulkanEngine& engine, VkImageUsageFlags usage, VkFormat format, VkExtent2D extent, size_t swapCount) {
+        MOE_ASSERT(!m_images.size(), "VulkanSwapImage already initialized");
+        MOE_ASSERT(swapCount > 0, "Swap count must be greater than 0");
+        MOE_ASSERT(extent.width > 0 && extent.height > 0, "Extent must be greater than 0");
+
+        m_swapCount = swapCount;
+        m_engine = &engine;
+
+        m_images.resize(swapCount);
+        for (size_t i = 0; i < swapCount; i++) {
+            auto image = engine.allocateImage(
+                    {extent.width, extent.height, 1},
+                    format,
+                    usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                    false);
+
+            m_images[i] = engine.m_caches.imageCache.addImage(std::move(image));
+        }
+
+        m_initialized = true;
+    }
+
+    void VulkanSwapImage::destroy() {
+        MOE_ASSERT(m_initialized, "VulkanSwapImage not initialized");
+
+        /*for (auto id: m_images) {
+            m_engine->m_caches.imageCache.disposeImage(id);
+        }*/
+        m_images.clear();
+
+        m_engine = nullptr;
+        m_initialized = false;
+    }
+
+    VulkanAllocatedImage& VulkanSwapImage::getNextImage() {
+        MOE_ASSERT(m_initialized, "VulkanSwapImage not initialized");
+
+        // todo: implement proper synchronization
+
+        MOE_ASSERT(false, "Not implemented");
+    }
 }// namespace moe
