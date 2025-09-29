@@ -587,40 +587,7 @@ namespace moe {
         // debug time
         auto time = static_cast<float>(glfwGetTime());
 
-        // ! illumination setup
-
-        // reset dynamic lights
-        m_illuminationBus.resetDynamicState();
-
-        m_illuminationBus.setAmbient(glm::vec3(0.1f, 0.1f, 0.1f), 0.2f);
-
-        {
-            VulkanCPULight light{};
-            light.type = LightType::Point;
-            light.position = glm::vec3(2.0f, 2.0f, -2.0f) * glm::vec3(glm::cos(time), 1.0f, glm::sin(time));
-            light.color = glm::vec3(1.0f, 0.5f, 0.0f);
-            light.intensity = 4.0f;
-            light.radius = 3.0f;
-            m_illuminationBus.addDynamicLight(light);
-        }
-        {
-            VulkanCPULight light{};
-            light.type = LightType::Point;
-            light.position = glm::vec3(-2.0f, 2.0f, 2.0f) * glm::vec3(glm::cos(time), 1.0f, glm::sin(time));
-            light.color = glm::vec3(0.0f, 0.5f, 1.0f);
-            light.intensity = 4.0f;
-            light.radius = 3.0f;
-            m_illuminationBus.addDynamicLight(light);
-        }
-        {
-            VulkanCPULight light{};
-            light.type = LightType::Directional;
-            light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-            light.intensity = 2.0f;
-            light.direction = glm::normalize(glm::vec3(1.0f, -1.0f, 0.0f));
-            m_illuminationBus.setSunlight(light.direction, light.color, light.intensity);
-        }
-
+        // ! illumination information upload
         m_illuminationBus.uploadToGPU(commandBuffer, currentFrameIndex);
 
         // ! shadow
@@ -1173,27 +1140,14 @@ namespace moe {
         allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         allocCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        vmaCreateImage(m_allocator, &drawImageInfo, &allocCreateInfo, &m_drawImage.image, &m_drawImage.vmaAllocation, nullptr);
-        vmaCreateImage(m_allocator, &depthImageInfo, &allocCreateInfo, &m_depthImage.image, &m_depthImage.vmaAllocation, nullptr);
-        vmaCreateImage(m_allocator, &finalColorImageInfo, &allocCreateInfo, &m_msaaResolveImage.image, &m_msaaResolveImage.vmaAllocation, nullptr);
-
-        VkImageViewCreateInfo drawImageViewInfo = VkInit::imageViewCreateInfo(m_drawImage.imageFormat, m_drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
-        VkImageViewCreateInfo depthImageViewInfo = VkInit::imageViewCreateInfo(m_depthImage.imageFormat, m_depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-        VkImageViewCreateInfo finalColorImageViewInfo = VkInit::imageViewCreateInfo(m_msaaResolveImage.imageFormat, m_msaaResolveImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        MOE_VK_CHECK(vkCreateImageView(m_device, &drawImageViewInfo, nullptr, &m_drawImage.imageView));
-        MOE_VK_CHECK(vkCreateImageView(m_device, &depthImageViewInfo, nullptr, &m_depthImage.imageView));
-        MOE_VK_CHECK(vkCreateImageView(m_device, &finalColorImageViewInfo, nullptr, &m_msaaResolveImage.imageView));
+        m_drawImage = allocateImage(drawImageInfo);
+        m_depthImage = allocateImage(depthImageInfo);
+        m_msaaResolveImage = allocateImage(finalColorImageInfo);
 
         m_mainDeletionQueue.pushFunction([=] {
-            vkDestroyImageView(m_device, m_msaaResolveImage.imageView, nullptr);
-            vmaDestroyImage(m_allocator, m_msaaResolveImage.image, m_msaaResolveImage.vmaAllocation);
-
-            vkDestroyImageView(m_device, m_drawImage.imageView, nullptr);
-            vmaDestroyImage(m_allocator, m_drawImage.image, m_drawImage.vmaAllocation);
-
-            vkDestroyImageView(m_device, m_depthImage.imageView, nullptr);
-            vmaDestroyImage(m_allocator, m_depthImage.image, m_depthImage.vmaAllocation);
+            destroyImage(m_msaaResolveImage);
+            destroyImage(m_depthImage);
+            destroyImage(m_drawImage);
         });
     }
 

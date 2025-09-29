@@ -30,6 +30,11 @@ namespace moe {
     }
 
     VulkanIlluminationBus& VulkanIlluminationBus::addLight(const VulkanCPULight& light, RegistryType type) {
+        if (light.type == LightType::Directional) {
+            Logger::warn("Directional light cannot be added via VulkanIlluminationBus::addLight(), use setSunlight() instead");
+            return *this;
+        }
+
         if (type == RegistryType::Static) {
             staticLights.push_back(light);
         } else {

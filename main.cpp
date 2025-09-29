@@ -65,10 +65,11 @@ int main() {
     moe::VulkanEngine engine;
     engine.init();
     auto& camera = engine.getDefaultCamera();
+    auto& illuminationBus = engine.getBus<moe::VulkanIlluminationBus>();
     camera.setPosition(glm::vec3(0.0f, 0.0f, 3.0f));
     camera.setYaw(-90.0f);
     constexpr float cameraRotDampening = 0.1f;
-    constexpr float cameraMoveSpeed = 2.f;
+    constexpr float cameraMoveSpeed = 5.f;
     CameraMovementMask movementMask;
 
     std::chrono::high_resolution_clock::time_point lastTime = std::chrono::high_resolution_clock::now();
@@ -79,11 +80,15 @@ int main() {
     auto& inputBus = engine.getInputBus();
     inputBus.setMouseValid(false);
 
+    float elapsed = 0.0f;
+
     while (running) {
         engine.beginFrame();
         auto now = std::chrono::high_resolution_clock::now();
         auto deltaTime = (float) std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count() / 1000.0f;
         lastTime = now;
+
+        elapsed += deltaTime;
 
         while (auto e = inputBus.pollEvent()) {
             if (e->is<moe::WindowEvent::Close>()) {
@@ -134,6 +139,38 @@ int main() {
             camera.setPosition(camera.getPosition() + cameraMovement * cameraMoveSpeed * deltaTime);
         } else {
             cameraMovement = glm::vec3(0.0f);
+        }
+
+        // reset dynamic lights
+        illuminationBus.resetDynamicState();
+
+        illuminationBus.setAmbient(glm::vec3(0.1f, 0.1f, 0.1f), 0.2f);
+
+        {
+            moe::VulkanCPULight light{};
+            light.type = moe::LightType::Point;
+            light.position = glm::vec3(2.0f, 2.0f, -2.0f) * glm::vec3(glm::cos(elapsed), 1.0f, glm::sin(elapsed));
+            light.color = glm::vec3(1.0f, 0.5f, 0.0f);
+            light.intensity = 4.0f;
+            light.radius = 3.0f;
+            illuminationBus.addDynamicLight(light);
+        }
+        {
+            moe::VulkanCPULight light{};
+            light.type = moe::LightType::Point;
+            light.position = glm::vec3(-2.0f, 2.0f, 2.0f) * glm::vec3(glm::cos(elapsed), 1.0f, glm::sin(elapsed));
+            light.color = glm::vec3(0.0f, 0.5f, 1.0f);
+            light.intensity = 4.0f;
+            light.radius = 3.0f;
+            illuminationBus.addDynamicLight(light);
+        }
+        {
+            moe::VulkanCPULight light{};
+            light.type = moe::LightType::Directional;
+            light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+            light.intensity = 2.0f;
+            light.direction = glm::normalize(glm::vec3(1.0f, -1.0f, 0.0f));
+            illuminationBus.setSunlight(light.direction, light.color, light.intensity);
         }
 
         engine.endFrame();

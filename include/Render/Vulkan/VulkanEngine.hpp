@@ -176,6 +176,17 @@ namespace moe {
 
         InputBus& getInputBus() { return m_inputBus; }
 
+        template<typename T>
+        T& getBus() {
+            if constexpr (std::is_same_v<T, InputBus>) {
+                return m_inputBus;
+            } else if constexpr (std::is_same_v<T, VulkanIlluminationBus>) {
+                return m_illuminationBus;
+            } else {
+                static_assert(std::false_type::value, "Unsupported bus type");
+            }
+        }
+
         bool isMultisamplingEnabled() const { return m_msaaSamples != VK_SAMPLE_COUNT_1_BIT; }
 
     private:
