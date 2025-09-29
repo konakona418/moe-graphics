@@ -37,3 +37,6 @@
 [submodule "vendors/tinygltf"]
 	path = vendors/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
+[submodule "vendors/JoltPhysics"]
+	path = vendors/JoltPhysics
+	url = https://github.com/jrouwe/JoltPhysics.git
