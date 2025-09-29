@@ -160,7 +160,8 @@ namespace moe {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
+        // draw set fxaa enabled
+        ImGui::Checkbox("Enable FXAA", &m_enableFxaa);
 
         ImGui::Render();
 
@@ -577,7 +578,7 @@ namespace moe {
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
         // ! load scene render packets
-        m_pipelines.testScene.updateTransform(glm::scale(glm::mat4(1.0f), glm::vec3(30.0f)));
+        m_pipelines.testScene.updateTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)));
 
         Vector<VulkanRenderPacket> packets;
         m_pipelines.testScene.gatherRenderPackets(packets);
@@ -693,11 +694,11 @@ namespace moe {
 
         VkUtils::transitionImage(
                 commandBuffer,
-                m_swapchainImages[swapchainImageIndex],
+                m_postFxImages.topOfPostFxImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         if (isMultisamplingEnabled()) {
-            // blit from resolved image to swapchain image
+            // blit from resolved image to postfx top image
             VkUtils::transitionImage(
                     commandBuffer,
                     m_msaaResolveImage.image,
@@ -705,10 +706,10 @@ namespace moe {
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_msaaResolveImage.image, m_swapchainImages[swapchainImageIndex],
-                    m_drawExtent, m_swapchainExtent);
+                    m_msaaResolveImage.image, m_postFxImages.topOfPostFxImage.image,
+                    m_drawExtent, m_drawExtent);
         } else {
-            // blit from draw image to swapchain image
+            // blit from draw image to postfx top image
             VkUtils::transitionImage(
                     commandBuffer,
                     m_drawImage.image,
@@ -716,7 +717,60 @@ namespace moe {
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_drawImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_drawImage.image, m_postFxImages.topOfPostFxImage.image,
+                    m_drawExtent, m_drawExtent);
+        }
+
+        // transform swapchain image to transfer dest, ready for copy
+        VkUtils::transitionImage(
+                commandBuffer,
+                m_swapchainImages[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        if (isFxaaEnabled()) {
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.topOfPostFxImage.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.fxaaImage.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            {
+                auto colorAttachment =
+                        VkInit::renderingAttachmentInfo(
+                                m_postFxImages.fxaaImage.imageView,
+                                &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, nullptr);
+                vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+                m_pipelines.fxaaPipeline.draw(
+                        commandBuffer, m_postFxImages.topOfPostFxImageId);
+
+                vkCmdEndRendering(commandBuffer);
+            }
+
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.fxaaImage.image,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            VkUtils::copyImage(
+                    commandBuffer,
+                    m_postFxImages.fxaaImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_drawExtent, m_swapchainExtent);
+        } else {
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.topOfPostFxImage.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+            VkUtils::copyImage(
+                    commandBuffer,
+                    m_postFxImages.topOfPostFxImage.image, m_swapchainImages[swapchainImageIndex],
                     m_drawExtent, m_swapchainExtent);
         }
 
@@ -1144,6 +1198,9 @@ namespace moe {
         m_depthImage = allocateImage(depthImageInfo);
         m_msaaResolveImage = allocateImage(finalColorImageInfo);
 
+        // ! the creation of post fx images are not placed here
+        // ! see initPostFXImages()
+
         m_mainDeletionQueue.pushFunction([=] {
             destroyImage(m_msaaResolveImage);
             destroyImage(m_depthImage);
@@ -1305,6 +1362,9 @@ namespace moe {
         m_pipelines.csmPipeline.init(*this);
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
+        m_pipelines.fxaaPipeline.init(*this);
+
+        initPostFXImages();
 
         m_pipelines.skyBoxImageId = m_caches.imageCache.loadCubeMapFromFiles(
                 {"skybox/right.jpg",
@@ -1322,11 +1382,12 @@ namespace moe {
                 sizeof(VulkanGPUSceneData),
                 FRAMES_IN_FLIGHT);
 
-        m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./de_dust2/scene.gltf");
+        m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
 
         m_mainDeletionQueue.pushFunction([&] {
             m_pipelines.sceneDataBuffer.destroy();
 
+            m_pipelines.fxaaPipeline.destroy();
             m_pipelines.deferredLightingPipeline.destroy();
             m_pipelines.gBufferPipeline.destroy();
             m_pipelines.csmPipeline.destroy();
@@ -1336,6 +1397,29 @@ namespace moe {
 
             m_illuminationBus.destroy();
         });
+    }
+
+    void VulkanEngine::initPostFXImages() {
+        VkExtent3D extent = {m_drawExtent.width, m_drawExtent.height, 1};
+
+        VkImageUsageFlags postFxImageUsage{};
+        postFxImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        postFxImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        postFxImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        postFxImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+        VkImageCreateInfo postFXImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, postFxImageUsage, extent);
+        postFXImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        auto topOfPostFXImage = allocateImage(postFXImageInfo);
+        auto topOfPostFXImageId = m_caches.imageCache.addImage(std::move(topOfPostFXImage));
+        m_postFxImages.topOfPostFxImageId = topOfPostFXImageId;
+        m_postFxImages.topOfPostFxImage = m_caches.imageCache.getImage(topOfPostFXImageId).value();
+
+        auto fxaaImage = allocateImage(postFXImageInfo);
+        auto fxaaImageId = m_caches.imageCache.addImage(std::move(fxaaImage));
+        m_postFxImages.fxaaImageId = fxaaImageId;
+        m_postFxImages.fxaaImage = m_caches.imageCache.getImage(fxaaImageId).value();
     }
 
     void VulkanEngine::queueEvent(WindowEvent event) {

@@ -4,6 +4,7 @@
 #include "Render/Vulkan/Pipeline/DeferredLightingPipeline.hpp"
 #include "Render/Vulkan/Pipeline/GBufferPipeline.hpp"
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
+#include "Render/Vulkan/Pipeline/PostFXPipeline.hpp"
 #include "Render/Vulkan/Pipeline/ShadowMapPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
@@ -63,6 +64,7 @@ namespace moe {
 
         VkSampleCountFlagBits m_msaaSamples{VK_SAMPLE_COUNT_1_BIT};
         // ! msaa x4; disable this if deferred rendering is implemented; use fxaa then
+        bool m_enableFxaa{true};
 
         GLFWwindow* m_window{nullptr};
         std::pair<float, float> m_lastMousePos{0.0f, 0.0f};
@@ -89,6 +91,14 @@ namespace moe {
         VulkanAllocatedImage m_depthImage;
         VulkanAllocatedImage m_msaaResolveImage;
         VkExtent2D m_drawExtent;
+
+        struct {
+            VulkanAllocatedImage topOfPostFxImage;
+            ImageId topOfPostFxImageId;
+
+            VulkanAllocatedImage fxaaImage;
+            ImageId fxaaImageId{NULL_IMAGE_ID};
+        } m_postFxImages;
 
         VkFence m_immediateModeFence;
         VkCommandBuffer m_immediateModeCommandBuffer;
@@ -121,6 +131,7 @@ namespace moe {
             Pipeline::CSMPipeline csmPipeline;
             Pipeline::GBufferPipeline gBufferPipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
+            Pipeline::FXAAPipeline fxaaPipeline;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
@@ -145,6 +156,10 @@ namespace moe {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
             return m_bindlessSet;
         }
+
+        bool isFxaaEnabled() const { return m_enableFxaa; }
+
+        void setFxaaEnabled(bool enabled) { m_enableFxaa = enabled; }
 
         void immediateSubmit(Function<void(VkCommandBuffer)>&& fn);
 
@@ -217,6 +232,8 @@ namespace moe {
         void initBindlessSet();
 
         void initPipelines();
+
+        void initPostFXImages();
 
         void drawBackground(VkCommandBuffer commandBuffer);
 

@@ -80,6 +80,8 @@ int main() {
     auto& inputBus = engine.getInputBus();
     inputBus.setMouseValid(false);
 
+    bool isMouseValid = false;
+
     float elapsed = 0.0f;
 
     while (running) {
@@ -95,10 +97,19 @@ int main() {
                 running = false;
             }
 
-            if (auto mouse = e->getIf<moe::WindowEvent::MouseMove>()) {
-                //moe::Logger::info("Mouse move: {}, {}", mouse->deltaX, mouse->deltaY);
-                camera.setYaw(camera.getYaw() + mouse->deltaX * cameraRotDampening);
-                camera.setPitch(camera.getPitch() + -mouse->deltaY * cameraRotDampening);
+            if (!isMouseValid) {
+                if (auto mouse = e->getIf<moe::WindowEvent::MouseMove>()) {
+                    //moe::Logger::info("Mouse move: {}, {}", mouse->deltaX, mouse->deltaY);
+                    camera.setYaw(camera.getYaw() + mouse->deltaX * cameraRotDampening);
+                    camera.setPitch(camera.getPitch() + -mouse->deltaY * cameraRotDampening);
+                }
+            }
+
+            if (auto keyup = e->getIf<moe::WindowEvent::KeyUp>()) {
+                if (keyup->keyCode == GLFW_KEY_ESCAPE) {
+                    inputBus.setMouseValid(!isMouseValid);
+                    isMouseValid = !isMouseValid;
+                }
             }
         }
 

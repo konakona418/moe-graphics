@@ -10,10 +10,10 @@ namespace moe {
 
 namespace moe {
     namespace Pipeline {
-        struct PostFXPipeline {
+        struct FXAAPipeline {
         public:
-            PostFXPipeline() = default;
-            ~PostFXPipeline() = default;
+            FXAAPipeline() = default;
+            ~FXAAPipeline() = default;
 
             void init(VulkanEngine& engine);
 
@@ -26,6 +26,8 @@ namespace moe {
         private:
             struct PushConstants {
                 ImageId inputImageId;
+                glm::vec2 screenSize;
+                glm::vec2 inverseScreenSize;
             };
 
             VulkanEngine* m_engine{nullptr};
