@@ -66,6 +66,8 @@ namespace moe {
         // ! msaa x4; disable this if deferred rendering is implemented; use fxaa then
         bool m_enableFxaa{true};
 
+        float m_shadowMapCameraScale{3.0f};
+
         GLFWwindow* m_window{nullptr};
         std::pair<float, float> m_lastMousePos{0.0f, 0.0f};
         bool m_firstMouse{true};

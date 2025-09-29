@@ -35,6 +35,10 @@ namespace moe {
 
             ImageId getShadowMapImageId() const { return m_shadowMapImageId; }
 
+            float getShadowMapCameraScale() const { return m_shadowMapCameraScale; }
+
+            void setShadowMapCameraScale(float scale) { m_shadowMapCameraScale = scale; }
+
             glm::mat4 m_cascadeLightTransforms[SHADOW_CASCADE_COUNT];
             float m_cascadeFarPlaneZs[SHADOW_CASCADE_COUNT];
 
@@ -55,6 +59,8 @@ namespace moe {
             Array<VkImageView, SHADOW_CASCADE_COUNT> m_shadowMapImageViews;
 
             Array<float, SHADOW_CASCADE_COUNT> m_cascadeSplitRatios;
+
+            float m_shadowMapCameraScale{3.0f};
         };
     }// namespace Pipeline
 }// namespace moe

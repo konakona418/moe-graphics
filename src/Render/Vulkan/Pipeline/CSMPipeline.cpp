@@ -145,7 +145,7 @@ namespace moe {
 
                 float aspect = (float) m_engine->m_drawExtent.width / (float) m_engine->m_drawExtent.height;
                 auto corners = subFrustumCamera.getFrustumCornersWorldSpace(aspect);
-                m_cascadeLightTransforms[i] = VulkanCamera::getCSMCamera(corners, lightDir, m_csmShadowMapSize).viewProj;
+                m_cascadeLightTransforms[i] = VulkanCamera::getCSMCamera(corners, lightDir, m_csmShadowMapSize, m_shadowMapCameraScale).viewProj;
 
                 auto depthClearValue = VkClearValue{.depthStencil = {1.0f, 0}};
                 auto depthAttachment = VkInit::renderingAttachmentInfo(

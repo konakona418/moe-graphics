@@ -163,6 +163,9 @@ namespace moe {
         // draw set fxaa enabled
         ImGui::Checkbox("Enable FXAA", &m_enableFxaa);
 
+        // shadow map cam scale
+        ImGui::SliderFloat("Shadow Map Scale", &m_shadowMapCameraScale, 1.0f, 5.0f);
+
         ImGui::Render();
 
         draw();
@@ -592,6 +595,7 @@ namespace moe {
         m_illuminationBus.uploadToGPU(commandBuffer, currentFrameIndex);
 
         // ! shadow
+        m_pipelines.csmPipeline.setShadowMapCameraScale(m_shadowMapCameraScale);
         m_pipelines.csmPipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
