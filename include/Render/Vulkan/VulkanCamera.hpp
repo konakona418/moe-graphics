@@ -142,14 +142,14 @@ namespace moe {
             return transform;
         }
 #else
-        static constexpr float DEFAULT_CSM_CAMERA_CLIP_SPACE_SCALE = 2.0f;
+        static constexpr glm::vec3 DEFAULT_CSM_CAMERA_CLIP_SPACE_SCALE = {2.0f, 2.0f, 2.0f};
 
         // new implementation, with more stable shadow quality
         static CSMCameraTransform getCSMCamera(
                 Array<glm::vec3, 8> corners,
                 glm::vec3 lightDir,
                 int textureSize,
-                float clipSpaceScale = DEFAULT_CSM_CAMERA_CLIP_SPACE_SCALE) {
+                glm::vec3 clipSpaceScale = DEFAULT_CSM_CAMERA_CLIP_SPACE_SCALE) {
             glm::vec3 minBounds(FLT_MAX);
             glm::vec3 maxBounds(-FLT_MAX);
 
@@ -193,11 +193,13 @@ namespace moe {
             // - for smaller scenes, 1.0f ~ 2.0f works well
             // - for larger scenes(dust2 test scene), 5.0f works well
             // maybe we can make this value dynamic based on the cascade range
-            float scale = clipSpaceScale;
+            float scaleX = clipSpaceScale.x;
+            float scaleY = clipSpaceScale.y;
+            float scaleZ = clipSpaceScale.z;
             glm::mat4 lightProj = glm::ortho(
-                    -radius * scale, radius * scale,
-                    -radius * scale, radius * scale,
-                    -radius * scale, radius * scale);
+                    -radius * scaleX, radius * scaleX,
+                    -radius * scaleY, radius * scaleY,
+                    -radius * scaleZ, radius * scaleZ);
             lightProj[1][1] *= -1;// vulkan NDC
 
             CSMCameraTransform transform{

@@ -35,9 +35,11 @@ namespace moe {
 
             ImageId getShadowMapImageId() const { return m_shadowMapImageId; }
 
-            float getShadowMapCameraScale() const { return m_shadowMapCameraScale; }
+            glm::vec3 getShadowMapCameraScale() const { return m_shadowMapCameraScale; }
 
-            void setShadowMapCameraScale(float scale) { m_shadowMapCameraScale = scale; }
+            // x and y mainly affect shadow quality, z mainly affects shadow range
+            // however if the scene is too large, a larger x and y may still be needed
+            void setShadowMapCameraScale(glm::vec3 scale) { m_shadowMapCameraScale = scale; }
 
             glm::mat4 m_cascadeLightTransforms[SHADOW_CASCADE_COUNT];
             float m_cascadeFarPlaneZs[SHADOW_CASCADE_COUNT];
@@ -60,7 +62,7 @@ namespace moe {
 
             Array<float, SHADOW_CASCADE_COUNT> m_cascadeSplitRatios;
 
-            float m_shadowMapCameraScale{3.0f};
+            glm::vec3 m_shadowMapCameraScale{2.0f, 2.0f, 2.0f};
         };
     }// namespace Pipeline
 }// namespace moe
