@@ -14,6 +14,7 @@
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
+#include "Render/Vulkan/VulkanObjectCache.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
@@ -110,6 +111,7 @@ namespace moe {
 
         InputBus m_inputBus{};
         VulkanIlluminationBus m_illuminationBus{};
+        VulkanRenderObjectBus m_renderBus{};
 
         VulkanCamera m_defaultCamera{
                 glm::vec3(0.0f, 0.0f, 0.0f),
@@ -124,6 +126,7 @@ namespace moe {
             VulkanImageCache imageCache;
             VulkanMeshCache meshCache;
             VulkanMaterialCache materialCache;
+            VulkanObjectCache objectCache;
         } m_caches;
 
         struct {
@@ -137,7 +140,6 @@ namespace moe {
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
-            VulkanScene testScene;
         } m_pipelines;
 
         static VulkanEngine& get();
@@ -153,6 +155,10 @@ namespace moe {
         void beginFrame();
 
         void endFrame();
+
+        RenderableId loadGLTF(StringView filename) {
+            return m_caches.objectCache.load(this, filename, ObjectLoader::Gltf).first;
+        }
 
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
@@ -199,6 +205,8 @@ namespace moe {
                 return m_inputBus;
             } else if constexpr (std::is_same_v<T, VulkanIlluminationBus>) {
                 return m_illuminationBus;
+            } else if constexpr (std::is_same_v<T, VulkanRenderObjectBus>) {
+                return m_renderBus;
             } else {
                 static_assert(std::false_type::value, "Unsupported bus type");
             }

@@ -17,12 +17,18 @@ namespace moe {
     };
 
     struct VulkanDrawContext {
-        VulkanDrawContext* lastContext{nullptr};
+        const VulkanDrawContext* lastContext{nullptr};
         Vector<VulkanSceneMesh>* sceneMeshes{nullptr};
+
+        bool isNull() const { return lastContext == nullptr && sceneMeshes == nullptr; }
     };
+
+    const static VulkanDrawContext NULL_DRAW_CONTEXT = {nullptr, nullptr};
 
     struct VulkanRenderable {
         virtual ~VulkanRenderable() = default;
-        virtual void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) = 0;
+
+        virtual void updateTransform(const glm::mat4& parentTransform) = 0;
+        virtual void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) = 0;
     };
 }// namespace moe

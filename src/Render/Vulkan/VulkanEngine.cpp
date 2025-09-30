@@ -586,10 +586,19 @@ namespace moe {
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
         // ! load scene render packets
-        m_pipelines.testScene.updateTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)));
 
         Vector<VulkanRenderPacket> packets;
-        m_pipelines.testScene.gatherRenderPackets(packets);
+        //m_pipelines.testScene.gatherRenderPackets(packets);
+        for (auto& renderCommands: m_renderBus.getRenderCommands()) {
+            auto id = renderCommands.renderableId;
+            if (auto renderable = m_caches.objectCache.get(id)) {
+                renderable->get()->updateTransform(renderCommands.transform.getMatrix());
+                renderable->get()->gatherRenderPackets(packets, NULL_DRAW_CONTEXT);
+            } else {
+                Logger::warn("Renderable with id {} not found in cache", id);
+                continue;
+            }
+        }
 
         auto& defaultCamera = getDefaultCamera();
 
@@ -1364,6 +1373,7 @@ namespace moe {
 
     void VulkanEngine::initPipelines() {
         m_illuminationBus.init(*this);
+        m_renderBus.init(*this);
 
         m_pipelines.meshPipeline.init(*this);
         //m_pipelines.skyBoxPipeline.init(*this);
@@ -1391,8 +1401,6 @@ namespace moe {
                 sizeof(VulkanGPUSceneData),
                 FRAMES_IN_FLIGHT);
 
-        m_pipelines.testScene = *VkLoaders::GLTF::loadSceneFromFile(*this, "./bz_v1/bz_v1.gltf");
-
         m_mainDeletionQueue.pushFunction([&] {
             m_pipelines.sceneDataBuffer.destroy();
 
@@ -1404,6 +1412,7 @@ namespace moe {
             //m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
 
+            m_renderBus.destroy();
             m_illuminationBus.destroy();
         });
     }

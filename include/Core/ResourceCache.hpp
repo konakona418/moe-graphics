@@ -17,7 +17,7 @@ namespace moe {
             typename ResIdT,
             typename ResT,
             typename LoaderFunctorT>
-    struct VulkanCache {
+    struct ResourceCache {
     public:
         Optional<SharedResource<ResT>> get(ResIdT id) {
             auto it = resources.find(id);
@@ -33,7 +33,7 @@ namespace moe {
                         LoaderFunctorT, Args...>>;
 
         template<typename... Args, typename = EnableIfInvocable<Args...>>
-        SharedResource<ResT> load(Args&&... args) {
+        Pair<ResIdT, SharedResource<ResT>> load(Args&&... args) {
             ResIdT id;
             if (!recycledIds.empty()) {
                 id = recycledIds.front();
@@ -42,7 +42,7 @@ namespace moe {
                 id = idCounter++;
             }
 
-            return resources.emplace(id, LoaderFunctorT{}(std::forward<Args>(args)...)).first->second;
+            return *resources.emplace(id, LoaderFunctorT{}(std::forward<Args>(args)...)).first;
         }
 
         void leak(ResIdT id) {

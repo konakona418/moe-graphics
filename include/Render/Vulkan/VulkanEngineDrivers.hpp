@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Render/Common.hpp"
 #include "Render/Vulkan/VulkanLight.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
 
 namespace moe {
     class VulkanEngine;
@@ -65,8 +67,51 @@ namespace moe {
         VulkanSwapBuffer lightBuffer;
     };
 
-    struct VulkanSceneBus {
+    struct VulkanRenderObjectBus {
     public:
+        VulkanRenderObjectBus() = default;
+        ~VulkanRenderObjectBus() = default;
+
+        void init(VulkanEngine& engine) {
+            m_engine = &engine;
+            m_initialized = true;
+        }
+
+        void destroy() {
+            m_engine = nullptr;
+            m_initialized = false;
+        }
+
+        VulkanRenderObjectBus& submitRender(RenderableId id, Transform transform) {
+            MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
+            if (m_renderCommands.size() >= MAX_RENDER_COMMANDS) {
+                Logger::warn("Render object bus reached max render commands(4096), check if dynamic state is reset properly; exceeding commands will be ignored");
+                return *this;
+            }
+            m_renderCommands.push_back({id, transform});
+            return *this;
+        }
+
+        VulkanRenderObjectBus& submitRender(RenderCommand command) {
+            MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
+            if (m_renderCommands.size() >= MAX_RENDER_COMMANDS) {
+                Logger::warn("Render object bus reached max render commands(4096), check if dynamic state is reset properly; exceeding commands will be ignored");
+                return *this;
+            }
+            m_renderCommands.push_back(command);
+            return *this;
+        }
+
+        void resetDynamicState() { m_renderCommands.clear(); }
+
+        Deque<RenderCommand>& getRenderCommands() { return m_renderCommands; }
+
     private:
+        static constexpr uint32_t MAX_RENDER_COMMANDS = 4096;
+
+        VulkanEngine* m_engine{nullptr};
+        bool m_initialized{false};
+
+        Deque<RenderCommand> m_renderCommands;
     };
 }// namespace moe

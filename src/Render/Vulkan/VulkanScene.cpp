@@ -8,7 +8,7 @@ namespace moe {
         }
     }
 
-    void VulkanSceneNode::gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) {
+    void VulkanSceneNode::gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) {
         MOE_ASSERT(drawContext.sceneMeshes != nullptr, "drawContext.sceneMeshes is null");
 
         if (resourceInternalId != NULL_SCENE_RESOURCE_INTERNAL_ID) {
@@ -34,7 +34,13 @@ namespace moe {
         }
     }
 
-    void VulkanScene::gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) {
+    void VulkanScene::gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) {
+        if (drawContext.isNull()) {
+            // dispatch to gather without context
+            gatherRenderPackets(packets);
+            return;
+        }
+
         VulkanDrawContext localCtx{.lastContext = &drawContext, .sceneMeshes = &meshes};
 
         packets.reserve(packets.size() + children.size());

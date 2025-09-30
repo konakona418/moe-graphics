@@ -58,6 +58,9 @@ namespace moe {
 
     template<typename... TArgs>
     using UnorderedSet = std::unordered_set<TArgs...>;
+
+    template<typename FirstT, typename SecondT>
+    using Pair = std::pair<FirstT, SecondT>;
 }// namespace moe
 
 #include "Core/Logger.hpp"

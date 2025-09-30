@@ -66,6 +66,7 @@ int main() {
     engine.init();
     auto& camera = engine.getDefaultCamera();
     auto& illuminationBus = engine.getBus<moe::VulkanIlluminationBus>();
+    auto& renderBus = engine.getBus<moe::VulkanRenderObjectBus>();
     camera.setPosition(glm::vec3(0.0f, 0.0f, 3.0f));
     camera.setYaw(-90.0f);
     constexpr float cameraRotDampening = 0.1f;
@@ -83,6 +84,8 @@ int main() {
     bool isMouseValid = false;
 
     float elapsed = 0.0f;
+
+    auto sceneId = engine.loadGLTF("de_dust2/scene.gltf");
 
     while (running) {
         engine.beginFrame();
@@ -151,6 +154,13 @@ int main() {
         } else {
             cameraMovement = glm::vec3(0.0f);
         }
+
+        renderBus.resetDynamicState();
+
+        moe::Transform objectTransform{};
+        objectTransform.setScale(glm::vec3(30.0f));
+
+        renderBus.submitRender(sceneId, objectTransform);
 
         // reset dynamic lights
         illuminationBus.resetDynamicState();

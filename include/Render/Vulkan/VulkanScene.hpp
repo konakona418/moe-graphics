@@ -13,16 +13,16 @@ namespace moe {
         glm::mat4 localTransform{1.0f};
         glm::mat4 worldTransform{1.0f};
 
-        void updateTransform(const glm::mat4& parentTransform);
+        void updateTransform(const glm::mat4& parentTransform) override;
 
-        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) override = 0;
+        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override = 0;
     };
 
     struct VulkanSceneNode : public VulkanRenderNode {
         SceneResourceInternalId resourceInternalId{NULL_SCENE_RESOURCE_INTERNAL_ID};// -> VulkanScene::meshes
         uint32_t sortKey{VulkanRenderPacket::INVALID_SORT_KEY};
 
-        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) override;
+        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override;
     };
 
     struct VulkanSceneMesh {
@@ -38,7 +38,6 @@ namespace moe {
             gatherRenderPackets(packets, drawContext);
         }
 
-    private:
-        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, VulkanDrawContext& drawContext) override;
+        void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override;
     };
 }// namespace moe
