@@ -2,6 +2,7 @@
 
 #include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanRenderable.hpp"
+#include "Render/Vulkan/VulkanSkeleton.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 
@@ -32,6 +33,7 @@ namespace moe {
 
     struct VulkanScene : public VulkanRenderNode {
         Vector<VulkanSceneMesh> meshes;
+        Vector<VulkanSkeleton> skeletons;
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets) {
             VulkanDrawContext drawContext{.lastContext = nullptr, .sceneMeshes = &meshes};

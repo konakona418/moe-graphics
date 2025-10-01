@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Render/Vulkan/VulkanSkeleton.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
 
 namespace moe {
     struct VulkanMeshGeoSurface {
@@ -21,6 +23,8 @@ namespace moe {
     struct VulkanCPUMesh {
         Vector<Vertex> vertices;
         Vector<uint32_t> indices;
+        Vector<SkinningData> skinningData;
+        bool hasSkeleton{false};
 
         glm::vec3 min;
         glm::vec3 max;

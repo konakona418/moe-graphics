@@ -112,7 +112,11 @@ namespace moe {
                     const tinygltf::Accessor& accessor) {
                 const auto& bv = model.bufferViews[accessor.bufferView];
                 const int bs = accessor.ByteStride(bv);
-                assert(bs == sizeof(T));// check that it's packed
+                if (bs != sizeof(T)) {
+                    Logger::error("Accessor buffer is not tightly packed, expected {}, got {}", sizeof(T), bs);
+                    MOE_ASSERT(false, "Accessor buffer is not tightly packed");
+                }
+
                 const auto& buf = model.buffers[bv.buffer];
                 const auto* data =
                         reinterpret_cast<const T*>(&buf.data.at(0) + bv.byteOffset + accessor.byteOffset);
@@ -342,28 +346,76 @@ namespace moe {
                     }
                 }
 
-                /* if (hasAccessor(primitive, GLTF_JOINTS_ACCESSOR)) {
-                    const auto joints =
-                            getPackedBufferSpan<std::uint8_t[4]>(model, primitive, GLTF_JOINTS_ACCESSOR);
-                    const auto weights = getPackedBufferSpan<float[4]>(model, primitive, GLTF_WEIGHTS_ACCESSOR);
+                if (hasAccessor(primitive, GLTF_JOINTS_ACCESSOR)) {
+                    MOE_ASSERT(hasAccessor(primitive, GLTF_WEIGHTS_ACCESSOR), "Joints accessor found without weights accessor");
 
-                    assert(joints.size() == numVertices);
-                    assert(weights.size() == numVertices);
+                    auto jointsAccessorIndex = findAttributeAccessor(primitive, GLTF_JOINTS_ACCESSOR);
+                    auto weightsAccessorIndex = findAttributeAccessor(primitive, GLTF_WEIGHTS_ACCESSOR);
+
+                    const auto& jointsAccessor = model.accessors[jointsAccessorIndex];
+                    const auto& weightsAccessor = model.accessors[weightsAccessorIndex];
 
                     mesh.hasSkeleton = true;
                     mesh.skinningData.resize(numVertices);
 
-                    for (std::size_t i = 0; i < joints.size(); ++i) {
-                        mesh.skinningData[i].jointIds =
-                                glm::uvec4{joints[i][0], joints[i][1], joints[i][2], joints[i][3]};
+                    {
+                        switch (jointsAccessor.componentType) {
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+                                const auto joints = getPackedBufferSpan<std::uint8_t[4]>(model, jointsAccessor);
+                                MOE_ASSERT(joints.size() == numVertices, "Invalid number of joints");
+
+                                for (std::size_t i = 0; i < joints.size(); ++i) {
+                                    mesh.skinningData[i].jointIds =
+                                            glm::uvec4{joints[i][0], joints[i][1], joints[i][2], joints[i][3]};
+                                }
+                                break;
+                            }
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+                                const auto joints =
+                                        getPackedBufferSpan<std::uint16_t[4]>(model, jointsAccessor);
+                                MOE_ASSERT(joints.size() == numVertices, "Invalid number of joints");
+
+
+                                for (std::size_t i = 0; i < joints.size(); ++i) {
+                                    mesh.skinningData[i].jointIds =
+                                            glm::uvec4{joints[i][0], joints[i][1], joints[i][2], joints[i][3]};
+                                }
+                                break;
+                            }
+                            default:
+                                MOE_ASSERT(false, "Unsupported joints accessor component type");
+                        }
                     }
 
-                    for (std::size_t i = 0; i < weights.size(); ++i) {
-                        mesh.skinningData[i].weights =
-                                glm::vec4{weights[i][0], weights[i][1], weights[i][2], weights[i][3]};
+                    {
+                        switch (weightsAccessor.componentType) {
+                            case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                                const auto weights =
+                                        getPackedBufferSpan<float[4]>(model, weightsAccessor);
+                                MOE_ASSERT(weights.size() == numVertices, "Invalid number of weights");
+
+                                for (std::size_t i = 0; i < weights.size(); ++i) {
+                                    mesh.skinningData[i].weights =
+                                            glm::vec4{weights[i][0], weights[i][1], weights[i][2], weights[i][3]};
+                                }
+                                break;
+                            }
+                            case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                                const auto weights =
+                                        getPackedBufferSpan<double[4]>(model, weightsAccessor);
+                                MOE_ASSERT(weights.size() == numVertices, "Invalid number of weights");
+
+                                for (std::size_t i = 0; i < weights.size(); ++i) {
+                                    mesh.skinningData[i].weights =
+                                            glm::vec4{weights[i][0], weights[i][1], weights[i][2], weights[i][3]};
+                                }
+                                break;
+                            }
+                            default:
+                                MOE_ASSERT(false, "Unsupported weights accessor component type");
+                        }
                     }
-                }*/
-                // ! WIP: Skinning
+                }
 
                 return mesh;
             }
@@ -402,6 +454,77 @@ namespace moe {
 
             bool isMesh(const tinygltf::Node& node) {
                 return node.mesh != -1;
+            }
+
+
+            VulkanSkeleton loadSkeleton(
+                    UnorderedMap<int, JointId> nodeIdxToJointId,
+                    const tinygltf::Model& model,
+                    const tinygltf::Skin& skin) {
+                VulkanSkeleton skeleton{};
+
+                const auto& inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
+                {
+                    MOE_ASSERT(
+                            inverseBindMatricesAccessor.type == TINYGLTF_TYPE_MAT4,
+                            "Invalid inverse bind matrices accessor type");
+
+                    switch (inverseBindMatricesAccessor.componentType) {
+                        case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                            const auto inverseBindMatricesSpan = getPackedBufferSpan<glm::mat4>(model, inverseBindMatricesAccessor);
+                            skeleton.inverseBindMatrices.reserve(inverseBindMatricesAccessor.count);
+                            skeleton.inverseBindMatrices.assign(
+                                    inverseBindMatricesSpan.begin(),
+                                    inverseBindMatricesSpan.end());
+                            break;
+                        }
+                        case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                            const auto inverseBindMatricesSpan = getPackedBufferSpan<glm::dmat4>(model, inverseBindMatricesAccessor);
+                            skeleton.inverseBindMatrices.reserve(inverseBindMatricesAccessor.count);
+                            skeleton.inverseBindMatrices.assign(
+                                    inverseBindMatricesSpan.begin(),
+                                    inverseBindMatricesSpan.end());
+                            break;
+                        }
+                        default:
+                            MOE_ASSERT(false, "Unsupported inverse bind matrices component type");
+                            break;
+                    }
+                }
+
+                size_t jointCount = skin.joints.size();
+                skeleton.joints.reserve(jointCount);
+                skeleton.jointNames.resize(jointCount);
+
+                {
+                    JointId jointId{0};
+                    for (const auto& nodeIdx: skin.joints) {
+                        nodeIdxToJointId.emplace(nodeIdx, jointId);
+
+                        const auto& jointNode = model.nodes[nodeIdx];
+                        skeleton.jointNames[jointId] = jointNode.name;
+
+                        skeleton.joints.push_back(VulkanSkeleton::Joint{
+                                .id = jointId,
+                                .localTransform = loadTransform(jointNode),
+                        });
+
+                        ++jointId;
+                    }
+                }
+
+                {
+                    skeleton.hierarchy.resize(jointCount);
+                    for (JointId jointId = 0; jointId < skeleton.joints.size(); ++jointId) {
+                        const auto& jointNode = model.nodes[skin.joints[jointId]];
+                        for (const auto& childIdx: jointNode.children) {
+                            const auto childJointId = nodeIdxToJointId.at(childIdx);
+                            skeleton.hierarchy[jointId].children.push_back(childJointId);
+                        }
+                    }
+                }
+
+                return skeleton;
             }
 
             void loadNode(VulkanSceneNode& node, const tinygltf::Node& gltfNode, const tinygltf::Model& model) {
@@ -483,13 +606,27 @@ namespace moe {
                     vkScene.meshes.push_back(vkMesh);
                 }
 
+                // ! fixme: only one skeleton is supported
+                UnorderedMap<int, JointId> nodeIdxToJointId;
+                vkScene.skeletons.reserve(model.skins.size());
+                for (const auto& skin: model.skins) {
+                    auto skeleton = loadSkeleton(nodeIdxToJointId, model, skin);
+                    vkScene.skeletons.push_back(std::move(skeleton));
+                }
+
+                Logger::debug("Loaded {} skeletons", vkScene.skeletons.size());
+
+                if (vkScene.skeletons.size() > 1) {
+                    Logger::warn("Only one skeleton is supported, but {} skeletons found", vkScene.skeletons.size());
+                }
+
                 // todo: joint animation lighting
 
                 vkScene.children.reserve(scene.nodes.size());
                 for (std::size_t nodeIdx = 0; nodeIdx < scene.nodes.size(); ++nodeIdx) {
                     const auto& gltfNode = model.nodes[scene.nodes[nodeIdx]];
 
-                    /*// ! the original imlementation from edbr.
+                    // ! the original imlementation from edbr.
                     // ! preserve for now
                     // HACK: load mesh with skin (for now only one assumed)
                     if (gltfNode.children.size() == 2) {
@@ -510,7 +647,7 @@ namespace moe {
 
                             continue;
                         }
-                    }*/
+                    }
 
                     auto nodePtr = std::make_unique<VulkanSceneNode>();
                     auto& node = *static_cast<VulkanSceneNode*>(nodePtr.get());
