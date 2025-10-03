@@ -61,4 +61,36 @@ namespace moe {
 
         VulkanPipelineBuilder& enableDepthTesting(bool depthWriteEnabled, VkCompareOp compareOp);
     };
+
+    class VulkanComputePipelineBuilder {
+    public:
+        explicit VulkanComputePipelineBuilder(VkPipelineLayout layout) {
+            pipelineLayout = layout;
+        }
+
+        VulkanComputePipelineBuilder& setShader(VkShaderModule computeShader) {
+            shaderStage.module = computeShader;
+            shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+            return *this;
+        }
+
+        VkPipeline build(VkDevice device) {
+            VkComputePipelineCreateInfo pipelineInfo{};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+            pipelineInfo.layout = pipelineLayout;
+            pipelineInfo.stage = shaderStage;
+
+            VkPipeline pipeline;
+            VkResult result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+            if (result != VK_SUCCESS) {
+                Logger::error("Failed to create compute pipeline");
+                return VK_NULL_HANDLE;
+            }
+            return pipeline;
+        }
+
+    private:
+        VkPipelineLayout pipelineLayout;
+        VkPipelineShaderStageCreateInfo shaderStage;
+    };
 }// namespace moe
