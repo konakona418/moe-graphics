@@ -458,7 +458,7 @@ namespace moe {
 
 
             VulkanSkeleton loadSkeleton(
-                    UnorderedMap<int, JointId> nodeIdxToJointId,
+                    UnorderedMap<int, JointId>& nodeIdxToJointId,
                     const tinygltf::Model& model,
                     const tinygltf::Skin& skin) {
                 VulkanSkeleton skeleton{};
@@ -525,6 +525,99 @@ namespace moe {
                 }
 
                 return skeleton;
+            }
+
+            UnorderedMap<String, VulkanSkeletonAnimation> loadAnimations(
+                    const VulkanSkeleton& skeleton,
+                    const UnorderedMap<int, JointId>& gltfNodeIdxToJointId,
+                    const tinygltf::Model& gltfModel) {
+                UnorderedMap<String, VulkanSkeletonAnimation> animations(gltfModel.animations.size());
+                for (const auto& gltfAnimation: gltfModel.animations) {
+                    Logger::debug("Loading animation: {}", gltfAnimation.name);
+
+                    auto& animation = animations[gltfAnimation.name];
+                    animation.name = gltfAnimation.name;
+
+                    const auto numJoints = skeleton.joints.size();
+
+                    animation.tracks.resize(numJoints);
+
+                    for (const auto& channel: gltfAnimation.channels) {
+                        const auto& sampler = gltfAnimation.samplers[channel.sampler];
+
+                        const auto& timesAccessor = gltfModel.accessors[sampler.input];
+                        const auto times = getPackedBufferSpan<float>(gltfModel, timesAccessor);
+
+                        animation.duration =
+                                static_cast<float>(timesAccessor.maxValues[0] - timesAccessor.minValues[0]);
+                        if (animation.duration == 0) {
+                            continue;// skip empty animations (e.g. keying sets)
+                        }
+
+                        if (channel.target_path == "weights") {
+                            // ! fixme: implement morph target animation
+                            // The "weights" target_path in glTF animation channels is used for morph target (blend shape) animations.
+                            // It animates the weights of morph targets on a mesh, allowing for vertex-based deformations (e.g. facial expressions).
+                            continue;
+                        }
+
+                        const auto nodeId = channel.target_node;
+                        const auto jointId = gltfNodeIdxToJointId.at(nodeId);
+
+                        const auto& outputAccessor = gltfModel.accessors[sampler.output];
+                        MOE_ASSERT(outputAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Unsupported output component type");
+                        if (channel.target_path == GLTF_SAMPLER_PATH_TRANSLATION) {
+                            const auto translationKeys =
+                                    getPackedBufferSpan<glm::vec3>(gltfModel, outputAccessor);
+
+                            auto& tc = animation.tracks[jointId].translations;
+                            if (translationKeys.size() == 2 && translationKeys[0] == translationKeys[1]) {
+                                tc.push_back(translationKeys[0]);
+                            } else {
+                                if (jointId == 0) {
+                                    assert(translationKeys.size() != 2);
+                                }
+                                tc.reserve(translationKeys.size());
+                                for (const auto& key: translationKeys) {
+                                    tc.push_back(key);
+                                }
+                            }
+
+                        } else if (channel.target_path == GLTF_SAMPLER_PATH_ROTATION) {
+                            const auto rotationKeys = getPackedBufferSpan<glm::vec4>(gltfModel, outputAccessor);
+                            auto& rc = animation.tracks[jointId].rotations;
+                            if (rotationKeys.size() == 2 && rotationKeys[0] == rotationKeys[1]) {
+                                const auto& qv = rotationKeys[0];
+                                const glm::quat q{qv.w, qv.x, qv.y, qv.z};
+                                rc.push_back(q);
+                            } else {
+                                rc.reserve(rotationKeys.size());
+                                for (const auto& qv: rotationKeys) {
+                                    const glm::quat q{qv.w, qv.x, qv.y, qv.z};
+                                    rc.push_back(q);
+                                }
+                            }
+                        } else if (channel.target_path == GLTF_SAMPLER_PATH_SCALE) {
+                            const auto scaleKeys =
+                                    getPackedBufferSpan<const glm::vec3>(gltfModel, outputAccessor);
+
+                            auto& sc = animation.tracks[jointId].scales;
+                            if (scaleKeys.size() == 2 && scaleKeys[0] == scaleKeys[1]) {
+                                sc.push_back(scaleKeys[0]);
+                            } else {
+                                sc.reserve(scaleKeys.size());
+                                for (const auto& key: scaleKeys) {
+                                    sc.push_back(key);
+                                }
+                            }
+
+                        } else {
+                            Logger::warn("Unsupported animation channel path: {}", channel.target_path);
+                        }
+                    }
+                }
+
+                return animations;
             }
 
             void loadNode(VulkanSceneNode& node, const tinygltf::Node& gltfNode, const tinygltf::Model& model) {
@@ -618,6 +711,11 @@ namespace moe {
 
                 if (vkScene.skeletons.size() > 1) {
                     Logger::warn("Only one skeleton is supported, but {} skeletons found", vkScene.skeletons.size());
+                }
+
+                if (!vkScene.skeletons.empty()) {
+                    vkScene.animations = loadAnimations(vkScene.skeletons[0], nodeIdxToJointId, model);
+                    Logger::debug("Loaded {} animations", vkScene.animations.size());
                 }
 
                 // todo: joint animation lighting

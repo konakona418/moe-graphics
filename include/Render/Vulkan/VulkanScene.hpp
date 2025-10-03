@@ -34,6 +34,7 @@ namespace moe {
     struct VulkanScene : public VulkanRenderNode {
         Vector<VulkanSceneMesh> meshes;
         Vector<VulkanSkeleton> skeletons;
+        UnorderedMap<String, VulkanSkeletonAnimation> animations;
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets) {
             VulkanDrawContext drawContext{.lastContext = nullptr, .sceneMeshes = &meshes};

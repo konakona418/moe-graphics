@@ -25,4 +25,20 @@ namespace moe {
 
         Vector<String> jointNames;
     };
+
+    struct VulkanSkeletonAnimation {
+        struct Track {
+            Vector<glm::vec3> translations;
+            Vector<glm::quat> rotations;
+            Vector<glm::vec3> scales;
+        };
+
+        Vector<Track> tracks;// index = jointId
+        float duration;
+        bool loop;
+
+        size_t startFrame;
+
+        String name;
+    };
 }// namespace moe
