@@ -13,11 +13,15 @@ namespace moe {
     struct VulkanGPUMeshBuffer {
         VulkanAllocatedBuffer vertexBuffer;
         VulkanAllocatedBuffer indexBuffer;
+        VulkanAllocatedBuffer skinningDataBuffer;
 
         VkDeviceAddress vertexBufferAddr;
+        VkDeviceAddress skinningDataBufferAddr;
 
         uint32_t indexCount;
         uint32_t vertexCount;
+
+        bool hasSkinningData;
     };
 
     struct VulkanCPUMesh {

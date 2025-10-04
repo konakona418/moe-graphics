@@ -472,9 +472,10 @@ namespace moe {
         vmaDestroyBuffer(m_allocator, buffer.buffer, buffer.vmaAllocation);
     }
 
-    VulkanGPUMeshBuffer VulkanEngine::uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices) {
+    VulkanGPUMeshBuffer VulkanEngine::uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices, Span<SkinningData> skinningData) {
         const size_t vertBufferSize = vertices.size() * sizeof(Vertex);
         const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+        const size_t skinningDataBufferSize = skinningData.size() * sizeof(SkinningData);
 
         VulkanGPUMeshBuffer surface;
         surface.indexCount = static_cast<uint32_t>(indices.size());
@@ -499,8 +500,33 @@ namespace moe {
                         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
 
+        bool hasSkinningData = !skinningData.empty();
+        surface.hasSkinningData = hasSkinningData;
+
+        size_t stagingBufferSize = 0;
+
+        if (hasSkinningData) {
+            Logger::info("Mesh has skinning data, size {} bytes", skinningDataBufferSize);
+
+            stagingBufferSize = indexBufferSize + vertBufferSize + skinningDataBufferSize;
+
+            surface.skinningDataBuffer = allocateBuffer(
+                    skinningDataBufferSize,
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                    VMA_MEMORY_USAGE_GPU_ONLY);
+
+            surface.skinningDataBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+        } else {
+            stagingBufferSize = indexBufferSize + vertBufferSize;
+
+            surface.skinningDataBuffer = {};
+            surface.skinningDataBufferAddr = 0;
+        }
+
         VulkanAllocatedBuffer stagingBuffer = allocateBuffer(
-                vertBufferSize + indexBufferSize,
+                stagingBufferSize,
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VMA_MEMORY_USAGE_CPU_ONLY);
 
@@ -510,7 +536,12 @@ namespace moe {
         std::memcpy(static_cast<uint8_t*>(data) + vertBufferSize,
                     indices.data(), indexBufferSize);
 
-        immediateSubmit([&](VkCommandBuffer cmdBuffer) {
+        if (hasSkinningData) {
+            std::memcpy(static_cast<uint8_t*>(data) + vertBufferSize + indexBufferSize,
+                        skinningData.data(), skinningDataBufferSize);
+        }
+
+        immediateSubmit([&, hasSkinningData](VkCommandBuffer cmdBuffer) {
             VkBufferCopy vertCopy{};
             vertCopy.srcOffset = 0;
             vertCopy.dstOffset = 0;
@@ -528,6 +559,17 @@ namespace moe {
             vkCmdCopyBuffer(cmdBuffer,
                             stagingBuffer.buffer, surface.indexBuffer.buffer,
                             1, &indexCopy);
+
+            if (hasSkinningData) {
+                VkBufferCopy skinningCopy{};
+                skinningCopy.srcOffset = vertBufferSize + indexBufferSize;
+                skinningCopy.dstOffset = 0;
+                skinningCopy.size = skinningDataBufferSize;
+
+                vkCmdCopyBuffer(cmdBuffer,
+                                stagingBuffer.buffer, surface.skinningDataBuffer.buffer,
+                                1, &skinningCopy);
+            }
         });
 
         destroyBuffer(stagingBuffer);

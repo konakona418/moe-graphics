@@ -189,7 +189,7 @@ namespace moe {
 
         void destroyBuffer(VulkanAllocatedBuffer& buffer);
 
-        VulkanGPUMeshBuffer uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices);
+        VulkanGPUMeshBuffer uploadMesh(Span<uint32_t> indices, Span<Vertex> vertices, Span<SkinningData> skinningData = {});
 
         FrameData& getCurrentFrame() { return m_frames[m_frameNumber % FRAMES_IN_FLIGHT]; }
 

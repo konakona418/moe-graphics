@@ -12,7 +12,7 @@ namespace moe {
     MeshId VulkanMeshCache::loadMesh(VulkanCPUMesh cpuMesh) {
         MOE_ASSERT(m_initialized, "VulkanMeshCache not initialized");
 
-        auto buffer = m_engine->uploadMesh(cpuMesh.indices, cpuMesh.vertices);
+        auto buffer = m_engine->uploadMesh(cpuMesh.indices, cpuMesh.vertices, cpuMesh.skinningData);
         MeshId id = m_idAllocator.allocateId();
         m_meshes.emplace(
                 id,
@@ -39,6 +39,9 @@ namespace moe {
         for (auto& [id, mesh]: m_meshes) {
             m_engine->destroyBuffer(mesh.gpuBuffer.vertexBuffer);
             m_engine->destroyBuffer(mesh.gpuBuffer.indexBuffer);
+            if (mesh.gpuBuffer.hasSkinningData) {
+                m_engine->destroyBuffer(mesh.gpuBuffer.skinningDataBuffer);
+            }
         }
 
         m_idAllocator.reset();
