@@ -16,6 +16,7 @@ namespace moe {
     constexpr ImageId NULL_IMAGE_ID = std::numeric_limits<ImageId>::max();
     constexpr SceneResourceInternalId NULL_SCENE_RESOURCE_INTERNAL_ID = std::numeric_limits<SceneResourceInternalId>::max();
     constexpr JointId NULL_JOINT_ID = std::numeric_limits<JointId>::max();
+    constexpr JointId ROOT_JOINT_ID = 0;
     constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
 
     namespace VkLoaders {

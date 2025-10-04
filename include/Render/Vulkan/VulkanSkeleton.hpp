@@ -41,4 +41,10 @@ namespace moe {
 
         String name;
     };
+
+    void calculateJointMatrices(
+            Vector<glm::mat4>& outJointMatrices,
+            const VulkanSkeleton& skeleton,
+            const VulkanSkeletonAnimation& animation,
+            float time);
 }// namespace moe
