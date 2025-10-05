@@ -6,7 +6,9 @@
 #include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
 #include "Render/Vulkan/Pipeline/PostFXPipeline.hpp"
 #include "Render/Vulkan/Pipeline/ShadowMapPipeline.hpp"
+#include "Render/Vulkan/Pipeline/SkinningPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
+
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
@@ -49,7 +51,7 @@ namespace moe {
         VulkanDescriptorAllocatorDynamic descriptorAllocator;
     };
 
-    constexpr uint32_t FRAMES_IN_FLIGHT = 2;
+    constexpr uint32_t FRAMES_IN_FLIGHT = Constants::FRAMES_IN_FLIGHT;
 
     class VulkanEngine {
     public:
@@ -130,6 +132,7 @@ namespace moe {
         } m_caches;
 
         struct {
+            Pipeline::SkinningPipeline skinningPipeline;
             Pipeline::VulkanMeshPipeline meshPipeline;
             //Pipeline::SkyBoxPipeline skyBoxPipeline;
             //Pipeline::ShadowMapPipeline shadowMapPipeline;

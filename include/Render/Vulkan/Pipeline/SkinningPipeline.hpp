@@ -1,7 +1,6 @@
 #pragma once
 
-
-#include "Render/Vulkan/VulkanEngine.hpp"
+#include "Render/Common.hpp"
 #include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanRenderable.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
@@ -20,6 +19,10 @@ namespace moe {
 
             void init(VulkanEngine& engine);
 
+            void beginFrame(size_t frameIndex);
+
+            size_t appendJointMatrices(Span<glm::mat4> jointMatrices, size_t frameIndex);
+
             void compute(
                     VkCommandBuffer cmdBuffer,
                     VulkanMeshCache& meshCache,
@@ -36,13 +39,16 @@ namespace moe {
                 VkDeviceAddress skinningDataBufferAddr;
                 VkDeviceAddress jointMatrixBufferAddr;
                 VkDeviceAddress outputVertexBufferAddr;
+                uint32_t jointMatrixStartIndex;
+                uint32_t vertexCount;
             };
 
             struct SwapData {
                 VulkanAllocatedBuffer jointMatrixBuffer;
+                size_t jointMatrixBufferSize;
             };
 
-            Array<SwapData, FRAMES_IN_FLIGHT> m_swapData;
+            Array<SwapData, Constants::FRAMES_IN_FLIGHT> m_swapData;
 
             VulkanEngine* m_engine{nullptr};
             bool m_initialized{false};

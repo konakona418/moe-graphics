@@ -16,4 +16,8 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer {
     Vertex vertices[];
 };
 
+layout(buffer_reference, std430) writeonly buffer OutputVertexBuffer {
+    Vertex outVertices[];
+};
+
 #endif// MOE_VERTEX_GLSL

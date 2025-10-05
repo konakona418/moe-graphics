@@ -1,0 +1,60 @@
+#version 450
+
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_GOOGLE_include_directive : require
+
+#include "vertex.glsl"
+
+struct SkinningData {
+    uvec4 jointIndices;
+    vec4 jointWeights;
+};
+
+layout(buffer_reference, scalar) readonly buffer SkinningDataBuffer {
+    SkinningData data[];
+};
+
+layout(buffer_reference, scalar) readonly buffer JointMatrixBuffer {
+    mat4 data[];
+};
+
+layout(push_constant, scalar) uniform SkinningPCS {
+    VertexBuffer vertexBuffer;
+    SkinningDataBuffer skinningDataBuffer;
+    JointMatrixBuffer jointMatrixBuffer;
+    OutputVertexBuffer outputVertexBuffer;
+    uint jointMatrixStartIndex;
+    uint vertexCount;
+}
+pcs;
+
+mat4 getJointMatrix(uint jointIndex) {
+    return pcs.jointMatrixBuffer.data[pcs.jointMatrixStartIndex + jointIndex];
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pcs.vertexCount) {
+        return;
+    }
+
+    SkinningData skinningData = pcs.skinningDataBuffer.data[idx];
+    mat4 skinMat =
+            skinningData.jointWeights.x * getJointMatrix(skinningData.jointIndices.x) +
+            skinningData.jointWeights.y * getJointMatrix(skinningData.jointIndices.y) +
+            skinningData.jointWeights.z * getJointMatrix(skinningData.jointIndices.z) +
+            skinningData.jointWeights.w * getJointMatrix(skinningData.jointIndices.w);
+
+    Vertex inVertex = pcs.vertexBuffer.vertices[idx];
+
+    Vertex outVertex;
+    outVertex.position = vec3(skinMat * vec4(inVertex.position, 1.0));
+    outVertex.normal = normalize(vec3(skinMat * vec4(inVertex.normal, 0.0)));
+    outVertex.tangent = normalize(vec4(vec3(skinMat * vec4(inVertex.tangent.xyz, 0.0)), inVertex.tangent.w));
+    outVertex.uv_x = inVertex.uv_x;
+    outVertex.uv_y = inVertex.uv_y;
+
+    pcs.outputVertexBuffer.outVertices[idx] = outVertex;
+}

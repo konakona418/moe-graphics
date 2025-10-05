@@ -9,11 +9,15 @@ namespace moe {
 
     struct VulkanRenderPacket {
         static constexpr uint32_t INVALID_SORT_KEY = std::numeric_limits<uint32_t>::max();
+        static constexpr size_t INVALID_JOINT_MATRIX_START_INDEX = std::numeric_limits<size_t>::max();
 
         MeshId meshId;
         MaterialId materialId;
         glm::mat4 transform;
         uint32_t sortKey{INVALID_SORT_KEY};// todo: add sorting key
+
+        bool skinned{false};
+        size_t jointMatrixStartIndex{INVALID_JOINT_MATRIX_START_INDEX};// for skinned meshes
     };
 
     struct VulkanDrawContext {

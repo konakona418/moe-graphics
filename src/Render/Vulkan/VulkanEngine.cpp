@@ -488,11 +488,13 @@ namespace moe {
                         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
 
-        VkBufferDeviceAddressInfo deviceAddrInfo{};
-        deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-        deviceAddrInfo.buffer = surface.vertexBuffer.buffer;
+        {
+            VkBufferDeviceAddressInfo deviceAddrInfo{};
+            deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            deviceAddrInfo.buffer = surface.vertexBuffer.buffer;
 
-        surface.vertexBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+            surface.vertexBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+        }
 
         surface.indexBuffer = allocateBuffer(
                 indexBufferSize,
@@ -508,6 +510,7 @@ namespace moe {
         if (hasSkinningData) {
             Logger::info("Mesh has skinning data, size {} bytes", skinningDataBufferSize);
 
+            // no need to initialize skinned vertex buffer here, will be done in skinning pipeline
             stagingBufferSize = indexBufferSize + vertBufferSize + skinningDataBufferSize;
 
             surface.skinningDataBuffer = allocateBuffer(
@@ -516,13 +519,33 @@ namespace moe {
                             VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                     VMA_MEMORY_USAGE_GPU_ONLY);
+            {
+                VkBufferDeviceAddressInfo deviceAddrInfo{};
+                deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+                deviceAddrInfo.buffer = surface.skinningDataBuffer.buffer;
+                surface.skinningDataBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+            }
 
-            surface.skinningDataBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+            surface.skinnedVertexBuffer = allocateBuffer(
+                    vertBufferSize,
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                    VMA_MEMORY_USAGE_GPU_ONLY);
+            {
+                VkBufferDeviceAddressInfo deviceAddrInfo{};
+                deviceAddrInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+                deviceAddrInfo.buffer = surface.skinnedVertexBuffer.buffer;
+                surface.skinnedVertexBufferAddr = vkGetBufferDeviceAddress(m_device, &deviceAddrInfo);
+            }
         } else {
             stagingBufferSize = indexBufferSize + vertBufferSize;
 
             surface.skinningDataBuffer = {};
             surface.skinningDataBufferAddr = 0;
+
+            surface.skinnedVertexBuffer = {};
+            surface.skinnedVertexBufferAddr = 0;
         }
 
         VulkanAllocatedBuffer stagingBuffer = allocateBuffer(
@@ -1417,6 +1440,7 @@ namespace moe {
         m_illuminationBus.init(*this);
         m_renderBus.init(*this);
 
+        m_pipelines.skinningPipeline.init(*this);
         m_pipelines.meshPipeline.init(*this);
         //m_pipelines.skyBoxPipeline.init(*this);
         //m_pipelines.shadowMapPipeline.init(*this);
@@ -1453,6 +1477,7 @@ namespace moe {
             //m_pipelines.shadowMapPipeline.destroy();
             //m_pipelines.skyBoxPipeline.destroy();
             m_pipelines.meshPipeline.destroy();
+            m_pipelines.skinningPipeline.destroy();
 
             m_renderBus.destroy();
             m_illuminationBus.destroy();

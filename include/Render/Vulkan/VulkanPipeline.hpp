@@ -69,8 +69,14 @@ namespace moe {
         }
 
         VulkanComputePipelineBuilder& setShader(VkShaderModule computeShader) {
+            shaderStage = {};
+            shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shaderStage.pNext = nullptr;
+
+            shaderStage.pName = "main";
             shaderStage.module = computeShader;
             shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+
             return *this;
         }
 

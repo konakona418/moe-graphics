@@ -4,6 +4,10 @@
 #include "Math/Transform.hpp"
 
 namespace moe {
+    namespace Constants {
+        constexpr uint32_t FRAMES_IN_FLIGHT = 2;
+    }
+
     using RenderableId = uint32_t;
 
     struct RenderCommand {
