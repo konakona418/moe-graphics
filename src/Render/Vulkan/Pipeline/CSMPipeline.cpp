@@ -186,7 +186,10 @@ namespace moe {
 
                     auto pushConstants = PushConstants{
                             .mvp = m_cascadeLightTransforms[i] * drawCommand.transform,
-                            .vertexBufferAddr = mesh.gpuBuffer.vertexBufferAddr,
+                            .vertexBufferAddr =
+                                    drawCommand.skinned
+                                            ? mesh.gpuBuffer.skinnedVertexBufferAddr
+                                            : mesh.gpuBuffer.vertexBufferAddr,
                     };
 
                     vkCmdPushConstants(cmdBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pushConstants);

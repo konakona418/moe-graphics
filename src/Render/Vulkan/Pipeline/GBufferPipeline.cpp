@@ -154,7 +154,10 @@ namespace moe {
                 vkCmdBindIndexBuffer(cmdBuffer, meshAsset.gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
                 const auto pushConstants = PushConstants{
                         .transform = cmd.transform,
-                        .vertexBufferAddr = meshAsset.gpuBuffer.vertexBufferAddr,
+                        .vertexBufferAddr =
+                                cmd.skinned
+                                        ? meshAsset.gpuBuffer.skinnedVertexBufferAddr
+                                        : meshAsset.gpuBuffer.vertexBufferAddr,
                         .sceneDataAddress = sceneDataBuffer.address,
                         .materialId = cmd.materialId,
                 };

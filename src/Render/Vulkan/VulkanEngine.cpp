@@ -665,10 +665,47 @@ namespace moe {
             }
         }
 
-        auto& defaultCamera = getDefaultCamera();
+        // ! compute
 
-        // debug time
-        auto time = static_cast<float>(glfwGetTime());
+        {
+            // barrier previous read - compute
+            const auto barrier = VkMemoryBarrier2{
+                    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                    .srcStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+                    .srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                    .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                    .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+            };
+            const auto dependencyInfo = VkDependencyInfo{
+                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                    .memoryBarrierCount = 1,
+                    .pMemoryBarriers = &barrier,
+            };
+            vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+        }
+
+        m_pipelines.skinningPipeline.beginFrame(currentFrameIndex);
+        // ! todo: load skinning matrices from cpu to gpu
+        m_pipelines.skinningPipeline.compute(commandBuffer, m_caches.meshCache, packets, currentFrameIndex);
+
+        {
+            // barrier compute - csm shadow
+            const auto barrier = VkMemoryBarrier2{
+                    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                    .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                    .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+                    .dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+                    .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT,
+            };
+            const auto dependencyInfo = VkDependencyInfo{
+                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                    .memoryBarrierCount = 1,
+                    .pMemoryBarriers = &barrier,
+            };
+            vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+        }
+
+        auto& defaultCamera = getDefaultCamera();
 
         // ! illumination information upload
         m_illuminationBus.uploadToGPU(commandBuffer, currentFrameIndex);
