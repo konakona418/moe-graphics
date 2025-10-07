@@ -22,11 +22,23 @@ namespace moe {
                         .sortKey = 0,
                 };
 
+                if (drawContext.jointMatrixStartIndex != INVALID_JOINT_MATRIX_START_INDEX) {
+                    packet.skinned = true;
+                    packet.jointMatrixStartIndex = drawContext.jointMatrixStartIndex;
+                } else {
+                    packet.skinned = false;
+                    packet.jointMatrixStartIndex = INVALID_JOINT_MATRIX_START_INDEX;
+                }
+
                 packets.push_back(packet);
             }
         }
 
-        VulkanDrawContext localCtx{.lastContext = &drawContext, .sceneMeshes = drawContext.sceneMeshes};
+        VulkanDrawContext localCtx{
+                .lastContext = &drawContext,
+                .sceneMeshes = drawContext.sceneMeshes,
+                .jointMatrixStartIndex = drawContext.jointMatrixStartIndex,
+        };
 
         packets.reserve(packets.size() + children.size());
         for (auto& child: children) {
@@ -36,12 +48,20 @@ namespace moe {
 
     void VulkanScene::gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) {
         if (drawContext.isNull()) {
-            // dispatch to gather without context
-            gatherRenderPackets(packets);
+            VulkanDrawContext localCtx{
+                    .lastContext = nullptr,
+                    .sceneMeshes = &meshes,
+                    .jointMatrixStartIndex = drawContext.jointMatrixStartIndex,
+            };
+            gatherRenderPackets(packets, localCtx);
             return;
         }
 
-        VulkanDrawContext localCtx{.lastContext = &drawContext, .sceneMeshes = &meshes};
+        VulkanDrawContext localCtx{
+                .lastContext = &drawContext,
+                .sceneMeshes = &meshes,
+                .jointMatrixStartIndex = drawContext.jointMatrixStartIndex,
+        };
 
         packets.reserve(packets.size() + children.size());
 

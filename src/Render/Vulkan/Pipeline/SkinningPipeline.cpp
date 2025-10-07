@@ -104,7 +104,7 @@ namespace moe {
                     continue;
                 }
 
-                if (packet.jointMatrixStartIndex == VulkanRenderPacket::INVALID_JOINT_MATRIX_START_INDEX) {
+                if (packet.jointMatrixStartIndex == INVALID_JOINT_MATRIX_START_INDEX) {
                     Logger::warn("Skinned mesh draw command has invalid joint matrix start index, skipping. Note that the matrices must be uploaded before calling this function");
                     continue;
                 }

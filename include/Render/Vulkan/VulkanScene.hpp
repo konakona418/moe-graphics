@@ -37,7 +37,11 @@ namespace moe {
         UnorderedMap<String, VulkanSkeletonAnimation> animations;
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets) {
-            VulkanDrawContext drawContext{.lastContext = nullptr, .sceneMeshes = &meshes};
+            VulkanDrawContext drawContext{
+                    .lastContext = nullptr,
+                    .sceneMeshes = &meshes,
+                    .jointMatrixStartIndex = INVALID_JOINT_MATRIX_START_INDEX,
+            };
             gatherRenderPackets(packets, drawContext);
         }
 

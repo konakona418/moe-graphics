@@ -30,6 +30,8 @@ layout(push_constant, scalar) uniform SkinningPCS {
 }
 pcs;
 
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+
 mat4 getJointMatrix(uint jointIndex) {
     return pcs.jointMatrixBuffer.data[pcs.jointMatrixStartIndex + jointIndex];
 }
@@ -51,8 +53,11 @@ void main() {
 
     Vertex outVertex;
     outVertex.position = vec3(skinMat * vec4(inVertex.position, 1.0));
-    outVertex.normal = normalize(vec3(skinMat * vec4(inVertex.normal, 0.0)));
-    outVertex.tangent = normalize(vec4(vec3(skinMat * vec4(inVertex.tangent.xyz, 0.0)), inVertex.tangent.w));
+
+    mat3 skinMat3 = mat3(skinMat);
+    outVertex.normal = vec3(skinMat * vec4(inVertex.normal, 0.0));
+    outVertex.tangent = vec4(vec3(skinMat * vec4(inVertex.tangent.xyz, 0.0)), inVertex.tangent.w);
+
     outVertex.uv_x = inVertex.uv_x;
     outVertex.uv_y = inVertex.uv_y;
 

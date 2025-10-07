@@ -13,5 +13,8 @@ namespace moe {
     struct RenderCommand {
         RenderableId renderableId;
         Transform transform;
+
+        bool hasSkeleton{false};
+        Span<glm::mat4> jointMatrices;
     };
 }// namespace moe

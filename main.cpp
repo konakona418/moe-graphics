@@ -85,7 +85,12 @@ int main() {
 
     float elapsed = 0.0f;
 
-    auto sceneId = engine.loadGLTF("de_dust2/scene.gltf");
+    auto sceneId = engine.loadGLTF("anim/anim.gltf");
+
+    auto scene = engine.m_caches.objectCache.get(sceneId).value();
+    auto& animations = static_cast<moe::VulkanScene*>(scene.get())->animations;
+    auto& skeleton = static_cast<moe::VulkanScene*>(scene.get())->skeletons.front();
+    auto& usedAnimation = animations.begin()->second;
 
     while (running) {
         engine.beginFrame();
@@ -158,9 +163,12 @@ int main() {
         renderBus.resetDynamicState();
 
         moe::Transform objectTransform{};
-        objectTransform.setScale(glm::vec3(30.0f));
+        objectTransform.setScale(glm::vec3(1.0f));
 
-        renderBus.submitRender(sceneId, objectTransform);
+        moe::Vector<glm::mat4> jointMatrices;
+        moe::calculateJointMatrices(jointMatrices, skeleton, usedAnimation, elapsed - std::floor(elapsed));
+
+        renderBus.submitRender(moe::RenderCommand{sceneId, objectTransform, true, moe::Span<glm::mat4>(jointMatrices)});
 
         // reset dynamic lights
         illuminationBus.resetDynamicState();

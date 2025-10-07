@@ -7,9 +7,10 @@
 namespace moe {
     struct VulkanSceneMesh;
 
+    constexpr size_t INVALID_JOINT_MATRIX_START_INDEX = std::numeric_limits<size_t>::max();
+
     struct VulkanRenderPacket {
         static constexpr uint32_t INVALID_SORT_KEY = std::numeric_limits<uint32_t>::max();
-        static constexpr size_t INVALID_JOINT_MATRIX_START_INDEX = std::numeric_limits<size_t>::max();
 
         MeshId meshId;
         MaterialId materialId;
@@ -24,10 +25,12 @@ namespace moe {
         const VulkanDrawContext* lastContext{nullptr};
         Vector<VulkanSceneMesh>* sceneMeshes{nullptr};
 
+        size_t jointMatrixStartIndex{INVALID_JOINT_MATRIX_START_INDEX};
+
         bool isNull() const { return lastContext == nullptr && sceneMeshes == nullptr; }
     };
 
-    const static VulkanDrawContext NULL_DRAW_CONTEXT = {nullptr, nullptr};
+    const static VulkanDrawContext NULL_DRAW_CONTEXT = {nullptr, nullptr, INVALID_JOINT_MATRIX_START_INDEX};
 
     struct VulkanRenderable {
         virtual ~VulkanRenderable() = default;

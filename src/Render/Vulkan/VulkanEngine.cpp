@@ -650,6 +650,10 @@ namespace moe {
 
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
+
+        // ! begin skinning. as we need to upload joint matrices from cpu to gpu, we do it first.
+        m_pipelines.skinningPipeline.beginFrame(currentFrameIndex);
+
         // ! load scene render packets
 
         Vector<VulkanRenderPacket> packets;
@@ -657,8 +661,15 @@ namespace moe {
         for (auto& renderCommands: m_renderBus.getRenderCommands()) {
             auto id = renderCommands.renderableId;
             if (auto renderable = m_caches.objectCache.get(id)) {
+                // todo: upload skeleton matrices if present, and set the values in render packets
+                size_t offset = INVALID_JOINT_MATRIX_START_INDEX;
+                if (renderCommands.hasSkeleton) {
+                    offset = m_pipelines.skinningPipeline.appendJointMatrices(renderCommands.jointMatrices, currentFrameIndex);
+                }
+                VulkanDrawContext ctx = NULL_DRAW_CONTEXT;
+                ctx.jointMatrixStartIndex = offset;
                 renderable->get()->updateTransform(renderCommands.transform.getMatrix());
-                renderable->get()->gatherRenderPackets(packets, NULL_DRAW_CONTEXT);
+                renderable->get()->gatherRenderPackets(packets, ctx);
             } else {
                 Logger::warn("Renderable with id {} not found in cache", id);
                 continue;
@@ -684,7 +695,6 @@ namespace moe {
             vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
         }
 
-        m_pipelines.skinningPipeline.beginFrame(currentFrameIndex);
         // ! todo: load skinning matrices from cpu to gpu
         m_pipelines.skinningPipeline.compute(commandBuffer, m_caches.meshCache, packets, currentFrameIndex);
 
