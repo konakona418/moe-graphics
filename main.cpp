@@ -89,8 +89,9 @@ int main() {
     auto sceneId = engine.loadGLTF("anim/anim.gltf");
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
-    auto& animations = static_cast<moe::VulkanScene*>(scene.get())->animations;
-    auto& skeleton = static_cast<moe::VulkanScene*>(scene.get())->skeletons.front();
+    auto* animatableRenderable = scene->checkedAs<moe::VulkanHasSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
+    auto& animations = animatableRenderable->getAnimations();
+    auto& skeleton = animatableRenderable->getSkeletons()[0];
     auto& usedAnimation = animations.begin()->second;
 
     while (running) {

@@ -17,6 +17,8 @@ namespace moe {
         void updateTransform(const glm::mat4& parentTransform) override;
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override = 0;
+
+        VulkanRenderableFeature getFeatures() const override { return VulkanRenderableFeature::HasHierarchy; }
     };
 
     struct VulkanSceneNode : public VulkanRenderNode {
@@ -31,7 +33,12 @@ namespace moe {
         Vector<MaterialId> primitiveMaterials;
     };
 
-    struct VulkanScene : public VulkanRenderNode {
+    struct VulkanHasSkeletalAnimation {
+        virtual const UnorderedMap<String, VulkanSkeletonAnimation>& getAnimations() const = 0;
+        virtual const Vector<VulkanSkeleton>& getSkeletons() const = 0;
+    };
+
+    struct VulkanScene : public VulkanRenderNode, public VulkanHasSkeletalAnimation {
         Vector<VulkanSceneMesh> meshes;
         Vector<VulkanSkeleton> skeletons;
         UnorderedMap<String, VulkanSkeletonAnimation> animations;
@@ -46,5 +53,17 @@ namespace moe {
         }
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override;
+
+        VulkanRenderableFeature getFeatures() const override {
+            Vector<VulkanRenderableFeature> features{VulkanRenderableFeature::HasHierarchy};
+            if (!skeletons.empty() && !animations.empty()) {
+                features.push_back(VulkanRenderableFeature::HasSkeletalAnimation);
+            }
+            return makeRenderFeatureBitmask(features);
+        }
+
+        const UnorderedMap<String, VulkanSkeletonAnimation>& getAnimations() const override { return animations; }
+
+        const Vector<VulkanSkeleton>& getSkeletons() const override { return skeletons; }
     };
 }// namespace moe
