@@ -1,4 +1,5 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
+#include "imgui.h"
 
 struct CameraMovementMask {
     enum class CameraMovementDirection {
@@ -151,6 +152,19 @@ int main() {
         } else {
             movementMask.set(CameraMovementMask::CameraMovementDirection::Down, false);
         }
+
+        engine.addImGuiDrawCommand([&] {
+            // draw set fxaa enabled
+            ImGui::Checkbox("Enable FXAA", &engine.m_enableFxaa);
+
+            // shadow map cam scale
+            ImGui::BeginGroup();
+            ImGui::Text("Shadow Map Camera Scale");
+            ImGui::SliderFloat("Scale X", &engine.m_shadowMapCameraScale.x, 1.0f, 5.0f);
+            ImGui::SliderFloat("Scale Y", &engine.m_shadowMapCameraScale.y, 1.0f, 5.0f);
+            ImGui::SliderFloat("Scale Z", &engine.m_shadowMapCameraScale.z, 1.0f, 5.0f);
+            ImGui::EndGroup();
+        });
 
 
         if (movementMask.isMoving()) {

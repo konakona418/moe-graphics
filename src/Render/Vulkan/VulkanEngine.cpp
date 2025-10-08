@@ -160,16 +160,11 @@ namespace moe {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // draw set fxaa enabled
-        ImGui::Checkbox("Enable FXAA", &m_enableFxaa);
-
-        // shadow map cam scale
-        ImGui::BeginGroup();
-        ImGui::Text("Shadow Map Camera Scale");
-        ImGui::SliderFloat("Scale X", &m_shadowMapCameraScale.x, 1.0f, 5.0f);
-        ImGui::SliderFloat("Scale Y", &m_shadowMapCameraScale.y, 1.0f, 5.0f);
-        ImGui::SliderFloat("Scale Z", &m_shadowMapCameraScale.z, 1.0f, 5.0f);
-        ImGui::EndGroup();
+        while (!m_imguiDrawQueue.empty()) {
+            auto& fn = m_imguiDrawQueue.front();
+            fn();
+            m_imguiDrawQueue.pop();
+        }
 
         ImGui::Render();
 

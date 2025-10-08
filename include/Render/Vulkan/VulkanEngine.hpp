@@ -115,6 +115,8 @@ namespace moe {
         VulkanIlluminationBus m_illuminationBus{};
         VulkanRenderObjectBus m_renderBus{};
 
+        Queue<Function<void()>> m_imguiDrawQueue;
+
         VulkanCamera m_defaultCamera{
                 glm::vec3(0.0f, 0.0f, 0.0f),
                 0.f,
@@ -158,6 +160,8 @@ namespace moe {
         void beginFrame();
 
         void endFrame();
+
+        void addImGuiDrawCommand(Function<void()>&& fn) { m_imguiDrawQueue.push(std::move(fn)); }
 
         RenderableId loadGLTF(StringView filename) {
             return m_caches.objectCache.load(this, filename, ObjectLoader::Gltf).first;
