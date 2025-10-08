@@ -166,7 +166,7 @@ int main() {
         objectTransform.setScale(glm::vec3(1.0f));
 
         moe::Vector<glm::mat4> jointMatrices;
-        moe::calculateJointMatrices(jointMatrices, skeleton, usedAnimation, elapsed - std::floor(elapsed));
+        moe::calculateJointMatrices(jointMatrices, skeleton, usedAnimation, (elapsed - std::floor(elapsed)));
 
         renderBus.submitRender(moe::RenderCommand{sceneId, objectTransform, true, moe::Span<glm::mat4>(jointMatrices)});
 

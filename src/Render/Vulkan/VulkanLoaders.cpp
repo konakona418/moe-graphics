@@ -545,12 +545,14 @@ namespace moe {
                     for (const auto& channel: gltfAnimation.channels) {
                         const auto& sampler = gltfAnimation.samplers[channel.sampler];
 
+                        MOE_ASSERT(gltfModel.accessors[sampler.input].count == gltfModel.accessors[sampler.output].count,
+                                   "Input and output accessor count mismatch");
+
                         const auto& timesAccessor = gltfModel.accessors[sampler.input];
                         const auto times = getPackedBufferSpan<float>(gltfModel, timesAccessor);
 
-                        animation.duration =
-                                static_cast<float>(timesAccessor.maxValues[0] - timesAccessor.minValues[0]);
-                        if (animation.duration == 0) {
+                        auto duration = static_cast<float>(timesAccessor.maxValues[0] - timesAccessor.minValues[0]);
+                        if (duration == 0) {
                             continue;// skip empty animations (e.g. keying sets)
                         }
 
@@ -564,53 +566,46 @@ namespace moe {
                         const auto nodeId = channel.target_node;
                         const auto jointId = gltfNodeIdxToJointId.at(nodeId);
 
+                        auto& animationTrack = animation.tracks[jointId];
+
                         const auto& outputAccessor = gltfModel.accessors[sampler.output];
                         MOE_ASSERT(outputAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Unsupported output component type");
                         if (channel.target_path == GLTF_SAMPLER_PATH_TRANSLATION) {
                             const auto translationKeys =
                                     getPackedBufferSpan<glm::vec3>(gltfModel, outputAccessor);
 
-                            auto& tc = animation.tracks[jointId].translations;
-                            if (translationKeys.size() == 2 && translationKeys[0] == translationKeys[1]) {
-                                tc.push_back(translationKeys[0]);
-                            } else {
-                                if (jointId == 0) {
-                                    assert(translationKeys.size() != 2);
-                                }
-                                tc.reserve(translationKeys.size());
-                                for (const auto& key: translationKeys) {
-                                    tc.push_back(key);
-                                }
-                            }
+                            auto& tc = animationTrack.translations;
 
+                            // in some cases this will have 2 identical keys, if no transform is applied.
+                            // however we don't care,
+                            // as this can simplify the interpolation implementation
+                            tc.reserve(translationKeys.size());
+                            tc.assign(translationKeys.begin(), translationKeys.end());
+
+                            animationTrack.keyTimes.translations.reserve(times.size());
+                            animationTrack.keyTimes.translations.assign(times.begin(), times.end());
                         } else if (channel.target_path == GLTF_SAMPLER_PATH_ROTATION) {
                             const auto rotationKeys = getPackedBufferSpan<glm::vec4>(gltfModel, outputAccessor);
-                            auto& rc = animation.tracks[jointId].rotations;
-                            if (rotationKeys.size() == 2 && rotationKeys[0] == rotationKeys[1]) {
-                                const auto& qv = rotationKeys[0];
+
+                            auto& rc = animationTrack.rotations;
+                            rc.reserve(rotationKeys.size());
+                            for (const auto& qv: rotationKeys) {
                                 const glm::quat q{qv.w, qv.x, qv.y, qv.z};
                                 rc.push_back(q);
-                            } else {
-                                rc.reserve(rotationKeys.size());
-                                for (const auto& qv: rotationKeys) {
-                                    const glm::quat q{qv.w, qv.x, qv.y, qv.z};
-                                    rc.push_back(q);
-                                }
                             }
+
+                            animationTrack.keyTimes.rotations.reserve(times.size());
+                            animationTrack.keyTimes.rotations.assign(times.begin(), times.end());
                         } else if (channel.target_path == GLTF_SAMPLER_PATH_SCALE) {
                             const auto scaleKeys =
                                     getPackedBufferSpan<const glm::vec3>(gltfModel, outputAccessor);
 
-                            auto& sc = animation.tracks[jointId].scales;
-                            if (scaleKeys.size() == 2 && scaleKeys[0] == scaleKeys[1]) {
-                                sc.push_back(scaleKeys[0]);
-                            } else {
-                                sc.reserve(scaleKeys.size());
-                                for (const auto& key: scaleKeys) {
-                                    sc.push_back(key);
-                                }
-                            }
+                            auto& sc = animationTrack.scales;
+                            sc.reserve(scaleKeys.size());
+                            sc.assign(scaleKeys.begin(), scaleKeys.end());
 
+                            animationTrack.keyTimes.scales.reserve(times.size());
+                            animationTrack.keyTimes.scales.assign(times.begin(), times.end());
                         } else {
                             Logger::warn("Unsupported animation channel path: {}", channel.target_path);
                         }

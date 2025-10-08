@@ -31,10 +31,15 @@ namespace moe {
             Vector<glm::vec3> translations;
             Vector<glm::quat> rotations;
             Vector<glm::vec3> scales;
+
+            struct {
+                Vector<float> translations;
+                Vector<float> rotations;
+                Vector<float> scales;
+            } keyTimes;
         };
 
         Vector<Track> tracks;// index = jointId
-        float duration;
         bool loop;
 
         size_t startFrame;
