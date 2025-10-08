@@ -677,7 +677,7 @@ namespace moe {
                 continue;
             }
 
-            auto* skeletal = renderable->get()->as<VulkanHasSkeletalAnimation>();
+            auto* skeletal = renderable->get()->as<VulkanSkeletalAnimation>();
             // ! fixme: only support one skeleton for now
             auto& skeleton = skeletal->getSkeletons()[0];
 

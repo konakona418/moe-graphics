@@ -89,7 +89,7 @@ int main() {
     auto sceneId = engine.loadGLTF("anim/anim.gltf");
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
-    auto* animatableRenderable = scene->checkedAs<moe::VulkanHasSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
+    auto* animatableRenderable = scene->checkedAs<moe::VulkanSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
     auto& animations = animatableRenderable->getAnimations();
     auto usedAnimation = animations.begin()->second;
 

@@ -33,12 +33,14 @@ namespace moe {
         Vector<MaterialId> primitiveMaterials;
     };
 
-    struct VulkanHasSkeletalAnimation {
+    struct VulkanSkeletalAnimation {
+        static constexpr size_t FEATURE_ID = (size_t) VulkanRenderableFeature::HasSkeletalAnimation;
+
         virtual const UnorderedMap<String, AnimationId>& getAnimations() const = 0;
         virtual const Vector<VulkanSkeleton>& getSkeletons() const = 0;
     };
 
-    struct VulkanScene : public VulkanRenderNode, public VulkanHasSkeletalAnimation {
+    struct VulkanScene : public VulkanRenderNode, public VulkanSkeletalAnimation {
         Vector<VulkanSceneMesh> meshes;
         Vector<VulkanSkeleton> skeletons;
         UnorderedMap<String, AnimationId> animations;
@@ -53,6 +55,13 @@ namespace moe {
         }
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets, const VulkanDrawContext& drawContext) override;
+
+        void* getFeatureImpl(size_t featureId) override {
+            if (featureId == (size_t) VulkanRenderableFeature::HasSkeletalAnimation) {
+                return static_cast<VulkanSkeletalAnimation*>(this);
+            }
+            return nullptr;
+        }
 
         VulkanRenderableFeature getFeatures() const override {
             Vector<VulkanRenderableFeature> features{VulkanRenderableFeature::HasHierarchy};

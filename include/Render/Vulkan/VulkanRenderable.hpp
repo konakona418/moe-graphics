@@ -64,6 +64,7 @@ namespace moe {
         }
         return (VulkanRenderableFeature) bitmask;
     }
+
     struct VulkanRenderable {
         virtual ~VulkanRenderable() = default;
 
@@ -72,16 +73,20 @@ namespace moe {
 
         virtual VulkanRenderableFeature getFeatures() const { return VulkanRenderableFeature::None; }
 
-        // ! todo: dynamic casting may introduce some overhead, consider using other methods if performance is critical
-        // !      (e.g. CRTP, or manual type enum + static_cast)
+        virtual void* getFeatureImpl(size_t featureId) { return nullptr; }
+
         template<typename T>
-        T* as() { return dynamic_cast<T*>(this); }
+        T* as() {
+            return static_cast<T*>(this->getFeatureImpl(T::FEATURE_ID));
+        }
 
         template<typename T, typename... Features, typename = std::enable_if_t<std::is_same_v<Features..., VulkanRenderableFeature>>>
         Optional<T*> checkedAs(Features... features) {
             Vector<VulkanRenderableFeature> required{features...};
             if (hasRenderFeature(this->getFeatures(), required)) {
-                return as<T>();
+                auto feature = as<T>();
+                MOE_ASSERT(feature != nullptr, "Feature pointer is null");
+                return feature;
             }
             return std::nullopt;
         }
