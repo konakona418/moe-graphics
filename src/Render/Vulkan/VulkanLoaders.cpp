@@ -527,10 +527,11 @@ namespace moe {
                 return skeleton;
             }
 
-            UnorderedMap<String, VulkanSkeletonAnimation> loadAnimations(
+            UnorderedMap<String, AnimationId> loadAnimations(
                     const VulkanSkeleton& skeleton,
                     const UnorderedMap<int, JointId>& gltfNodeIdxToJointId,
-                    const tinygltf::Model& gltfModel) {
+                    const tinygltf::Model& gltfModel,
+                    VulkanEngine& engine) {
                 UnorderedMap<String, VulkanSkeletonAnimation> animations(gltfModel.animations.size());
                 for (const auto& gltfAnimation: gltfModel.animations) {
                     Logger::debug("Loading animation: {}", gltfAnimation.name);
@@ -612,7 +613,13 @@ namespace moe {
                     }
                 }
 
-                return animations;
+                UnorderedMap<String, AnimationId> animationNameToId{animations.size()};
+                for (auto& [name, animation]: animations) {
+                    AnimationId id = engine.m_caches.animationCache.load(std::move(animation)).first;
+                    animationNameToId[name] = id;
+                }
+
+                return animationNameToId;
             }
 
             void loadNode(VulkanSceneNode& node, const tinygltf::Node& gltfNode, const tinygltf::Model& model) {
@@ -709,7 +716,7 @@ namespace moe {
                 }
 
                 if (!vkScene.skeletons.empty()) {
-                    vkScene.animations = loadAnimations(vkScene.skeletons[0], nodeIdxToJointId, model);
+                    vkScene.animations = loadAnimations(vkScene.skeletons[0], nodeIdxToJointId, model, engine);
                     Logger::debug("Loaded {} animations", vkScene.animations.size());
                 }
 

@@ -649,6 +649,45 @@ namespace moe {
         // ! begin skinning. as we need to upload joint matrices from cpu to gpu, we do it first.
         m_pipelines.skinningPipeline.beginFrame(currentFrameIndex);
 
+        auto& computeSkinCommands = m_renderBus.getComputeSkinCommands();
+        ComputeSkinHandleId handleIdCounter = 0;
+        ComputeSkinHandleId maxHandleId = m_renderBus.getNumComputeSkinCommands();
+
+        for (auto& command: computeSkinCommands) {
+            MOE_ASSERT(handleIdCounter < maxHandleId, "Compute skin command handle id out of range");
+            auto handleId = handleIdCounter++;
+
+            // initialize with invalid index
+            m_renderBus.setComputeSkinMatrix(handleId, INVALID_JOINT_MATRIX_START_INDEX);
+
+            auto renderable = m_caches.objectCache.get(command.renderableId);
+            if (!renderable.has_value()) {
+                Logger::warn("Renderable with id {} not found in cache", command.renderableId);
+                continue;
+            }
+
+            auto animation = m_caches.animationCache.get(command.animationId);
+            if (!animation.has_value()) {
+                Logger::warn("Animation with id {} not found in cache", command.animationId);
+                continue;
+            }
+
+            if (!renderable->get()->hasFeature<VulkanRenderableFeature::HasSkeletalAnimation>()) {
+                Logger::warn("Renderable with id {} does not have skeletal animation feature", command.renderableId);
+                continue;
+            }
+
+            auto* skeletal = renderable->get()->as<VulkanHasSkeletalAnimation>();
+            // ! fixme: only support one skeleton for now
+            auto& skeleton = skeletal->getSkeletons()[0];
+
+            Vector<glm::mat4> jointMatrices;
+            calculateJointMatrices(jointMatrices, skeleton, *animation.value(), command.time);
+            auto offset = m_pipelines.skinningPipeline.appendJointMatrices(jointMatrices, currentFrameIndex);
+
+            m_renderBus.setComputeSkinMatrix(handleId, offset);
+        }
+
         // ! load scene render packets
 
         Vector<VulkanRenderPacket> packets;
@@ -658,8 +697,8 @@ namespace moe {
             if (auto renderable = m_caches.objectCache.get(id)) {
                 // todo: upload skeleton matrices if present, and set the values in render packets
                 size_t offset = INVALID_JOINT_MATRIX_START_INDEX;
-                if (renderCommands.hasSkeleton) {
-                    offset = m_pipelines.skinningPipeline.appendJointMatrices(renderCommands.jointMatrices, currentFrameIndex);
+                if (renderCommands.computeHandle != NULL_COMPUTE_SKIN_HANDLE_ID) {
+                    offset = m_renderBus.getComputeSkinMatrix(renderCommands.computeHandle);
                 }
                 VulkanDrawContext ctx = NULL_DRAW_CONTEXT;
                 ctx.jointMatrixStartIndex = offset;

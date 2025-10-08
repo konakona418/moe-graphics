@@ -9,6 +9,7 @@
 #include "Render/Vulkan/Pipeline/SkinningPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
 
+#include "Render/Vulkan/VulkanAnimationCache.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
 #include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
@@ -20,6 +21,7 @@
 #include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
+
 
 
 #include "Core/Input.hpp"
@@ -131,6 +133,7 @@ namespace moe {
             VulkanMeshCache meshCache;
             VulkanMaterialCache materialCache;
             VulkanObjectCache objectCache;
+            VulkanAnimationCache animationCache;
         } m_caches;
 
         struct {

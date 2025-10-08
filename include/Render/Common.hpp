@@ -8,13 +8,27 @@ namespace moe {
         constexpr uint32_t FRAMES_IN_FLIGHT = 2;
     }
 
-    using RenderableId = uint32_t;
+    using BaseIdType = uint32_t;
+
+    using RenderableId = BaseIdType;
+    using AnimationId = BaseIdType;
+    using ComputeSkinHandleId = BaseIdType;
+
+    constexpr RenderableId NULL_RENDERABLE_ID = std::numeric_limits<RenderableId>::max();
+    constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
+    constexpr ComputeSkinHandleId NULL_COMPUTE_SKIN_HANDLE_ID = std::numeric_limits<ComputeSkinHandleId>::max();
 
     struct RenderCommand {
         RenderableId renderableId;
         Transform transform;
 
-        bool hasSkeleton{false};
-        Span<glm::mat4> jointMatrices;
+        ComputeSkinHandleId computeHandle{NULL_COMPUTE_SKIN_HANDLE_ID};
+    };
+
+    struct ComputeSkinCommand {
+        RenderableId renderableId;
+
+        AnimationId animationId;
+        float time;
     };
 }// namespace moe

@@ -34,14 +34,14 @@ namespace moe {
     };
 
     struct VulkanHasSkeletalAnimation {
-        virtual const UnorderedMap<String, VulkanSkeletonAnimation>& getAnimations() const = 0;
+        virtual const UnorderedMap<String, AnimationId>& getAnimations() const = 0;
         virtual const Vector<VulkanSkeleton>& getSkeletons() const = 0;
     };
 
     struct VulkanScene : public VulkanRenderNode, public VulkanHasSkeletalAnimation {
         Vector<VulkanSceneMesh> meshes;
         Vector<VulkanSkeleton> skeletons;
-        UnorderedMap<String, VulkanSkeletonAnimation> animations;
+        UnorderedMap<String, AnimationId> animations;
 
         void gatherRenderPackets(Vector<VulkanRenderPacket>& packets) {
             VulkanDrawContext drawContext{
@@ -62,7 +62,7 @@ namespace moe {
             return makeRenderFeatureBitmask(features);
         }
 
-        const UnorderedMap<String, VulkanSkeletonAnimation>& getAnimations() const override { return animations; }
+        const UnorderedMap<String, AnimationId>& getAnimations() const override { return animations; }
 
         const Vector<VulkanSkeleton>& getSkeletons() const override { return skeletons; }
     };

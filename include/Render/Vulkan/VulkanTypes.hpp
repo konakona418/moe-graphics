@@ -9,6 +9,8 @@
 #include <vulkan/vulkan_core.h>
 
 #include "Math/Common.hpp"
+#include "Render/Common.hpp"
+
 
 namespace moe {
 

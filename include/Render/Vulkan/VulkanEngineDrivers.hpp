@@ -2,6 +2,7 @@
 
 #include "Render/Common.hpp"
 #include "Render/Vulkan/VulkanLight.hpp"
+#include "Render/Vulkan/VulkanRenderable.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
@@ -69,6 +70,8 @@ namespace moe {
 
     struct VulkanRenderObjectBus {
     public:
+        friend class VulkanEngine;
+
         VulkanRenderObjectBus() = default;
         ~VulkanRenderObjectBus() = default;
 
@@ -83,12 +86,12 @@ namespace moe {
         }
 
         VulkanRenderObjectBus& submitRender(RenderableId id, Transform transform) {
-            MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
-            if (m_renderCommands.size() >= MAX_RENDER_COMMANDS) {
-                Logger::warn("Render object bus reached max render commands(4096), check if dynamic state is reset properly; exceeding commands will be ignored");
-                return *this;
-            }
-            m_renderCommands.push_back({id, transform});
+            submitRender(RenderCommand{.renderableId = id, .transform = transform, .computeHandle = NULL_COMPUTE_SKIN_HANDLE_ID});
+            return *this;
+        }
+
+        VulkanRenderObjectBus& submitRender(RenderableId id, Transform transform, ComputeSkinHandleId computeHandle) {
+            submitRender(RenderCommand{.renderableId = id, .transform = transform, .computeHandle = computeHandle});
             return *this;
         }
 
@@ -102,9 +105,32 @@ namespace moe {
             return *this;
         }
 
-        void resetDynamicState() { m_renderCommands.clear(); }
+        ComputeSkinHandleId submitComputeSkin(ComputeSkinCommand command) {
+            MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
+            if (m_computeSkinCommands.size() >= MAX_RENDER_COMMANDS) {
+                Logger::warn("Render object bus reached max render commands(4096), check if dynamic state is reset properly; exceeding commands will be ignored");
+                return NULL_COMPUTE_SKIN_HANDLE_ID;
+            }
+            m_computeSkinCommands.push_back(command);
+            return m_nextComputeSkinHandleId++;
+        }
+
+        ComputeSkinHandleId submitComputeSkin(RenderableId id, AnimationId animationId, float time) {
+            return submitComputeSkin(ComputeSkinCommand{.renderableId = id, .animationId = animationId, .time = time});
+        }
+
+        void resetDynamicState() {
+            m_renderCommands.clear();
+            m_computeSkinCommands.clear();
+            m_computeSkinHandleToMatrixOffset.clear();
+            m_nextComputeSkinHandleId = 0;
+        }
 
         Deque<RenderCommand>& getRenderCommands() { return m_renderCommands; }
+
+        Vector<ComputeSkinCommand>& getComputeSkinCommands() { return m_computeSkinCommands; }
+
+        size_t getNumComputeSkinCommands() const { return m_computeSkinCommands.size(); }
 
     private:
         static constexpr uint32_t MAX_RENDER_COMMANDS = 4096;
@@ -113,5 +139,20 @@ namespace moe {
         bool m_initialized{false};
 
         Deque<RenderCommand> m_renderCommands;
+
+        Vector<ComputeSkinCommand> m_computeSkinCommands;
+        Vector<size_t> m_computeSkinHandleToMatrixOffset;
+        ComputeSkinHandleId m_nextComputeSkinHandleId{0};
+
+        void setComputeSkinMatrix(ComputeSkinHandleId handle, size_t offset) {
+            if (handle >= m_computeSkinHandleToMatrixOffset.size()) {
+                m_computeSkinHandleToMatrixOffset.resize(m_computeSkinCommands.size(), INVALID_JOINT_MATRIX_START_INDEX);
+            }
+            m_computeSkinHandleToMatrixOffset[handle] = offset;
+        }
+
+        size_t getComputeSkinMatrix(ComputeSkinHandleId handle) const {
+            return m_computeSkinHandleToMatrixOffset.at(handle);
+        }
     };
 }// namespace moe

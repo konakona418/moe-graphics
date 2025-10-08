@@ -91,8 +91,10 @@ int main() {
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
     auto* animatableRenderable = scene->checkedAs<moe::VulkanHasSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
     auto& animations = animatableRenderable->getAnimations();
-    auto& skeleton = animatableRenderable->getSkeletons()[0];
-    auto& usedAnimation = animations.begin()->second;
+    auto usedAnimation = animations.begin()->second;
+
+    float animationTime = 0.0f;
+    int animationIndex = 0;
 
     while (running) {
         engine.beginFrame();
@@ -165,6 +167,19 @@ int main() {
             ImGui::SliderFloat("Scale Y", &engine.m_shadowMapCameraScale.y, 1.0f, 5.0f);
             ImGui::SliderFloat("Scale Z", &engine.m_shadowMapCameraScale.z, 1.0f, 5.0f);
             ImGui::EndGroup();
+
+            ImGui::Separator();
+            ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
+            ImGui::BeginListBox("Animation Select");
+            int i = 0;
+            for (auto& [name, animation]: animations) {
+                if (ImGui::Selectable(name.c_str(), animationIndex == i)) {
+                    usedAnimation = animation;
+                    animationIndex = i;
+                }
+                i++;
+            }
+            ImGui::EndListBox();
         });
 
 
@@ -180,10 +195,13 @@ int main() {
         moe::Transform objectTransform{};
         objectTransform.setScale(glm::vec3(1.0f));
 
-        moe::Vector<glm::mat4> jointMatrices;
-        moe::calculateJointMatrices(jointMatrices, skeleton, usedAnimation, (elapsed - std::floor(elapsed)));
-
-        renderBus.submitRender(moe::RenderCommand{sceneId, objectTransform, true, moe::Span<glm::mat4>(jointMatrices)});
+        auto computeHandle = renderBus.submitComputeSkin(sceneId, usedAnimation, animationTime);
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                objectTransform.setPosition(glm::vec3((i - 2) * 2.0f, 0.0f, (j - 2) * 2.0f));
+                renderBus.submitRender(sceneId, objectTransform, computeHandle);
+            }
+        }
 
         // reset dynamic lights
         illuminationBus.resetDynamicState();

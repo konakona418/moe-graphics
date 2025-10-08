@@ -2,14 +2,11 @@
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
-    using BaseIdType = uint32_t;
-
     using MaterialId = BaseIdType;
     using MeshId = BaseIdType;
     using ImageId = BaseIdType;
     using SceneResourceInternalId = BaseIdType;
     using JointId = BaseIdType;
-    using AnimationId = BaseIdType;
 
     constexpr MaterialId NULL_MATERIAL_ID = std::numeric_limits<MaterialId>::max();
     constexpr MeshId NULL_MESH_ID = std::numeric_limits<MeshId>::max();
@@ -17,7 +14,6 @@ namespace moe {
     constexpr SceneResourceInternalId NULL_SCENE_RESOURCE_INTERNAL_ID = std::numeric_limits<SceneResourceInternalId>::max();
     constexpr JointId NULL_JOINT_ID = std::numeric_limits<JointId>::max();
     constexpr JointId ROOT_JOINT_ID = 0;
-    constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
 
     namespace VkLoaders {
         namespace GLTF {
