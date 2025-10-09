@@ -22,6 +22,10 @@ add_subdirectory(vendors/tinygltf)
 
 add_subdirectory(vendors/JoltPhysics/Build)
 
+add_subdirectory(vendors/harfbuzz)
+add_subdirectory(vendors/freetype)
+add_subdirectory(vendors/utfcpp)
+
 include_directories(include)
 
 file(GLOB_RECURSE ENGINE_SOURCES src/Engine/*.cpp)
@@ -56,6 +60,7 @@ target_link_libraries(moe-graphics PRIVATE
   spdlog::spdlog fmt::fmt
   tinygltf
   Jolt
+  utf8cpp freetype harfbuzz
 )
 
 target_include_directories(moe-graphics PRIVATE

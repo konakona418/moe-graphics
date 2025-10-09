@@ -157,29 +157,33 @@ int main() {
         }
 
         engine.addImGuiDrawCommand([&] {
-            // draw set fxaa enabled
-            ImGui::Checkbox("Enable FXAA", &engine.m_enableFxaa);
+            if (ImGui::Begin("Settings")) {
+                // draw set fxaa enabled
+                ImGui::Checkbox("Enable FXAA", &engine.m_enableFxaa);
 
-            // shadow map cam scale
-            ImGui::BeginGroup();
-            ImGui::Text("Shadow Map Camera Scale");
-            ImGui::SliderFloat("Scale X", &engine.m_shadowMapCameraScale.x, 1.0f, 5.0f);
-            ImGui::SliderFloat("Scale Y", &engine.m_shadowMapCameraScale.y, 1.0f, 5.0f);
-            ImGui::SliderFloat("Scale Z", &engine.m_shadowMapCameraScale.z, 1.0f, 5.0f);
-            ImGui::EndGroup();
+                // shadow map cam scale
+                ImGui::BeginGroup();
+                ImGui::Text("Shadow Map Camera Scale");
+                ImGui::SliderFloat("Scale X", &engine.m_shadowMapCameraScale.x, 1.0f, 5.0f);
+                ImGui::SliderFloat("Scale Y", &engine.m_shadowMapCameraScale.y, 1.0f, 5.0f);
+                ImGui::SliderFloat("Scale Z", &engine.m_shadowMapCameraScale.z, 1.0f, 5.0f);
+                ImGui::EndGroup();
 
-            ImGui::Separator();
-            ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
-            ImGui::BeginListBox("Animation Select");
-            int i = 0;
-            for (auto& [name, animation]: animations) {
-                if (ImGui::Selectable(name.c_str(), animationIndex == i)) {
-                    usedAnimation = animation;
-                    animationIndex = i;
+                ImGui::Separator();
+                ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
+                if (ImGui::BeginListBox("Animation Select")) {
+                    int i = 0;
+                    for (auto& [name, animation]: animations) {
+                        if (ImGui::Selectable(name.c_str(), animationIndex == i)) {
+                            usedAnimation = animation;
+                            animationIndex = i;
+                        }
+                        i++;
+                    }
+                    ImGui::EndListBox();
                 }
-                i++;
+                ImGui::End();
             }
-            ImGui::EndListBox();
         });
 
 

@@ -40,3 +40,12 @@
 [submodule "vendors/JoltPhysics"]
 	path = vendors/JoltPhysics
 	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "vendors/freetype"]
+	path = vendors/freetype
+	url = https://github.com/freetype/freetype.git
+[submodule "vendors/utfcpp"]
+	path = vendors/utfcpp
+	url = https://github.com/nemtrif/utfcpp.git
+[submodule "vendors/harfbuzz"]
+	path = vendors/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
