@@ -8,6 +8,7 @@
 namespace moe {
     void VulkanRenderTarget::init(
             VulkanEngine* engine,
+            RenderTargetContextId contextId,
             SharedPtr<VPMatrixProvider> cameraProvider,
             Viewport viewport, Color clearColor,
             BlendMode blendMode,
@@ -16,6 +17,7 @@ namespace moe {
         MOE_ASSERT(cameraProvider != nullptr, "cameraProvider is null");
 
         this->engine = engine;
+        this->contextId = contextId;
         this->cameraProvider = std::move(cameraProvider);
         this->viewport = viewport;
         this->clearColor = clearColor;

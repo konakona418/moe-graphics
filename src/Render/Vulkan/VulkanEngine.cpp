@@ -694,8 +694,9 @@ namespace moe {
         auto& resolveImage = renderTarget.msaaResolveImage;
 
         // clear previous frame's render packets
-        auto& packets = renderTarget.context.renderPackets;
-        packets.clear();
+        auto& renderTargetContext = *m_caches.renderTargetContextCache.get(renderTarget.contextId).value();
+        renderTargetContext.resetDynamicState();
+        auto& packets = renderTargetContext.renderPackets;
 
         static constexpr size_t MAX_EXPECTED_RENDER_PACKETS = 2048;
         if (packets.size() > MAX_EXPECTED_RENDER_PACKETS) {
@@ -1339,9 +1340,11 @@ namespace moe {
         // ! the creation of post fx images are not placed here
         // ! see initPostFXImages()
 
+        m_defaultRenderTargetContextId = m_caches.renderTargetContextCache.load(VulkanRenderTargetContext{}).first;
         auto target = VulkanRenderTarget{};
         target.init(
                 this,
+                m_defaultRenderTargetContextId,
                 m_defaultCamera,
                 Viewport{
                         0,

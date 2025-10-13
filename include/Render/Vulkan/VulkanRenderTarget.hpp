@@ -12,6 +12,26 @@
 namespace moe {
     struct VulkanEngine;
 
+    struct VulkanRenderTargetContext {
+        Vector<VulkanRenderPacket> renderPackets;
+
+        void resetDynamicState() {
+            renderPackets.clear();
+        }
+    };
+
+    struct VulkanRenderTargetContextLoaderFunctor {
+        SharedResource<VulkanRenderTargetContext> operator()(VulkanRenderTargetContext&& context) {
+            return std::make_shared<VulkanRenderTargetContext>(std::forward<VulkanRenderTargetContext>(context));
+        }
+    };
+
+    struct VulkanRenderTargetContextCache
+        : public ResourceCache<
+                  RenderTargetId,
+                  VulkanRenderTargetContext,
+                  VulkanRenderTargetContextLoaderFunctor> {};
+
     struct VulkanRenderTarget {
         enum class BlendMode {
             None,
@@ -24,11 +44,9 @@ namespace moe {
         static constexpr Priority PRIORITY_HIGHEST = 0;
         static constexpr Priority PRIORITY_DEFAULT = PRIORITY_LOWEST / 2;
 
-        struct Context {
-            Vector<VulkanRenderPacket> renderPackets;
-        } context;
-
         VulkanEngine* engine{nullptr};
+
+        RenderTargetContextId contextId{NULL_RENDER_TARGET_CONTEXT_ID};
 
         VulkanAllocatedImage drawImage{};
         VulkanAllocatedImage depthImage{};
@@ -45,6 +63,7 @@ namespace moe {
 
         void init(
                 VulkanEngine* engine,
+                RenderTargetContextId contextId,
                 SharedPtr<VPMatrixProvider> cameraProvider,
                 Viewport viewport, Color clearColor = {0.f, 0.f, 0.f, 1.f},
                 BlendMode blendMode = BlendMode::None,
