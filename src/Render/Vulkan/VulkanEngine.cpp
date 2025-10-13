@@ -636,15 +636,11 @@ namespace moe {
 
         VkCommandBuffer commandBuffer = currentFrame.mainCommandBuffer;
 
-        m_drawExtent.width = m_drawImage.imageExtent.width;
-        m_drawExtent.height = m_drawImage.imageExtent.height;
-
         MOE_VK_CHECK(vkResetCommandBuffer(commandBuffer, 0));
 
         VkCommandBufferBeginInfo beginInfo = VkInit::commandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
         MOE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
 
         // ! begin skinning. as we need to upload joint matrices from cpu to gpu, we do it first.
         m_pipelines.skinningPipeline.beginFrame(currentFrameIndex);
@@ -690,7 +686,23 @@ namespace moe {
 
         // ! load scene render packets
 
-        Vector<VulkanRenderPacket> packets;
+        auto& renderTarget =
+                *m_caches.renderTargetCache.get(m_defaultRenderTargetId).value();
+
+        auto& drawImage = renderTarget.drawImage;
+        auto& depthImage = renderTarget.depthImage;
+        auto& resolveImage = renderTarget.msaaResolveImage;
+
+        // clear previous frame's render packets
+        auto& packets = renderTarget.context.renderPackets;
+        packets.clear();
+
+        static constexpr size_t MAX_EXPECTED_RENDER_PACKETS = 2048;
+        if (packets.size() > MAX_EXPECTED_RENDER_PACKETS) {
+            Logger::warn("Render packets size {} exceeds max expected {}, is this normal or is the packets vector not cleared properly?",
+                         packets.size(), MAX_EXPECTED_RENDER_PACKETS);
+        }
+
         //m_pipelines.testScene.gatherRenderPackets(packets);
         for (auto& renderCommands: m_renderBus.getRenderCommands()) {
             auto id = renderCommands.renderableId;
@@ -804,16 +816,18 @@ namespace moe {
 
         //! fixme: general image layout is not an optimal choice.
         VkUtils::transitionImage(
-                commandBuffer, m_drawImage.image,
+                commandBuffer, drawImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
         VkUtils::transitionImage(
-                commandBuffer, m_depthImage.image,
+                commandBuffer, depthImage.image,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-        VkUtils::transitionImage(
-                commandBuffer, m_msaaResolveImage.image,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        if (isMultisamplingEnabled()) {
+            VkUtils::transitionImage(
+                    commandBuffer, resolveImage.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        }
 
         // todo: sync with last read
         m_pipelines.gBufferPipeline.draw(
@@ -821,11 +835,19 @@ namespace moe {
                 m_caches.meshCache, m_caches.materialCache,
                 packets, m_pipelines.sceneDataBuffer.getBuffer());
 
-        VkClearValue clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
+        auto clearColor = renderTarget.clearColor;
+        VkClearValue clearValue = {
+                .color = {
+                        clearColor.r,
+                        clearColor.g,
+                        clearColor.b,
+                        clearColor.a,
+                },
+        };
         //VkClearValue depthClearValue = {.depthStencil = {1.0f, 0}};
-        auto colorAttachment = VkInit::renderingAttachmentInfo(m_drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        auto colorAttachment = VkInit::renderingAttachmentInfo(drawImage.imageView, &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         if (isMultisamplingEnabled()) {
-            colorAttachment.resolveImageView = m_msaaResolveImage.imageView;
+            colorAttachment.resolveImageView = resolveImage.imageView;
             colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
             colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;// ! msaa x4
             // resolve msaa x4 image -> 1 sample resolved image
@@ -865,23 +887,23 @@ namespace moe {
             // blit from resolved image to postfx top image
             VkUtils::transitionImage(
                     commandBuffer,
-                    m_msaaResolveImage.image,
+                    resolveImage.image,
                     VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_msaaResolveImage.image, m_postFxImages.topOfPostFxImage.image,
+                    resolveImage.image, m_postFxImages.topOfPostFxImage.image,
                     m_drawExtent, m_drawExtent);
         } else {
             // blit from draw image to postfx top image
             VkUtils::transitionImage(
                     commandBuffer,
-                    m_drawImage.image,
+                    drawImage.image,
                     VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_drawImage.image, m_postFxImages.topOfPostFxImage.image,
+                    drawImage.image, m_postFxImages.topOfPostFxImage.image,
                     m_drawExtent, m_drawExtent);
         }
 
@@ -983,13 +1005,6 @@ namespace moe {
         }
 
         m_frameNumber++;
-    }
-
-    void VulkanEngine::drawBackground(VkCommandBuffer commandBuffer) {
-        VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-        VkImageSubresourceRange range = VkUtils::makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-
-        vkCmdClearColorImage(commandBuffer, m_drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &range);
     }
 
     void VulkanEngine::drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget) {
@@ -1321,54 +1336,24 @@ namespace moe {
 
         m_drawExtent = {drawExtent.width, drawExtent.height};
 
-        m_drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-        m_drawImage.imageExtent = drawExtent;
-
-        m_depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-        m_depthImage.imageExtent = drawExtent;
-
-        m_msaaResolveImage.imageFormat = m_drawImage.imageFormat;
-        m_msaaResolveImage.imageExtent = drawExtent;
-
-        VkImageUsageFlags drawImageUsage{};
-        drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        drawImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        drawImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
-
-        VkImageUsageFlags depthImageUsage{};
-        depthImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-        VkImageUsageFlags finalColorImageUsage{};
-        finalColorImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        finalColorImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        finalColorImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        finalColorImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
-
-        VkImageCreateInfo drawImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, drawImageUsage, drawExtent);
-        drawImageInfo.samples = isMultisamplingEnabled() ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
-
-        VkImageCreateInfo depthImageInfo = VkInit::imageCreateInfo(m_depthImage.imageFormat, depthImageUsage, drawExtent);
-        depthImageInfo.samples = isMultisamplingEnabled() ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
-
-        VkImageCreateInfo finalColorImageInfo = VkInit::imageCreateInfo(m_msaaResolveImage.imageFormat, finalColorImageUsage, drawExtent);
-        finalColorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-
-        VmaAllocationCreateInfo allocCreateInfo{};
-        allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-        allocCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        m_drawImage = allocateImage(drawImageInfo);
-        m_depthImage = allocateImage(depthImageInfo);
-        m_msaaResolveImage = allocateImage(finalColorImageInfo);
-
         // ! the creation of post fx images are not placed here
         // ! see initPostFXImages()
 
+        auto target = VulkanRenderTarget{};
+        target.init(
+                this,
+                m_defaultCamera,
+                Viewport{
+                        0,
+                        0,
+                        m_drawExtent.width,
+                        m_drawExtent.height,
+                });
+        m_defaultRenderTargetId =
+                m_caches.renderTargetCache.load(std::move(target)).first;
+
         m_mainDeletionQueue.pushFunction([=] {
-            destroyImage(m_msaaResolveImage);
-            destroyImage(m_depthImage);
-            destroyImage(m_drawImage);
+            m_caches.renderTargetCache.get(m_defaultRenderTargetId)->get()->cleanup();
         });
     }
 
@@ -1574,7 +1559,7 @@ namespace moe {
         postFxImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         postFxImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
-        VkImageCreateInfo postFXImageInfo = VkInit::imageCreateInfo(m_drawImage.imageFormat, postFxImageUsage, extent);
+        VkImageCreateInfo postFXImageInfo = VkInit::imageCreateInfo(m_drawImageFormat, postFxImageUsage, extent);
         postFXImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
         auto topOfPostFXImage = allocateImage(postFXImageInfo);

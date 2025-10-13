@@ -18,10 +18,10 @@
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanObjectCache.hpp"
+#include "Render/Vulkan/VulkanRenderTarget.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
-
 
 
 #include "Core/Input.hpp"
@@ -94,10 +94,9 @@ namespace moe {
         VkQueue m_graphicsQueue;
         uint32_t m_graphicsQueueFamilyIndex;
 
-        VulkanAllocatedImage m_drawImage;
-        VulkanAllocatedImage m_depthImage;
-        VulkanAllocatedImage m_msaaResolveImage;
         VkExtent2D m_drawExtent;
+        VkFormat m_drawImageFormat{VK_FORMAT_R16G16B16A16_SFLOAT};
+        VkFormat m_depthImageFormat{VK_FORMAT_D32_SFLOAT};
 
         struct {
             VulkanAllocatedImage topOfPostFxImage;
@@ -119,14 +118,15 @@ namespace moe {
 
         Queue<Function<void()>> m_imguiDrawQueue;
 
-        VulkanCamera m_defaultCamera{
+        RenderTargetId m_defaultRenderTargetId{NULL_RENDER_TARGET_ID};
+
+        SharedPtr<VulkanCamera> m_defaultCamera = std::make_shared<VulkanCamera>(
                 glm::vec3(0.0f, 0.0f, 0.0f),
                 0.f,
                 0.f,
                 45.0f,
                 0.1f,
-                100.0f,
-        };
+                100.0f);
 
         struct {
             VulkanImageCache imageCache;
@@ -134,6 +134,8 @@ namespace moe {
             VulkanMaterialCache materialCache;
             VulkanObjectCache objectCache;
             VulkanAnimationCache animationCache;
+
+            VulkanRenderTargetCache renderTargetCache{};
         } m_caches;
 
         struct {
@@ -205,7 +207,7 @@ namespace moe {
 
         size_t getCurrentFrameIndex() const { return m_frameNumber % FRAMES_IN_FLIGHT; }
 
-        VulkanCamera& getDefaultCamera() { return m_defaultCamera; }
+        VulkanCamera& getDefaultCamera() { return *m_defaultCamera; }
 
         InputBus& getInputBus() { return m_inputBus; }
 
@@ -254,8 +256,6 @@ namespace moe {
         void initPipelines();
 
         void initPostFXImages();
-
-        void drawBackground(VkCommandBuffer commandBuffer);
 
         void drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget);
 

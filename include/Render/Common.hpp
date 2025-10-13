@@ -14,9 +14,13 @@ namespace moe {
     using AnimationId = BaseIdType;
     using ComputeSkinHandleId = BaseIdType;
 
+    using RenderTargetId = BaseIdType;
+
     constexpr RenderableId NULL_RENDERABLE_ID = std::numeric_limits<RenderableId>::max();
     constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
     constexpr ComputeSkinHandleId NULL_COMPUTE_SKIN_HANDLE_ID = std::numeric_limits<ComputeSkinHandleId>::max();
+
+    constexpr RenderTargetId NULL_RENDER_TARGET_ID = std::numeric_limits<RenderTargetId>::max();
 
     struct RenderCommand {
         RenderableId renderableId;
@@ -30,5 +34,17 @@ namespace moe {
 
         AnimationId animationId;
         float time;
+    };
+
+    struct VPMatrixProvider {
+        virtual glm::mat4 viewMatrix() const = 0;
+        virtual glm::mat4 projectionMatrix(float aspectRatio) const = 0;
+    };
+
+    struct Viewport {
+        int32_t x{0};
+        int32_t y{0};
+        uint32_t width{0};
+        uint32_t height{0};
     };
 }// namespace moe

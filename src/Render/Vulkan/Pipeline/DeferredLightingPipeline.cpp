@@ -44,7 +44,7 @@ namespace moe {
                                    .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                                    .disableBlending()
                                    .disableDepthTesting()
-                                   .setColorAttachmentFormat(engine.m_drawImage.imageFormat)
+                                   .setColorAttachmentFormat(engine.m_drawImageFormat)
                                    .disableMultisampling();
 
             if (engine.isMultisamplingEnabled()) {

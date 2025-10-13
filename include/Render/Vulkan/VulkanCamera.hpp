@@ -3,17 +3,17 @@
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
-    struct VulkanCamera {
+    struct VulkanCamera : VPMatrixProvider {
         static constexpr float PITCH_LIMIT = 89.0f;
         VulkanCamera(glm::vec3 pos, float pitch = 0.0f, float yaw = 0.0f, float fovDeg = 45.0f, float nearZ = 0.1f, float farZ = 100.0f)
             : pos(pos), pitch(pitch), yaw(yaw), fovDeg(fovDeg), nearZ(nearZ), farZ(farZ) {
             updateVectors();
         }
 
-        glm::mat4 viewMatrix() const {
+        glm::mat4 viewMatrix() const override {
             return glm::lookAt(pos, pos + front, up);
         }
-        glm::mat4 projectionMatrix(float aspectRatio) const {
+        glm::mat4 projectionMatrix(float aspectRatio) const override {
             auto proj = glm::perspective(glm::radians(fovDeg), aspectRatio, nearZ, farZ);
             proj[1][1] *= -1;// vulkan NDC
             return proj;
