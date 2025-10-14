@@ -119,9 +119,9 @@ namespace moe {
         Queue<Function<void()>> m_imguiDrawQueue;
 
         RenderTargetId m_defaultRenderTargetId{NULL_RENDER_TARGET_ID};
-        RenderTargetContextId m_defaultRenderTargetContextId{NULL_RENDER_TARGET_CONTEXT_ID};
+        RenderViewId m_defaultRenderViewId{NULL_RENDER_VIEW_ID};
 
-        SharedPtr<VulkanCamera> m_defaultCamera = std::make_shared<VulkanCamera>(
+        Pinned<VulkanCamera> m_defaultCamera = makePinned<VulkanCamera>(
                 glm::vec3(0.0f, 0.0f, 0.0f),
                 0.f,
                 0.f,
@@ -137,7 +137,7 @@ namespace moe {
             VulkanAnimationCache animationCache;
 
             VulkanRenderTargetCache renderTargetCache{};
-            VulkanRenderTargetContextCache renderTargetContextCache{};
+            VulkanRenderViewCache renderViewCache{};
         } m_caches;
 
         struct {

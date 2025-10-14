@@ -61,6 +61,47 @@ namespace moe {
 
     template<typename FirstT, typename SecondT>
     using Pair = std::pair<FirstT, SecondT>;
+
+    template<typename T>
+    struct Pinned {
+    private:
+        UniquePtr<T> m_ptr;
+
+    public:
+        template<typename... Args>
+        explicit Pinned(Args&&... args)
+            : m_ptr(std::make_unique<T>(std::forward<Args>(args)...)) {}
+
+        T* operator->() { return m_ptr.get(); }
+
+        const T* operator->() const { return m_ptr.get(); }
+
+        T& operator*() { return *m_ptr; }
+
+        const T& operator*() const { return *m_ptr; }
+
+        T* get() { return m_ptr.get(); }
+
+        const T* get() const { return m_ptr.get(); }
+
+        Pinned(Pinned&& other) noexcept
+            : m_ptr(std::move(other.m_ptr)) {}
+
+        Pinned& operator=(Pinned&& other) noexcept {
+            if (this != &other) {
+                m_ptr = std::move(other.m_ptr);
+            }
+            return *this;
+        }
+
+        Pinned(const Pinned&) = delete;
+        Pinned& operator=(const Pinned&) = delete;
+    };
+
+    template<typename T, typename... Args, typename = std::enable_if_t<std::is_constructible_v<T, Args...>>>
+    Pinned<T> makePinned(Args&&... args) {
+        return Pinned<T>(std::forward<Args>(args)...);
+    }
 }// namespace moe
 
 #include "Core/Logger.hpp"

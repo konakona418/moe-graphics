@@ -688,15 +688,15 @@ namespace moe {
 
         auto& renderTarget =
                 *m_caches.renderTargetCache.get(m_defaultRenderTargetId).value();
+        auto& renderView = *m_caches.renderViewCache.get(m_defaultRenderViewId).value();
 
-        auto& drawImage = renderTarget.drawImage;
-        auto& depthImage = renderTarget.depthImage;
-        auto& resolveImage = renderTarget.msaaResolveImage;
+        auto& drawImage = renderView.drawImage;
+        auto& depthImage = renderView.depthImage;
+        auto& resolveImage = renderView.msaaResolveImage;
 
         // clear previous frame's render packets
-        auto& renderTargetContext = *m_caches.renderTargetContextCache.get(renderTarget.contextId).value();
-        renderTargetContext.resetDynamicState();
-        auto& packets = renderTargetContext.renderPackets;
+        renderTarget.resetDynamicState();
+        auto& packets = renderTarget.renderPackets;
 
         static constexpr size_t MAX_EXPECTED_RENDER_PACKETS = 2048;
         if (packets.size() > MAX_EXPECTED_RENDER_PACKETS) {
@@ -836,7 +836,7 @@ namespace moe {
                 m_caches.meshCache, m_caches.materialCache,
                 packets, m_pipelines.sceneDataBuffer.getBuffer());
 
-        auto clearColor = renderTarget.clearColor;
+        auto clearColor = renderView.clearColor;
         VkClearValue clearValue = {
                 .color = {
                         clearColor.r,
@@ -1340,23 +1340,23 @@ namespace moe {
         // ! the creation of post fx images are not placed here
         // ! see initPostFXImages()
 
-        m_defaultRenderTargetContextId = m_caches.renderTargetContextCache.load(VulkanRenderTargetContext{}).first;
-        auto target = VulkanRenderTarget{};
-        target.init(
+        m_defaultRenderTargetId = m_caches.renderTargetCache.load(VulkanRenderTarget{}).first;
+        auto view = VulkanRenderView{};
+        view.init(
                 this,
-                m_defaultRenderTargetContextId,
-                m_defaultCamera,
+                m_defaultRenderTargetId,
+                m_defaultCamera.get(),
                 Viewport{
                         0,
                         0,
                         m_drawExtent.width,
                         m_drawExtent.height,
                 });
-        m_defaultRenderTargetId =
-                m_caches.renderTargetCache.load(std::move(target)).first;
+        m_defaultRenderViewId =
+                m_caches.renderViewCache.load(std::move(view)).first;
 
         m_mainDeletionQueue.pushFunction([=] {
-            m_caches.renderTargetCache.get(m_defaultRenderTargetId)->get()->cleanup();
+            m_caches.renderViewCache.get(m_defaultRenderViewId)->get()->cleanup();
         });
     }
 

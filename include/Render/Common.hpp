@@ -15,14 +15,14 @@ namespace moe {
     using ComputeSkinHandleId = BaseIdType;
 
     using RenderTargetId = BaseIdType;
-    using RenderTargetContextId = BaseIdType;
+    using RenderViewId = BaseIdType;
 
     constexpr RenderableId NULL_RENDERABLE_ID = std::numeric_limits<RenderableId>::max();
     constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
     constexpr ComputeSkinHandleId NULL_COMPUTE_SKIN_HANDLE_ID = std::numeric_limits<ComputeSkinHandleId>::max();
 
     constexpr RenderTargetId NULL_RENDER_TARGET_ID = std::numeric_limits<RenderTargetId>::max();
-    constexpr RenderTargetContextId NULL_RENDER_TARGET_CONTEXT_ID = std::numeric_limits<RenderTargetContextId>::max();
+    constexpr RenderViewId NULL_RENDER_VIEW_ID = std::numeric_limits<RenderViewId>::max();
 
     struct RenderCommand {
         RenderableId renderableId;

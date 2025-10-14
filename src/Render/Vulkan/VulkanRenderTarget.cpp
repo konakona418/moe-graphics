@@ -6,10 +6,10 @@
 #include "Render/Vulkan/VulkanRenderable.hpp"
 
 namespace moe {
-    void VulkanRenderTarget::init(
+    void VulkanRenderView::init(
             VulkanEngine* engine,
-            RenderTargetContextId contextId,
-            SharedPtr<VPMatrixProvider> cameraProvider,
+            RenderTargetId targetId,
+            VPMatrixProvider* cameraProvider,
             Viewport viewport, Color clearColor,
             BlendMode blendMode,
             Priority priority) {
@@ -17,7 +17,7 @@ namespace moe {
         MOE_ASSERT(cameraProvider != nullptr, "cameraProvider is null");
 
         this->engine = engine;
-        this->contextId = contextId;
+        this->targetId = targetId;
         this->cameraProvider = std::move(cameraProvider);
         this->viewport = viewport;
         this->clearColor = clearColor;
@@ -68,7 +68,7 @@ namespace moe {
         }
     }
 
-    void VulkanRenderTarget::cleanup() {
+    void VulkanRenderView::cleanup() {
         if (engine) {
             engine->destroyImage(msaaResolveImage);
             engine->destroyImage(depthImage);
