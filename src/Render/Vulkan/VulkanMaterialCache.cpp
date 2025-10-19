@@ -25,18 +25,13 @@ namespace moe {
         return std::nullopt;
     }
 
-    MaterialId VulkanMaterialCache::loadMaterial(VulkanCPUMaterial material) {
-        MOE_ASSERT(m_initialized, "VulkanMaterialCache not initialized");
-
-        MaterialId id = allocateMaterialId();
-        MOE_ASSERT(id < MAX_MATERIAL_COUNT, "MaterialId out of bounds");
-
+    void VulkanMaterialCache::loadMaterial(VulkanCPUMaterial material, MaterialId matId) {
         auto* gpuMaterial =
                 static_cast<VulkanGPUMaterial*>(m_materialBuffer.vmaAllocationInfo.pMappedData);
 
         // todo: this requires textures must be valid.
         // ! fixme: work on this after texture cache is implemented
-        gpuMaterial[id] =
+        gpuMaterial[matId] =
                 VulkanGPUMaterial{
                         .baseColor = material.baseColor,
                         .metallicRoughnessEmissive = glm::vec4(material.metallic, material.roughness, material.emissive, 0.0f),
@@ -47,7 +42,34 @@ namespace moe {
                         .emissiveTexture = material.emissiveTexture,
                 };
 
+        Logger::debug("Loaded material with id {}", matId);
+    }
+
+    MaterialId VulkanMaterialCache::loadMaterial(VulkanCPUMaterial material) {
+        MOE_ASSERT(m_initialized, "VulkanMaterialCache not initialized");
+
+        MaterialId id = allocateMaterialId();
+        MOE_ASSERT(id < MAX_STATIC_MATERIAL_COUNT, "MaterialId out of bounds");
+
+        m_materials[id] = material;
+        loadMaterial(material, id);
+
         Logger::debug("Loaded material with id {}", id);
+
+        return id;
+    }
+
+    void VulkanMaterialCache::resetDynamicState() {
+        m_temporaryMaterialCount = 0;
+    }
+
+    MaterialId VulkanMaterialCache::loadTemporaryMaterial(VulkanCPUMaterial material) {
+        MOE_ASSERT(m_initialized, "VulkanMaterialCache not initialized");
+        MOE_ASSERT(m_temporaryMaterialCount < MAX_TEMPORARY_MATERIAL_COUNT, "Max temporary material count reached");
+
+        MaterialId id = TEMPORARY_MATERIAL_START_ID + m_temporaryMaterialCount++;
+        m_materials[id] = material;
+        loadMaterial(material, id);
 
         return id;
     }

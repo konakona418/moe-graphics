@@ -145,6 +145,9 @@ namespace moe {
             m_resizeRequested = false;
         }
 
+        // reset all shared dynamic states
+        resetDynamicState();
+
         if (m_stopRendering) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             return;
@@ -1586,6 +1589,12 @@ namespace moe {
 
     bool VulkanEngine::isKeyPressed(int key) const {
         return glfwGetKey(m_window, key) == GLFW_PRESS;
+    }
+
+    void VulkanEngine::resetDynamicState() {
+        m_caches.materialCache.resetDynamicState();
+        m_renderBus.resetDynamicState();
+        m_illuminationBus.resetDynamicState();
     }
 
 }// namespace moe

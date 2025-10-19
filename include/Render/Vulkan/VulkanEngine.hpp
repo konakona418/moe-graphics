@@ -262,6 +262,8 @@ namespace moe {
         void drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget);
 
         bool isKeyPressed(int key) const;
+
+        void resetDynamicState();
     };
 
 }// namespace moe

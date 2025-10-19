@@ -194,8 +194,6 @@ int main() {
             cameraMovement = glm::vec3(0.0f);
         }
 
-        renderBus.resetDynamicState();
-
         moe::Transform objectTransform{};
         objectTransform.setScale(glm::vec3(1.0f));
 
@@ -206,9 +204,6 @@ int main() {
                 renderBus.submitRender(sceneId, objectTransform, computeHandle);
             }
         }
-
-        // reset dynamic lights
-        illuminationBus.resetDynamicState();
 
         illuminationBus.setAmbient(glm::vec3(0.1f, 0.1f, 0.1f), 0.2f);
 

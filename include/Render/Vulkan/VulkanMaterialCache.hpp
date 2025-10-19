@@ -29,6 +29,10 @@ namespace moe {
 
         MaterialId loadMaterial(VulkanCPUMaterial material);
 
+        void resetDynamicState();
+
+        MaterialId loadTemporaryMaterial(VulkanCPUMaterial material);
+
         void disposeMaterial(MaterialId id);
 
         void destroy();
@@ -64,7 +68,12 @@ namespace moe {
         }
 
     private:
-        constexpr static uint32_t MAX_MATERIAL_COUNT = 1024;
+        constexpr static uint32_t MAX_MATERIAL_COUNT = 4096;
+        constexpr static uint32_t TEMPORARY_MATERIAL_START_ID = MAX_MATERIAL_COUNT / 4 * 3;
+        constexpr static uint32_t MAX_STATIC_MATERIAL_COUNT = TEMPORARY_MATERIAL_START_ID;
+        constexpr static uint32_t MAX_TEMPORARY_MATERIAL_COUNT = MAX_MATERIAL_COUNT - TEMPORARY_MATERIAL_START_ID;
+
+        size_t m_temporaryMaterialCount{0};
 
         struct {
             MaterialId whiteMaterial{NULL_MATERIAL_ID};
@@ -79,6 +88,8 @@ namespace moe {
         VulkanCacheIdAllocator<MaterialId> m_idAllocator;
 
         VulkanAllocatedBuffer m_materialBuffer;
+
+        void loadMaterial(VulkanCPUMaterial material, MaterialId matId);
 
         void recycleMaterialId(MaterialId id);
         MaterialId allocateMaterialId();
