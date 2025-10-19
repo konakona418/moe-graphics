@@ -48,9 +48,9 @@ namespace moe {
 
         RenderTargetId targetId{NULL_RENDER_TARGET_ID};
 
-        VulkanAllocatedImage drawImage{};
-        VulkanAllocatedImage depthImage{};
-        VulkanAllocatedImage msaaResolveImage{};// only used if multisampling is enabled
+        ImageId drawImageId{NULL_IMAGE_ID};
+        ImageId depthImageId{NULL_IMAGE_ID};
+        ImageId msaaResolveImageId{NULL_IMAGE_ID};// only used if multisampling is enabled
 
         Color clearColor{0.f, 0.f, 0.f, 1.f};
         BlendMode blendMode{BlendMode::None};

@@ -49,6 +49,31 @@ namespace moe {
         bool discarded{false};
     };
 
+    inline VulkanCPUMesh getDefaultRectMesh() {
+        VulkanCPUMesh mesh;
+
+        mesh.vertices = {
+                {{-0.5f, -0.5f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+                {{0.5f, -0.5f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+                {{0.5f, 0.5f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+                {{-0.5f, 0.5f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+        };
+
+        mesh.indices = {
+                0,
+                1,
+                2,
+                2,
+                3,
+                0,
+        };
+
+        mesh.min = glm::vec3(-0.5f, -0.5f, 0.0f);
+        mesh.max = glm::vec3(0.5f, 0.5f, 0.0f);
+
+        return mesh;
+    }
+
     struct VulkanGPUMesh {
         VulkanGPUMeshBuffer gpuBuffer;
 

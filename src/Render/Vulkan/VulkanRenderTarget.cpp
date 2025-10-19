@@ -29,6 +29,8 @@ namespace moe {
                 static_cast<uint32_t>(viewport.height),
                 1};
 
+        VulkanAllocatedImage drawImage, depthImage, msaaResolveImage;
+
         drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
         drawImage.imageExtent = drawExtent;
 
@@ -39,6 +41,7 @@ namespace moe {
         drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         drawImageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         drawImageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        drawImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
         drawImageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
 
         VkImageCreateInfo drawImageInfo = VkInit::imageCreateInfo(drawImage.imageFormat, drawImageUsage, drawExtent);
@@ -48,6 +51,7 @@ namespace moe {
 
         VkImageUsageFlags depthImageUsage{};
         depthImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        depthImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
         VkImageCreateInfo depthImageInfo = VkInit::imageCreateInfo(depthImage.imageFormat, depthImageUsage, drawExtent);
         depthImageInfo.samples = engine->isMultisamplingEnabled() ? VK_SAMPLE_COUNT_4_BIT : VK_SAMPLE_COUNT_1_BIT;
@@ -66,14 +70,15 @@ namespace moe {
 
             msaaResolveImage = engine->allocateImage(msaaResolveImageInfo);
         }
+
+        drawImageId = engine->m_caches.imageCache.addImage(std::move(drawImage));
+        depthImageId = engine->m_caches.imageCache.addImage(std::move(depthImage));
+        if (engine->isMultisamplingEnabled()) {
+            msaaResolveImageId = engine->m_caches.imageCache.addImage(std::move(msaaResolveImage));
+        }
     }
 
     void VulkanRenderView::cleanup() {
-        if (engine) {
-            engine->destroyImage(msaaResolveImage);
-            engine->destroyImage(depthImage);
-            engine->destroyImage(drawImage);
-        }
         engine = nullptr;
     }
 }// namespace moe

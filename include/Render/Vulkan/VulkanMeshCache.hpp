@@ -26,6 +26,10 @@ namespace moe {
 
         void destroy();
 
+        struct {
+            MeshId rectMeshId;
+        } defaults;
+
     private:
         bool m_initialized{false};
         VulkanEngine* m_engine{nullptr};

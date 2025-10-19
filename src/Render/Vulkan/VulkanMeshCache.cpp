@@ -7,6 +7,8 @@ namespace moe {
     void VulkanMeshCache::init(VulkanEngine& engine) {
         m_engine = &engine;
         m_initialized = true;
+
+        defaults.rectMeshId = loadMesh(getDefaultRectMesh());
     }
 
     MeshId VulkanMeshCache::loadMesh(VulkanCPUMesh cpuMesh) {

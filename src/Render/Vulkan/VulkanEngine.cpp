@@ -690,9 +690,16 @@ namespace moe {
                 *m_caches.renderTargetCache.get(m_defaultRenderTargetId).value();
         auto& renderView = *m_caches.renderViewCache.get(m_defaultRenderViewId).value();
 
-        auto& drawImage = renderView.drawImage;
-        auto& depthImage = renderView.depthImage;
-        auto& resolveImage = renderView.msaaResolveImage;
+        auto drawImageId = renderView.drawImageId;
+        auto depthImageId = renderView.depthImageId;
+        auto resolveImageId = renderView.msaaResolveImageId;
+
+        auto drawImage = *m_caches.imageCache.getImage(drawImageId);
+        auto depthImage = *m_caches.imageCache.getImage(depthImageId);
+        VulkanAllocatedImage resolveImage;
+        if (resolveImageId != NULL_IMAGE_ID) {
+            resolveImage = *m_caches.imageCache.getImage(resolveImageId);
+        }
 
         // clear previous frame's render packets
         renderTarget.resetDynamicState();
@@ -1339,25 +1346,6 @@ namespace moe {
 
         // ! the creation of post fx images are not placed here
         // ! see initPostFXImages()
-
-        m_defaultRenderTargetId = m_caches.renderTargetCache.load(VulkanRenderTarget{}).first;
-        auto view = VulkanRenderView{};
-        view.init(
-                this,
-                m_defaultRenderTargetId,
-                m_defaultCamera.get(),
-                Viewport{
-                        0,
-                        0,
-                        m_drawExtent.width,
-                        m_drawExtent.height,
-                });
-        m_defaultRenderViewId =
-                m_caches.renderViewCache.load(std::move(view)).first;
-
-        m_mainDeletionQueue.pushFunction([=] {
-            m_caches.renderViewCache.get(m_defaultRenderViewId)->get()->cleanup();
-        });
     }
 
     void VulkanEngine::createSwapchain(uint32_t width, uint32_t height) {
@@ -1517,6 +1505,22 @@ namespace moe {
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
         m_pipelines.fxaaPipeline.init(*this);
+
+        // init default render target and view
+        m_defaultRenderTargetId = m_caches.renderTargetCache.load(VulkanRenderTarget{}).first;
+        auto view = VulkanRenderView{};
+        view.init(
+                this,
+                m_defaultRenderTargetId,
+                m_defaultCamera.get(),
+                Viewport{
+                        0,
+                        0,
+                        m_drawExtent.width,
+                        m_drawExtent.height,
+                });
+        m_defaultRenderViewId =
+                m_caches.renderViewCache.load(std::move(view)).first;
 
         initPostFXImages();
 
