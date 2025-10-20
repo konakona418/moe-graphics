@@ -889,6 +889,42 @@ namespace moe {
 
         vkCmdEndRendering(commandBuffer);
 
+        // ! sprites
+
+        // barrier prev write
+        VkUtils::transitionImage(
+                commandBuffer,
+                drawImage.image,
+                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+
+        Vector<VulkanSprite> sprites;
+        sprites.push_back(VulkanSprite{
+                .transform = Transform().setPosition({-480.0f, -240.0f, 0.0f}),
+                .color = Color(1.0f, 1.0f, 1.0f, 1.0f),
+                .size = {960.f, 480.0f},
+                .texOffset = {0.0f, 0.0f},
+                .texSize = {1920.f, 1080.0f},
+                .textureId = m_pipelines.testSpriteRenderImageId,
+        });
+
+        auto uiViewportW = static_cast<float>(m_drawExtent.width);
+        auto uiViewportH = static_cast<float>(m_drawExtent.height);
+        auto uiCamProj = glm::ortho(
+                -uiViewportW / 2.0f, uiViewportW / 2.0f,
+                uiViewportH / 2.0f, -uiViewportH / 2.0f,
+                -1.f, 1.f);
+        uiCamProj[1][1] *= -1;
+        auto uiCamViewProj = uiCamProj * glm::mat4(1.0f);
+
+        m_pipelines.spritePipeline.draw(
+                commandBuffer,
+                m_caches.meshCache,
+                sprites,
+                uiCamViewProj,
+                drawImage);
+
+        // ! post fx
+
         VkUtils::transitionImage(
                 commandBuffer,
                 m_postFxImages.topOfPostFxImage.image,
@@ -1507,6 +1543,7 @@ namespace moe {
         m_pipelines.csmPipeline.init(*this);
         m_pipelines.gBufferPipeline.init(*this);
         m_pipelines.deferredLightingPipeline.init(*this);
+        m_pipelines.spritePipeline.init(*this);
         m_pipelines.fxaaPipeline.init(*this);
 
         // init default render target and view
@@ -1537,6 +1574,11 @@ namespace moe {
                 VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
         //m_pipelines.skyBoxPipeline.setSkyBoxImage(m_pipelines.skyBoxImageId);
 
+        m_pipelines.testSpriteRenderImageId = m_caches.imageCache.loadImageFromFile(
+                "test_sprite.jpg",
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT);
+
         m_pipelines.sceneDataBuffer.init(
                 *this,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -1547,6 +1589,7 @@ namespace moe {
             m_pipelines.sceneDataBuffer.destroy();
 
             m_pipelines.fxaaPipeline.destroy();
+            m_pipelines.spritePipeline.destroy();
             m_pipelines.deferredLightingPipeline.destroy();
             m_pipelines.gBufferPipeline.destroy();
             m_pipelines.csmPipeline.destroy();

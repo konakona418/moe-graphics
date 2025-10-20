@@ -8,6 +8,7 @@
 #include "Render/Vulkan/Pipeline/ShadowMapPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkinningPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkyBoxPipeline.hpp"
+#include "Render/Vulkan/Pipeline/SpritePipeline.hpp"
 
 #include "Render/Vulkan/VulkanAnimationCache.hpp"
 #include "Render/Vulkan/VulkanBindlessSet.hpp"
@@ -121,6 +122,8 @@ namespace moe {
         RenderTargetId m_defaultRenderTargetId{NULL_RENDER_TARGET_ID};
         RenderViewId m_defaultRenderViewId{NULL_RENDER_VIEW_ID};
 
+        RenderViewId m_defaultSpriteRenderViewId{NULL_RENDER_VIEW_ID};
+
         Pinned<VulkanCamera> m_defaultCamera = makePinned<VulkanCamera>(
                 glm::vec3(0.0f, 0.0f, 0.0f),
                 0.f,
@@ -147,10 +150,12 @@ namespace moe {
             //Pipeline::ShadowMapPipeline shadowMapPipeline;
             Pipeline::CSMPipeline csmPipeline;
             Pipeline::GBufferPipeline gBufferPipeline;
+            Pipeline::SpritePipeline spritePipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
             Pipeline::FXAAPipeline fxaaPipeline;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
+            ImageId testSpriteRenderImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
         } m_pipelines;
 

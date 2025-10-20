@@ -1,6 +1,123 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
 #include "imgui.h"
 
+#include <iostream>
+
+#include <Jolt/Jolt.h>
+
+#include <Jolt/Core/Factory.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Core/TempAllocator.h>
+#include <Jolt/Physics/Body/BodyActivationListener.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/PhysicsSettings.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/RegisterTypes.h>
+
+static void TraceImpl(const char* inFMT, ...) {
+    // Format the message
+    va_list list;
+    va_start(list, inFMT);
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), inFMT, list);
+    va_end(list);
+
+    // Print to the TTY
+    std::cout << buffer << std::endl;
+}
+
+#ifdef JPH_ENABLE_ASSERTS
+
+// Callback for asserts, connect this to your own assert handler if you have one
+static bool AssertFailedImpl(const char* inExpression, const char* inMessage, const char* inFile, JPH::uint inLine) {
+    // Print to the TTY
+    std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr ? inMessage : "") << std::endl;
+
+    // Breakpoint
+    return true;
+};
+
+#endif// JPH_ENABLE_ASSERTS
+
+namespace Layers {
+    static constexpr JPH::ObjectLayer NON_MOVING = JPH::ObjectLayer(0);
+    static constexpr JPH::ObjectLayer MOVING = JPH::ObjectLayer(1);
+    static constexpr JPH::ObjectLayer NUM_LAYERS = JPH::ObjectLayer(2);
+}// namespace Layers
+
+class ObjectLayerFilterImpl : public JPH::ObjectLayerPairFilter {
+public:
+    virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override {
+        switch (inObject1) {
+            case Layers::NON_MOVING:
+                return inObject2 == Layers::MOVING;
+            case Layers::MOVING:
+                return true;
+            default:
+                JPH_ASSERT(false);
+                return false;
+        }
+    }
+};
+
+namespace BroadPhaseLayers {
+    static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
+    static constexpr JPH::BroadPhaseLayer MOVING(1);
+    static constexpr JPH::uint NUM_LAYERS(2);
+}// namespace BroadPhaseLayers
+
+class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface {
+public:
+    BPLayerInterfaceImpl() {
+        // Create a mapping table from object to broad phase layer
+        mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
+        mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
+    }
+
+    virtual JPH::uint GetNumBroadPhaseLayers() const override {
+        return BroadPhaseLayers::NUM_LAYERS;
+    }
+
+    virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override {
+        JPH_ASSERT(inLayer < Layers::NUM_LAYERS);
+        return mObjectToBroadPhase[inLayer];
+    }
+
+#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
+    virtual const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override {
+        switch ((JPH::BroadPhaseLayer::Type) inLayer) {
+            case (JPH::BroadPhaseLayer::Type) BroadPhaseLayers::NON_MOVING:
+                return "NON_MOVING";
+            case (JPH::BroadPhaseLayer::Type) BroadPhaseLayers::MOVING:
+                return "MOVING";
+            default:
+                JPH_ASSERT(false);
+                return "INVALID";
+        }
+    }
+#endif// JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
+
+private:
+    JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
+};
+
+class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
+public:
+    virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override {
+        switch (inLayer1) {
+            case Layers::NON_MOVING:
+                return inLayer2 == BroadPhaseLayers::MOVING;
+            case Layers::MOVING:
+                return true;
+            default:
+                JPH_ASSERT(false);
+                return false;
+        }
+    }
+};
+
 struct CameraMovementMask {
     enum class CameraMovementDirection {
         Forward,
@@ -63,6 +180,79 @@ struct CameraMovementMask {
 };
 
 int main() {
+    JPH::RegisterDefaultAllocator();
+
+    JPH::Trace = TraceImpl;
+    JPH_IF_ENABLE_ASSERTS(JPH::AssertFailed = AssertFailedImpl;)
+
+    JPH::Factory::sInstance = new JPH::Factory();
+    JPH::RegisterTypes();
+    JPH::TempAllocatorImpl tempAllocator(10 * 1024 * 1024);
+    JPH::JobSystemThreadPool jobSystem(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers);
+    const JPH::uint cMaxBodies = 1024;
+    const JPH::uint cNumBodyMutexes = 0;
+    const JPH::uint cMaxBodyPairs = 1024;
+    const JPH::uint cMaxContactConstraints = 1024;
+
+    BPLayerInterfaceImpl broadPhaseLayerInterface;
+    ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhaseLayerFilter;
+    ObjectLayerFilterImpl objectLayerFilter;
+
+    JPH::PhysicsSystem physicsSystem;
+    physicsSystem.Init(
+            cMaxBodies, cNumBodyMutexes,
+            cMaxBodyPairs, cMaxContactConstraints,
+            broadPhaseLayerInterface,
+            objectVsBroadPhaseLayerFilter,
+            objectLayerFilter);
+
+    JPH::BodyInterface& bodyInterface = physicsSystem.GetBodyInterface();
+
+    auto floorSettings = JPH::BodyCreationSettings(
+            new JPH::BoxShape({10.0f, 0.1f, 10.0f}),
+            JPH::RVec3(0.0f, -0.08f, 0.0f),
+            JPH::Quat::sIdentity(),
+            JPH::EMotionType::Static,
+            Layers::NON_MOVING);
+
+    auto floorBody =
+            bodyInterface.CreateAndAddBody(
+                    floorSettings,
+                    JPH::EActivation::DontActivate);
+
+    moe::Vector<JPH::BodyID> sphereBodies;
+
+    constexpr float sphereScale = 0.1f;
+    float sphereSpeed = 0.0;
+    float planeFriction = 0.5f;
+    float sphereRestitution = 0.6f;
+    float sphereFriction = 0.5f;
+
+    auto sphereFactory = [&](glm::vec3 pos, glm::vec3 velocity) {
+        JPH::BodyCreationSettings sphereSettings(
+                new JPH::SphereShape(1.5f * sphereScale),
+                JPH::RVec3(pos.x, pos.y, pos.z),
+                JPH::Quat::sIdentity(),
+                JPH::EMotionType::Dynamic,
+                Layers::MOVING);
+
+        auto sphereBody =
+                bodyInterface.CreateAndAddBody(
+                        sphereSettings,
+                        JPH::EActivation::Activate);
+
+        bodyInterface.SetLinearVelocity(
+                sphereBody,
+                JPH::Vec3(velocity.x, velocity.y, velocity.z));
+
+        bodyInterface.SetRestitution(sphereBody, sphereRestitution);
+        bodyInterface.SetFriction(sphereBody, sphereFriction);
+
+        sphereBodies.push_back(sphereBody);
+    };
+
+    physicsSystem.OptimizeBroadPhase();
+
     moe::VulkanEngine engine;
     engine.init();
     auto& camera = engine.getDefaultCamera();
@@ -86,7 +276,7 @@ int main() {
 
     float elapsed = 0.0f;
 
-    auto sceneId = engine.loadGLTF("anim/anim.gltf");
+    /*auto sceneId = engine.loadGLTF("anim/anim.gltf");
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
     auto* animatableRenderable = scene->checkedAs<moe::VulkanSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
@@ -94,8 +284,12 @@ int main() {
     auto usedAnimation = animations.begin()->second;
 
     float animationTime = 0.0f;
-    int animationIndex = 0;
+    int animationIndex = 0;*/
 
+    auto plane = engine.loadGLTF("phy/plane/plane.gltf");
+    auto sphere = engine.loadGLTF("phy/sphere/sphere.gltf");
+
+    moe::Logger::debug("Starting main loop");
     while (running) {
         engine.beginFrame();
         auto now = std::chrono::high_resolution_clock::now();
@@ -170,7 +364,19 @@ int main() {
                 ImGui::EndGroup();
 
                 ImGui::Separator();
-                ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
+                ImGui::Text("Physics Debug");
+                ImGui::Button("Generate a sphere", ImVec2(150, 0));
+                if (ImGui::IsItemClicked()) {
+                    moe::Logger::debug("Generate a sphere");
+                    sphereFactory(
+                            camera.getPosition() + glm::normalize(camera.getFront()) * 0.2f,
+                            glm::normalize(camera.getFront()) * sphereSpeed);
+                }
+                ImGui::SliderFloat("Sphere Initial Speed", &sphereSpeed, 0.0f, 20.0f);
+                ImGui::SliderFloat("Plane Friction", &planeFriction, 0.0f, 1.0f);
+                ImGui::SliderFloat("Sphere Restitution", &sphereRestitution, 0.0f, 1.0f);
+                ImGui::SliderFloat("Sphere Friction", &sphereFriction, 0.0f, 1.0f);
+                /*ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
                 if (ImGui::BeginListBox("Animation Select")) {
                     int i = 0;
                     for (auto& [name, animation]: animations) {
@@ -181,14 +387,16 @@ int main() {
                         i++;
                     }
                     ImGui::EndListBox();
-                }
+                }*/
                 ImGui::End();
             }
         });
 
 
         if (movementMask.isMoving()) {
-            cameraMovement = movementMask.getDirection(camera.getFront(), camera.getRight(), camera.getUp());
+            glm::vec3 frontProjected = camera.getFront();
+            frontProjected.y = 0.0f;
+            cameraMovement = movementMask.getDirection(frontProjected, camera.getRight(), camera.getUp());
             camera.setPosition(camera.getPosition() + cameraMovement * cameraMoveSpeed * deltaTime);
         } else {
             cameraMovement = glm::vec3(0.0f);
@@ -197,15 +405,36 @@ int main() {
         moe::Transform objectTransform{};
         objectTransform.setScale(glm::vec3(1.0f));
 
-        auto computeHandle = renderBus.submitComputeSkin(sceneId, usedAnimation, animationTime);
+        /*auto computeHandle = renderBus.submitComputeSkin(sceneId, usedAnimation, animationTime);
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
                 objectTransform.setPosition(glm::vec3((i - 2) * 2.0f, 0.0f, (j - 2) * 2.0f));
                 renderBus.submitRender(sceneId, objectTransform, computeHandle);
             }
+        }*/
+
+        bodyInterface.SetFriction(floorBody, planeFriction);
+        renderBus.submitRender(plane, moe::Transform{});
+
+        for (auto bodyId: sphereBodies) {
+            glm::vec3 position(0);
+            glm::quat rotation(1, 0, 0, 0);
+            JPH::RVec3 comPosition = bodyInterface.GetCenterOfMassPosition(bodyId);
+            JPH::Quat comOrientation = bodyInterface.GetRotation(bodyId);
+
+            position = glm::vec3(comPosition.GetX(), comPosition.GetY(), comPosition.GetZ());
+            rotation = glm::quat(comOrientation.GetW(), comOrientation.GetX(), comOrientation.GetY(), comOrientation.GetZ());
+
+            moe::Transform sphereTransform{};
+            sphereTransform.setPosition(position);
+            sphereTransform.setScale(glm::vec3(sphereScale));
+            sphereTransform.setRotation(rotation);
+            renderBus.submitRender(sphere, sphereTransform);
         }
 
-        illuminationBus.setAmbient(glm::vec3(0.1f, 0.1f, 0.1f), 0.2f);
+        physicsSystem.Update(deltaTime, 3, &tempAllocator, &jobSystem);
+
+        illuminationBus.setAmbient(glm::vec3(1.f, 1.f, 1.f), 0.2f);
 
         {
             moe::VulkanCPULight light{};
@@ -238,5 +467,14 @@ int main() {
     }
 
     engine.cleanup();
+
+    bodyInterface.RemoveBody(floorBody);
+    bodyInterface.RemoveBodies(sphereBodies.data(), (JPH::uint) sphereBodies.size());
+    bodyInterface.DestroyBody(floorBody);
+    bodyInterface.DestroyBodies(sphereBodies.data(), (JPH::uint) sphereBodies.size());
+
+    JPH::UnregisterTypes();
+
+    delete JPH::Factory::sInstance;
     return 0;
 }
