@@ -3,12 +3,31 @@
 #include "Render/Common.hpp"
 #include "Render/Vulkan/VulkanLight.hpp"
 #include "Render/Vulkan/VulkanRenderable.hpp"
+#include "Render/Vulkan/VulkanSprite.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 
 namespace moe {
     class VulkanEngine;
+
+    struct VulkanLoader {
+    public:
+        RenderableId load(StringView path, Loader::GltfT);
+
+        ImageId load(StringView path, Loader::ImageT);
+
+        void init(VulkanEngine& engine) {
+            m_engine = &engine;
+        }
+
+        void destroy() {
+            m_engine = nullptr;
+        }
+
+    private:
+        VulkanEngine* m_engine{nullptr};
+    };
 
     struct VulkanIlluminationBus {
     public:
@@ -105,6 +124,14 @@ namespace moe {
             return *this;
         }
 
+        VulkanRenderObjectBus& submitSpriteRender(
+                const ImageId imageId,
+                const Transform& transform,
+                const Color& color,
+                const glm::vec2& size,
+                const glm::vec2& texOffset = glm::vec2(0.0f, 0.0f),
+                const glm::vec2& texSize = glm::vec2(0.0f, 0.0f));
+
         ComputeSkinHandleId submitComputeSkin(ComputeSkinCommand command) {
             MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
             if (m_computeSkinCommands.size() >= MAX_RENDER_COMMANDS) {
@@ -121,6 +148,7 @@ namespace moe {
 
         void resetDynamicState() {
             m_renderCommands.clear();
+            m_spriteRenderCommands.clear();
             m_computeSkinCommands.clear();
             m_computeSkinHandleToMatrixOffset.clear();
             m_nextComputeSkinHandleId = 0;
@@ -128,17 +156,21 @@ namespace moe {
 
         Deque<RenderCommand>& getRenderCommands() { return m_renderCommands; }
 
+        Vector<VulkanSprite>& getSpriteRenderCommands() { return m_spriteRenderCommands; }
+
         Vector<ComputeSkinCommand>& getComputeSkinCommands() { return m_computeSkinCommands; }
 
         size_t getNumComputeSkinCommands() const { return m_computeSkinCommands.size(); }
 
     private:
         static constexpr uint32_t MAX_RENDER_COMMANDS = 4096;
+        static constexpr uint32_t MAX_SPRITE_RENDER_COMMANDS = 10240;
 
         VulkanEngine* m_engine{nullptr};
         bool m_initialized{false};
 
         Deque<RenderCommand> m_renderCommands;
+        Vector<VulkanSprite> m_spriteRenderCommands;
 
         Vector<ComputeSkinCommand> m_computeSkinCommands;
         Vector<size_t> m_computeSkinHandleToMatrixOffset;

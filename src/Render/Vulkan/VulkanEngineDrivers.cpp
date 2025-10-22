@@ -4,6 +4,19 @@
 namespace moe {
     constexpr uint32_t BUS_LIGHT_WARNING_LIMIT = 128;
 
+    RenderableId VulkanLoader::load(StringView path, Loader::GltfT) {
+        MOE_ASSERT(m_engine, "VulkanLoader not initialized");
+        return m_engine->m_caches.objectCache.load(m_engine, path, ObjectLoader::Gltf).first;
+    }
+
+    ImageId VulkanLoader::load(StringView path, Loader::ImageT) {
+        MOE_ASSERT(m_engine, "VulkanLoader not initialized");
+        return m_engine->m_caches.imageCache.loadImageFromFile(
+                path,
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT);
+    }
+
     void VulkanIlluminationBus::init(VulkanEngine& engine) {
         m_engine = &engine;
 
@@ -70,5 +83,36 @@ namespace moe {
         }
 
         lightBuffer.upload(cmdBuffer, allLights.data(), frameIndex, sizeof(VulkanGPULight) * allLights.size());
+    }
+
+    VulkanRenderObjectBus& VulkanRenderObjectBus::submitSpriteRender(
+            const ImageId imageId,
+            const Transform& transform,
+            const Color& color,
+            const glm::vec2& size,
+            const glm::vec2& texOffset,
+            const glm::vec2& texSize) {
+        MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
+        if (m_spriteRenderCommands.size() >= MAX_SPRITE_RENDER_COMMANDS) {
+            Logger::warn("Render object bus reached max sprite render commands(10240), check if dynamic state is reset properly; exceeding commands will be ignored");
+            return *this;
+        }
+
+        auto realTexSize = texSize;
+        if (texSize.x == 0.0f || texSize.y == 0.0f) {
+            // if tex size is zero, use full size
+            realTexSize = size;
+        }
+
+        m_spriteRenderCommands.push_back(VulkanSprite{
+                .transform = transform,
+                .color = color,
+                .size = size,
+                .texOffset = texOffset,
+                .texSize = realTexSize,
+                .textureId = imageId,
+        });
+
+        return *this;
     }
 }// namespace moe

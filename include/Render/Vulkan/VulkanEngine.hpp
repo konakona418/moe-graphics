@@ -58,6 +58,9 @@ namespace moe {
 
     class VulkanEngine {
     public:
+        static constexpr float DEFAULT_VIEWPORT_WIDTH = 1280.0f;
+        static constexpr float DEFAULT_VIEWPORT_HEIGHT = 720.0f;
+
         DeletionQueue m_mainDeletionQueue;
         VmaAllocator m_allocator;
         VulkanDescriptorAllocator m_globalDescriptorAllocator;
@@ -66,7 +69,10 @@ namespace moe {
         int32_t m_frameNumber{0};
         bool m_stopRendering{false};
         bool m_resizeRequested{false};
-        VkExtent2D m_windowExtent{1280, 720};
+        VkExtent2D m_windowExtent{
+                (uint32_t) DEFAULT_VIEWPORT_WIDTH,
+                (uint32_t) DEFAULT_VIEWPORT_HEIGHT,
+        };
 
         VkSampleCountFlagBits m_msaaSamples{VK_SAMPLE_COUNT_1_BIT};
         // ! msaa x4; disable this if deferred rendering is implemented; use fxaa then
@@ -116,6 +122,7 @@ namespace moe {
         InputBus m_inputBus{};
         VulkanIlluminationBus m_illuminationBus{};
         VulkanRenderObjectBus m_renderBus{};
+        VulkanLoader m_resourceLoader{};
 
         Queue<Function<void()>> m_imguiDrawQueue;
 
@@ -131,6 +138,11 @@ namespace moe {
                 45.0f,
                 0.1f,
                 100.0f);
+
+        Pinned<Vulkan2DCamera> m_defaultSpriteCamera = makePinned<Vulkan2DCamera>(
+                glm::vec2(0.0f, 0.0f),
+                DEFAULT_VIEWPORT_WIDTH,
+                DEFAULT_VIEWPORT_HEIGHT);
 
         struct {
             VulkanImageCache imageCache;
@@ -155,7 +167,6 @@ namespace moe {
             Pipeline::FXAAPipeline fxaaPipeline;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
-            ImageId testSpriteRenderImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
         } m_pipelines;
 
@@ -174,10 +185,6 @@ namespace moe {
         void endFrame();
 
         void addImGuiDrawCommand(Function<void()>&& fn) { m_imguiDrawQueue.push(std::move(fn)); }
-
-        RenderableId loadGLTF(StringView filename) {
-            return m_caches.objectCache.load(this, filename, ObjectLoader::Gltf).first;
-        }
 
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
@@ -216,7 +223,11 @@ namespace moe {
 
         VulkanCamera& getDefaultCamera() { return *m_defaultCamera; }
 
+        Vulkan2DCamera& getDefaultSpriteCamera() { return *m_defaultSpriteCamera; }
+
         InputBus& getInputBus() { return m_inputBus; }
+
+        VulkanLoader& getResourceLoader() { return m_resourceLoader; }
 
         template<typename T>
         T& getBus() {

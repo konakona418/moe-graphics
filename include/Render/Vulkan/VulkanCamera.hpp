@@ -3,7 +3,7 @@
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 namespace moe {
-    struct VulkanCamera : VPMatrixProvider {
+    struct VulkanCamera : public VPMatrixProvider {
         static constexpr float PITCH_LIMIT = 89.0f;
         VulkanCamera(glm::vec3 pos, float pitch = 0.0f, float yaw = 0.0f, float fovDeg = 45.0f, float nearZ = 0.1f, float farZ = 100.0f)
             : pos(pos), pitch(pitch), yaw(yaw), fovDeg(fovDeg), nearZ(nearZ), farZ(farZ) {
@@ -235,6 +235,42 @@ namespace moe {
 
             front = glm::normalize(newFront);
             right = glm::normalize(glm::cross(front, up));
+        }
+    };
+
+    struct Vulkan2DCamera : public VPMatrixProvider {
+        glm::vec2 position{0.0f, 0.0f};
+        glm::vec2 viewportWH{1280.0f, 720.0f};
+        float zoom{1.0f};
+
+        Vulkan2DCamera(glm::vec2 pos, float screenWidth, float screenHeight)
+            : position(pos), viewportWH(screenWidth, screenHeight), zoom(1.0f) {}
+
+        void setPosition(const glm::vec2& newPos) { position = newPos; }
+
+        void setZoom(float newZoom) { zoom = newZoom; }
+
+        void setScreenSize(const glm::vec2& newSize) { viewportWH = newSize; }
+
+        glm::mat4 viewMatrix() const {
+            glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-position, 0.0f));
+            view = glm::scale(view, glm::vec3(zoom, zoom, 1.0f));
+            return view;
+        }
+
+        glm::mat4 projectionMatrix(float aspectRatio) const {
+            float screenHeight = viewportWH.y;
+            float halfHeight = screenHeight * 0.5f / zoom;
+            float halfWidth = halfHeight * aspectRatio;
+            glm::mat4 proj = glm::ortho(
+                    -halfWidth, halfWidth,
+                    -halfHeight, halfHeight,
+                    -1.0f, 1.0f);
+            return proj;
+        }
+
+        glm::mat4 getViewProjectionMatrix() const {
+            return projectionMatrix(viewportWH.x / viewportWH.y) * viewMatrix();
         }
     };
 }// namespace moe

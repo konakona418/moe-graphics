@@ -714,7 +714,6 @@ namespace moe {
                          packets.size(), MAX_EXPECTED_RENDER_PACKETS);
         }
 
-        //m_pipelines.testScene.gatherRenderPackets(packets);
         for (auto& renderCommands: m_renderBus.getRenderCommands()) {
             auto id = renderCommands.renderableId;
             if (auto renderable = m_caches.objectCache.get(id)) {
@@ -897,16 +896,6 @@ namespace moe {
                 drawImage.image,
                 VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
 
-        Vector<VulkanSprite> sprites;
-        sprites.push_back(VulkanSprite{
-                .transform = Transform().setPosition({-480.0f, -240.0f, 0.0f}),
-                .color = Color(1.0f, 1.0f, 1.0f, 1.0f),
-                .size = {960.f, 480.0f},
-                .texOffset = {0.0f, 0.0f},
-                .texSize = {1920.f, 1080.0f},
-                .textureId = m_pipelines.testSpriteRenderImageId,
-        });
-
         auto uiViewportW = static_cast<float>(m_drawExtent.width);
         auto uiViewportH = static_cast<float>(m_drawExtent.height);
         auto uiCamProj = glm::ortho(
@@ -916,11 +905,12 @@ namespace moe {
         uiCamProj[1][1] *= -1;
         auto uiCamViewProj = uiCamProj * glm::mat4(1.0f);
 
+        auto& sprites = m_renderBus.getSpriteRenderCommands();
         m_pipelines.spritePipeline.draw(
                 commandBuffer,
                 m_caches.meshCache,
                 sprites,
-                uiCamViewProj,
+                m_defaultSpriteCamera->getViewProjectionMatrix(),
                 drawImage);
 
         // ! post fx
@@ -1535,6 +1525,7 @@ namespace moe {
     void VulkanEngine::initPipelines() {
         m_illuminationBus.init(*this);
         m_renderBus.init(*this);
+        m_resourceLoader.init(*this);
 
         m_pipelines.skinningPipeline.init(*this);
         m_pipelines.meshPipeline.init(*this);
@@ -1573,11 +1564,6 @@ namespace moe {
                  "skybox/back.jpg"},
                 VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT);
         //m_pipelines.skyBoxPipeline.setSkyBoxImage(m_pipelines.skyBoxImageId);
-
-        m_pipelines.testSpriteRenderImageId = m_caches.imageCache.loadImageFromFile(
-                "test_sprite.jpg",
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_USAGE_SAMPLED_BIT);
 
         m_pipelines.sceneDataBuffer.init(
                 *this,

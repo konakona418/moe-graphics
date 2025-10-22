@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Common.hpp"
+#include "Math/Color.hpp"
 #include "Math/Transform.hpp"
 
 namespace moe {
@@ -8,11 +9,28 @@ namespace moe {
         constexpr uint32_t FRAMES_IN_FLIGHT = 2;
     }
 
+    namespace Loader {
+        struct GltfT {
+            constexpr GltfT() = default;
+        };
+        static constexpr GltfT Gltf{};
+        struct ObjT {
+            constexpr ObjT() = default;
+        };
+        static constexpr ObjT Obj{};
+
+        struct ImageT {
+            constexpr ImageT() = default;
+        };
+        static constexpr ImageT Image{};
+    }// namespace Loader
+
     using BaseIdType = uint32_t;
 
     using RenderableId = BaseIdType;
     using AnimationId = BaseIdType;
     using ComputeSkinHandleId = BaseIdType;
+    using ImageId = BaseIdType;
 
     using RenderTargetId = BaseIdType;
     using RenderViewId = BaseIdType;
@@ -20,6 +38,7 @@ namespace moe {
     constexpr RenderableId NULL_RENDERABLE_ID = std::numeric_limits<RenderableId>::max();
     constexpr AnimationId NULL_ANIMATION_ID = std::numeric_limits<AnimationId>::max();
     constexpr ComputeSkinHandleId NULL_COMPUTE_SKIN_HANDLE_ID = std::numeric_limits<ComputeSkinHandleId>::max();
+    constexpr ImageId NULL_IMAGE_ID = std::numeric_limits<ImageId>::max();
 
     constexpr RenderTargetId NULL_RENDER_TARGET_ID = std::numeric_limits<RenderTargetId>::max();
     constexpr RenderViewId NULL_RENDER_VIEW_ID = std::numeric_limits<RenderViewId>::max();

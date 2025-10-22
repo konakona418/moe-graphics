@@ -256,6 +256,7 @@ int main() {
     moe::VulkanEngine engine;
     engine.init();
     auto& camera = engine.getDefaultCamera();
+    auto& spriteCamera = engine.getDefaultSpriteCamera();
     auto& illuminationBus = engine.getBus<moe::VulkanIlluminationBus>();
     auto& renderBus = engine.getBus<moe::VulkanRenderObjectBus>();
     camera.setPosition(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -286,8 +287,12 @@ int main() {
     float animationTime = 0.0f;
     int animationIndex = 0;*/
 
-    auto plane = engine.loadGLTF("phy/plane/plane.gltf");
-    auto sphere = engine.loadGLTF("phy/sphere/sphere.gltf");
+    auto& loader = engine.getResourceLoader();
+
+    auto plane = loader.load("phy/plane/plane.gltf", moe::Loader::Gltf);
+    auto sphere = loader.load("phy/sphere/sphere.gltf", moe::Loader::Gltf);
+
+    auto spriteImageId = loader.load("test_sprite.jpg", moe::Loader::Image);
 
     moe::Logger::debug("Starting main loop");
     while (running) {
@@ -364,6 +369,12 @@ int main() {
                 ImGui::EndGroup();
 
                 ImGui::Separator();
+                ImGui::Text("UI Camera");
+                ImGui::SliderFloat("UI Camera Pos X", &spriteCamera.position.x, -1000.0f, 1000.0f);
+                ImGui::SliderFloat("UI Camera Pos Y", &spriteCamera.position.y, -1000.0f, 1000.0f);
+                ImGui::SliderFloat("UI Camera Zoom", &spriteCamera.zoom, 0.1f, 10.0f);
+
+                ImGui::Separator();
                 ImGui::Text("Physics Debug");
                 ImGui::Button("Generate a sphere", ImVec2(150, 0));
                 if (ImGui::IsItemClicked()) {
@@ -433,6 +444,16 @@ int main() {
         }
 
         physicsSystem.Update(deltaTime, 3, &tempAllocator, &jobSystem);
+
+        {
+            renderBus.submitSpriteRender(
+                    spriteImageId,
+                    moe::Transform{},
+                    moe::Colors::White,
+                    glm::vec2(640.0f, 360.0f),
+                    glm::vec2(0.0f, 0.0f),
+                    glm::vec2(1920.0f, 1080.0f));
+        }
 
         illuminationBus.setAmbient(glm::vec3(1.f, 1.f, 1.f), 0.2f);
 
