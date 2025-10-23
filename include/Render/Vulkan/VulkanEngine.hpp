@@ -211,6 +211,8 @@ namespace moe {
 
         Optional<VulkanAllocatedImage> loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
+        Optional<VulkanAllocatedImage> loadImageFromMemory(Span<uint8_t> imageData, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
         void destroyImage(VulkanAllocatedImage& image);
 
         void destroyBuffer(VulkanAllocatedBuffer& buffer);

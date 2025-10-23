@@ -30,6 +30,8 @@ namespace moe {
 
         ImageId loadImageFromFile(StringView filename, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
+        ImageId loadImageFromMemory(Span<uint8_t> imageData, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
+
         ImageId loadCubeMapFromFiles(Array<StringView, 6> filenames, VkFormat format, VkImageUsageFlags usage, bool mipmap = false);
 
         void disposeImage(ImageId id);

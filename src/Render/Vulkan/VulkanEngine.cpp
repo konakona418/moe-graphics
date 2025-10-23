@@ -461,6 +461,24 @@ namespace moe {
         return image;
     }
 
+    Optional<VulkanAllocatedImage> VulkanEngine::loadImageFromMemory(Span<uint8_t> imageData, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        // ! this is for internal use only
+        // ! loading arbitary image from memory is not safe without knowing the format and size beforehand
+        if (imageData.empty()) {
+            Logger::error("Image data is empty");
+            return {std::nullopt};
+        }
+
+        VulkanAllocatedImage image = allocateImage(
+                imageData.data(),
+                {extent.width, extent.height, 1},
+                format,
+                usage,
+                mipmap);
+
+        return image;
+    }
+
     void VulkanEngine::destroyImage(VulkanAllocatedImage& image) {
         vkDestroyImageView(m_device, image.imageView, nullptr);
         vmaDestroyImage(m_allocator, image.image, image.vmaAllocation);

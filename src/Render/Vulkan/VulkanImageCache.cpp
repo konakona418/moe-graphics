@@ -47,6 +47,18 @@ namespace moe {
         return addImage(std::move(image.value()));
     }
 
+    ImageId VulkanImageCache::loadImageFromMemory(Span<uint8_t> imageData, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
+        MOE_ASSERT(m_initialized, "VulkanImageCache not initialized");
+
+        auto image = m_engine->loadImageFromMemory(imageData, extent, format, usage, mipmap);
+        if (!image) {
+            Logger::error("Failed to load image from memory");
+            return NULL_IMAGE_ID;
+        }
+
+        return addImage(std::move(image.value()));
+    }
+
     ImageId VulkanImageCache::loadCubeMapFromFiles(Array<StringView, 6> filenames, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
         MOE_ASSERT(m_initialized, "VulkanImageCache not initialized");
 
