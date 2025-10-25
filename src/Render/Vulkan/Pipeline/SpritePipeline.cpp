@@ -45,7 +45,7 @@ namespace moe {
                                    .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                                    .setPolygonMode(VK_POLYGON_MODE_FILL)
                                    .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                   .disableBlending()
+                                   .enableBlending()
                                    .setColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT)
                                    .setDepthFormat(VK_FORMAT_D32_SFLOAT)
                                    .disableMultisampling()
@@ -126,6 +126,7 @@ namespace moe {
                         .texRegionSize = sprite.texSize,
                         .textureSize = texSize,
                         .textureId = sprite.textureId,
+                        .isTextSprite = sprite.isTextSprite,
                 };
 
                 vkCmdPushConstants(

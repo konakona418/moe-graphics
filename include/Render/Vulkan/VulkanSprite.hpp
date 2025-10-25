@@ -16,5 +16,7 @@ namespace moe {
         glm::vec2 texSize{0.0f, 0.0f};
 
         ImageId textureId{NULL_IMAGE_ID};
+
+        bool isTextSprite{false};
     };
 }// namespace moe

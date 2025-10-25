@@ -15,6 +15,7 @@ layout(push_constant, scalar) uniform PCS_Transform {
     vec2 texRegionSize;
     vec2 texSize;
     uint texId;
+    uint isTextSprite;
 }
 u_pushConstants;
 
@@ -27,11 +28,16 @@ void main() {
 
     vec4 outColor;
     if (u_pushConstants.texId != INVALID_TEXTURE_ID) {
-        outColor =
-                sampleTextureLinear(
-                        u_pushConstants.texId,
-                        uv) *
-                u_pushConstants.color;
+        if (u_pushConstants.isTextSprite != 0) {
+            outColor = u_pushConstants.color;
+            outColor.a *= sampleTextureNearest(u_pushConstants.texId, uv).r;
+        } else {
+            outColor =
+                    sampleTextureNearest(
+                            u_pushConstants.texId,
+                            uv) *
+                    u_pushConstants.color;
+        }
     } else {
         outColor = u_pushConstants.color;
     }

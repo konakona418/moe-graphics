@@ -23,6 +23,11 @@ namespace moe {
             constexpr ImageT() = default;
         };
         static constexpr ImageT Image{};
+
+        struct FontT {
+            constexpr FontT() = default;
+        };
+        static constexpr FontT Font{};
     }// namespace Loader
 
     using BaseIdType = uint32_t;

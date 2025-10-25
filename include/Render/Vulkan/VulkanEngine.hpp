@@ -15,6 +15,7 @@
 #include "Render/Vulkan/VulkanCamera.hpp"
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 #include "Render/Vulkan/VulkanEngineDrivers.hpp"
+#include "Render/Vulkan/VulkanFont.hpp"
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
@@ -153,6 +154,7 @@ namespace moe {
 
             VulkanRenderTargetCache renderTargetCache{};
             VulkanRenderViewCache renderViewCache{};
+            VulkanFontCache fontCache{};
         } m_caches;
 
         struct {

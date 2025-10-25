@@ -1,7 +1,9 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
+#include "Render/Vulkan/VulkanFont.hpp"
 #include "imgui.h"
 
 #include <iostream>
+
 
 #include <Jolt/Jolt.h>
 
@@ -255,6 +257,31 @@ int main() {
 
     moe::VulkanEngine engine;
     engine.init();
+
+    auto zhcnGlyphRangeGenerator = []() -> moe::String {
+        std::basic_stringstream<char32_t> ss;
+        for (char32_t c = 0x0000; c <= 0x007F; ++c) {
+            if (!std::isprint(static_cast<char>(c))) {
+                continue;
+            }
+            ss << c;
+        }
+        for (char32_t c = 0x4E00; c <= 0x9FFF; ++c) {
+            ss << c;
+        }
+        for (char32_t c = 0x3000; c <= 0x303F; ++c) {
+            ss << c;
+        }
+        for (char32_t c = 0xFF00; c <= 0xFFEF; ++c) {
+            ss << c;
+        }
+        return utf8::utf32to8(ss.str());
+    };
+    moe::String zhcnGlyphRange = zhcnGlyphRangeGenerator();
+
+    moe::FontId defaultFontId = engine.getResourceLoader().load("fonts/NotoSansSC-Regular.ttf", 24.0f, moe::StringView(zhcnGlyphRange), moe::Loader::Font);
+    auto font = engine.m_caches.fontCache.get(defaultFontId).value();
+
     auto& camera = engine.getDefaultCamera();
     auto& spriteCamera = engine.getDefaultSpriteCamera();
     auto& illuminationBus = engine.getBus<moe::VulkanIlluminationBus>();
@@ -293,6 +320,8 @@ int main() {
     auto sphere = loader.load("phy/sphere/sphere.gltf", moe::Loader::Gltf);
 
     auto spriteImageId = loader.load("test_sprite.jpg", moe::Loader::Image);
+    glm::vec2 spriteTexOffset(0.0f, 0.0f);
+    moe::String text;
 
     moe::Logger::debug("Starting main loop");
     while (running) {
@@ -374,6 +403,14 @@ int main() {
                 ImGui::SliderFloat("UI Camera Pos Y", &spriteCamera.position.y, -1000.0f, 1000.0f);
                 ImGui::SliderFloat("UI Camera Zoom", &spriteCamera.zoom, 0.1f, 10.0f);
 
+                ImGui::SliderFloat("Sprite Tex Offset X", &spriteTexOffset.x, -640.0f, 1920.0f - 640.0f);
+                ImGui::SliderFloat("Sprite Tex Offset Y", &spriteTexOffset.y, -360.0f, 1080.0f - 360.0f);
+
+                char textBuffer[256];
+                std::strncpy(textBuffer, text.c_str(), sizeof(textBuffer));
+                ImGui::InputText("Text Input", textBuffer, sizeof(textBuffer));
+                text = moe::String(textBuffer);
+
                 ImGui::Separator();
                 ImGui::Text("Physics Debug");
                 ImGui::Button("Generate a sphere", ImVec2(150, 0));
@@ -447,12 +484,22 @@ int main() {
 
         {
             renderBus.submitSpriteRender(
+                    font->getFontImageId(),
+                    moe::Transform{},
+                    moe::Colors::White,
+                    glm::vec2(4000.0f, 4000.0f),
+                    glm::vec2(0.0f, 0.0f),
+                    glm::vec2(4000.0f, 4000.0f));
+
+            renderBus.submitSpriteRender(
                     spriteImageId,
                     moe::Transform{},
                     moe::Colors::White,
                     glm::vec2(640.0f, 360.0f),
-                    glm::vec2(0.0f, 0.0f),
+                    spriteTexOffset,
                     glm::vec2(1920.0f, 1080.0f));
+
+            renderBus.submitTextSpriteRender(defaultFontId, text, moe::Transform{}, moe::Colors::Blue);
         }
 
         illuminationBus.setAmbient(glm::vec3(1.f, 1.f, 1.f), 0.2f);

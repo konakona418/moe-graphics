@@ -13,6 +13,7 @@ layout(push_constant, scalar) uniform PCS_Transform {
     vec2 texRegionSize;
     vec2 texSize;
     uint texId;
+    uint isTextSprite;
 }
 u_pushConstants;
 

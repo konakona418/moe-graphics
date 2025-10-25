@@ -38,6 +38,7 @@ namespace moe {
         }
 
         m_engine = &engine;
+        m_fontSize = fontSize;
 
         FT_Library ft;
         if (FT_Init_FreeType(&ft)) {
@@ -82,18 +83,27 @@ namespace moe {
             }
 
             auto& charInfo = m_characters[c];
-            fontImageBuffer.addGlyph(
+            bool result = fontImageBuffer.addGlyph(
                     face->glyph->bitmap.buffer,
                     face->glyph->bitmap.width,
                     face->glyph->bitmap.rows,
                     &charInfo.uvOffset.x,
                     &charInfo.uvOffset.y);
+            if (!result) {
+                Logger::warn("Failed to add Glyph {} to font image buffer", static_cast<uint32_t>(c));
+                continue;
+            }
 
-            Logger::debug(
+            charInfo.pxOffset = {
+                    charInfo.uvOffset.x * fontImageBuffer.widthInPixels + CELL_PADDING,
+                    charInfo.uvOffset.y * fontImageBuffer.heightInPixels + CELL_PADDING,
+            };
+
+            /*Logger::debug(
                     "Loaded glyph '{}' : uv offset ({}, {}), px offset ({}, {})",
                     static_cast<uint32_t>(c),
                     charInfo.uvOffset.x, charInfo.uvOffset.y,
-                    charInfo.uvOffset.x * fontImageBuffer.widthInPixels, charInfo.uvOffset.y * fontImageBuffer.heightInPixels);
+                    charInfo.pxOffset.x, charInfo.pxOffset.y);*/
 
             charInfo.size = glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows);
             charInfo.bearing = glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top);
@@ -114,6 +124,11 @@ namespace moe {
 
         FT_Done_Face(face);
         FT_Done_FreeType(ft);
+
+        Logger::debug(
+                "Initialized font with {} glyphs, atlas size: {}x{}",
+                m_characters.size(),
+                fontImageBuffer.widthInPixels, fontImageBuffer.heightInPixels);
     }
 
     void VulkanFont::destroy() {

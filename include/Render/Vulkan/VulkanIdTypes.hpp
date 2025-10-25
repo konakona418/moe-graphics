@@ -6,12 +6,14 @@ namespace moe {
     using MeshId = BaseIdType;
     using SceneResourceInternalId = BaseIdType;
     using JointId = BaseIdType;
+    using FontId = BaseIdType;
 
     constexpr MaterialId NULL_MATERIAL_ID = std::numeric_limits<MaterialId>::max();
     constexpr MeshId NULL_MESH_ID = std::numeric_limits<MeshId>::max();
     constexpr SceneResourceInternalId NULL_SCENE_RESOURCE_INTERNAL_ID = std::numeric_limits<SceneResourceInternalId>::max();
     constexpr JointId NULL_JOINT_ID = std::numeric_limits<JointId>::max();
     constexpr JointId ROOT_JOINT_ID = 0;
+    constexpr FontId NULL_FONT_ID = std::numeric_limits<FontId>::max();
 
     namespace VkLoaders {
         namespace GLTF {

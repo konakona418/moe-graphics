@@ -908,6 +908,8 @@ namespace moe {
 
         // ! sprites
 
+        // ! fixme: the sprite layer should not use fxaa
+
         // barrier prev write
         VkUtils::transitionImage(
                 commandBuffer,

@@ -17,6 +17,8 @@ namespace moe {
 
         ImageId load(StringView path, Loader::ImageT);
 
+        FontId load(StringView path, float fontSize, StringView glyphRange, Loader::FontT);
+
         void init(VulkanEngine& engine) {
             m_engine = &engine;
         }
@@ -130,7 +132,14 @@ namespace moe {
                 const Color& color,
                 const glm::vec2& size,
                 const glm::vec2& texOffset = glm::vec2(0.0f, 0.0f),
-                const glm::vec2& texSize = glm::vec2(0.0f, 0.0f));
+                const glm::vec2& texSize = glm::vec2(0.0f, 0.0f),
+                bool isTextSprite = false);
+
+        VulkanRenderObjectBus& submitTextSpriteRender(
+                FontId fontId,
+                StringView text,
+                const Transform& transform,
+                const Color& color);
 
         ComputeSkinHandleId submitComputeSkin(ComputeSkinCommand command) {
             MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");

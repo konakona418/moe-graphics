@@ -1,6 +1,8 @@
 #include "Render/Vulkan/VulkanEngineDrivers.hpp"
 #include "Render/Vulkan/VulkanEngine.hpp"
 
+#include <fstream>
+
 namespace moe {
     constexpr uint32_t BUS_LIGHT_WARNING_LIMIT = 128;
 
@@ -15,6 +17,27 @@ namespace moe {
                 path,
                 VK_FORMAT_R8G8B8A8_UNORM,
                 VK_IMAGE_USAGE_SAMPLED_BIT);
+    }
+
+    FontId VulkanLoader::load(StringView path, float fontSize, StringView glyphRange, Loader::FontT) {
+        MOE_ASSERT(m_engine, "VulkanLoader not initialized");
+        std::fstream fontFile(path.data(), std::ios::in | std::ios::binary);
+        if (!fontFile.is_open()) {
+            moe::Logger::error("Failed to open font file: {}", path);
+            return NULL_FONT_ID;
+        }
+        fontFile.seekg(0, std::ios::end);
+        size_t fileSize = static_cast<size_t>(fontFile.tellg());
+
+        std::vector<uint8_t> fontData(fileSize);
+        fontFile.seekg(0, std::ios::beg);
+        fontFile.read(reinterpret_cast<char*>(fontData.data()), fileSize);
+        fontFile.close();
+
+        VulkanFont font;
+        font.init(*m_engine, fontData, fontSize, glyphRange);
+
+        return m_engine->m_caches.fontCache.load(std::move(font)).first;
     }
 
     void VulkanIlluminationBus::init(VulkanEngine& engine) {
@@ -91,7 +114,8 @@ namespace moe {
             const Color& color,
             const glm::vec2& size,
             const glm::vec2& texOffset,
-            const glm::vec2& texSize) {
+            const glm::vec2& texSize,
+            bool isTextSprite) {
         MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
         if (m_spriteRenderCommands.size() >= MAX_SPRITE_RENDER_COMMANDS) {
             Logger::warn("Render object bus reached max sprite render commands(10240), check if dynamic state is reset properly; exceeding commands will be ignored");
@@ -111,7 +135,66 @@ namespace moe {
                 .texOffset = texOffset,
                 .texSize = realTexSize,
                 .textureId = imageId,
+                .isTextSprite = isTextSprite,
         });
+
+        return *this;
+    }
+
+    VulkanRenderObjectBus& VulkanRenderObjectBus::submitTextSpriteRender(
+            FontId fontId,
+            StringView text,
+            const Transform& transform,
+            const Color& color) {
+        MOE_ASSERT(m_initialized, "VulkanRenderObjectBus not initialized");
+        if (m_spriteRenderCommands.size() >= MAX_RENDER_COMMANDS) {
+            Logger::warn("Render object bus reached max sprite render commands(10240), check if dynamic state is reset properly; exceeding commands will be ignored");
+            return *this;
+        }
+
+        auto font = m_engine->m_caches.fontCache.get(fontId);
+        if (!font.has_value()) {
+            Logger::warn("Font with id {} not found in cache, text sprite render ignored", fontId);
+            return *this;
+        }
+
+        auto* fontRef = font->get();
+        auto advanceTransform = transform;
+
+        std::u32string text32 = utf8::utf8to32(text);
+        for (size_t i = 0; i < text32.size(); ++i) {
+            char32_t c = text32[i];
+            const auto& glyphIt = fontRef->getCharacters().find(c);
+            if (glyphIt == fontRef->getCharacters().end()) {
+                Logger::warn("Glyph with codepoint {} not found in font id {}, skipping character", static_cast<uint32_t>(c), fontId);
+                continue;
+            }
+            const auto& glyph = glyphIt->second;
+
+            glm::vec2 glyphPosOffset = glm::vec2(
+                    glyph.bearing.x,
+                    -glyph.bearing.y + fontRef->getFontSize());
+
+            glm::vec2 glyphSize = glyph.size;
+            glm::vec2 texOffset = glyph.pxOffset;
+
+            glm::vec2 texSize = glyph.size;
+
+            Transform glyphTransform = advanceTransform;
+            glyphTransform.setPosition(glyphTransform.getPosition() + glm::vec3(glyphPosOffset, 0.0f));
+
+            submitSpriteRender(
+                    fontRef->getFontImageId(),
+                    glyphTransform,
+                    color,
+                    glyphSize,
+                    texOffset,
+                    texSize,
+                    true);
+
+            // ! the (glyph.advance >> 6) converts from 1/64 pixels (the unit of measurement in FreeType) to pixels
+            advanceTransform.setPosition(advanceTransform.getPosition() + glm::vec3((glyph.advance >> 6), 0.0f, 0.0f));
+        }
 
         return *this;
     }

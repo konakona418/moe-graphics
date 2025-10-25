@@ -41,6 +41,7 @@ namespace moe {
                 glm::vec2 texRegionSize;
                 glm::vec2 textureSize;
                 uint32_t textureId;
+                uint32_t isTextSprite;
             };
 
             VulkanEngine* m_engine{nullptr};

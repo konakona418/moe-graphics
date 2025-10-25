@@ -13,9 +13,17 @@ namespace moe {
             return *this;
         }
 
+        glm::vec3 getPosition() const {
+            return position;
+        }
+
         Transform& setRotation(glm::mat4 rot) {
             rotation = rot;
             return *this;
+        }
+
+        glm::mat4 getRotation() const {
+            return rotation;
         }
 
         Transform& setRotation(glm::quat rot) {
@@ -26,6 +34,10 @@ namespace moe {
         Transform& setRotation(glm::vec3 axis, float angleRad) {
             rotation = glm::rotate(glm::mat4(1.0f), angleRad, axis);
             return *this;
+        }
+
+        glm::vec3 getScale() const {
+            return scale;
         }
 
         Transform& setScale(glm::vec3 scale) {
