@@ -280,7 +280,7 @@ int main() {
     moe::String zhcnGlyphRange = zhcnGlyphRangeGenerator();
 
     moe::FontId defaultFontId = engine.getResourceLoader().load("fonts/NotoSansSC-Regular.ttf", 24.0f, moe::StringView(zhcnGlyphRange), moe::Loader::Font);
-    auto font = engine.m_caches.fontCache.get(defaultFontId).value();
+    auto* font = engine.m_caches.fontCache.getRaw(defaultFontId).value();
 
     auto& camera = engine.getDefaultCamera();
     auto& spriteCamera = engine.getDefaultSpriteCamera();
@@ -399,8 +399,8 @@ int main() {
 
                 ImGui::Separator();
                 ImGui::Text("UI Camera");
-                ImGui::SliderFloat("UI Camera Pos X", &spriteCamera.position.x, -1000.0f, 1000.0f);
-                ImGui::SliderFloat("UI Camera Pos Y", &spriteCamera.position.y, -1000.0f, 1000.0f);
+                ImGui::SliderFloat("UI Camera Pos X", &spriteCamera.position.x, -5000.0f, 5000.0f);
+                ImGui::SliderFloat("UI Camera Pos Y", &spriteCamera.position.y, -5000.0f, 5000.0f);
                 ImGui::SliderFloat("UI Camera Zoom", &spriteCamera.zoom, 0.1f, 10.0f);
 
                 ImGui::SliderFloat("Sprite Tex Offset X", &spriteTexOffset.x, -640.0f, 1920.0f - 640.0f);
@@ -487,9 +487,9 @@ int main() {
                     font->getFontImageId(),
                     moe::Transform{},
                     moe::Colors::White,
-                    glm::vec2(4000.0f, 4000.0f),
+                    glm::vec2(3822.0f, 3769.0f),
                     glm::vec2(0.0f, 0.0f),
-                    glm::vec2(4000.0f, 4000.0f));
+                    glm::vec2(3822.0f, 3769.f));
 
             renderBus.submitSpriteRender(
                     spriteImageId,
@@ -499,7 +499,11 @@ int main() {
                     spriteTexOffset,
                     glm::vec2(1920.0f, 1080.0f));
 
-            renderBus.submitTextSpriteRender(defaultFontId, text, moe::Transform{}, moe::Colors::Blue);
+            renderBus.submitTextSpriteRender(
+                    defaultFontId,
+                    text,
+                    moe::Transform{},
+                    moe::Colors::Blue);
         }
 
         illuminationBus.setAmbient(glm::vec3(1.f, 1.f, 1.f), 0.2f);

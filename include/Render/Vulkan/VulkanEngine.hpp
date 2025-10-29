@@ -197,7 +197,7 @@ namespace moe {
 
         void setFxaaEnabled(bool enabled) { m_enableFxaa = enabled; }
 
-        void immediateSubmit(Function<void(VkCommandBuffer)>&& fn);
+        void immediateSubmit(Function<void(VkCommandBuffer)>&& fn, Function<void()>&& postFn = nullptr);
 
         VulkanAllocatedBuffer allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 

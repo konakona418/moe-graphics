@@ -159,6 +159,10 @@ namespace moe {
         }
 
         auto* fontRef = font->get();
+
+        // lazy load pending characters from last frame
+        fontRef->lazyLoadCharacters();
+
         auto advanceTransform = transform;
 
         std::u32string text32 = utf8::utf8to32(text);
@@ -166,7 +170,7 @@ namespace moe {
             char32_t c = text32[i];
             const auto& glyphIt = fontRef->getCharacters().find(c);
             if (glyphIt == fontRef->getCharacters().end()) {
-                Logger::warn("Glyph with codepoint {} not found in font id {}, skipping character", static_cast<uint32_t>(c), fontId);
+                fontRef->addCharToLazyLoadQueue(c);
                 continue;
             }
             const auto& glyph = glyphIt->second;

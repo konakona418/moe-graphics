@@ -174,7 +174,7 @@ namespace moe {
         draw();
     }
 
-    void VulkanEngine::immediateSubmit(Function<void(VkCommandBuffer)>&& fn) {
+    void VulkanEngine::immediateSubmit(Function<void(VkCommandBuffer)>&& fn, Function<void()>&& postFn) {
         MOE_VK_CHECK(vkResetFences(m_device, 1, &m_immediateModeFence));
         MOE_VK_CHECK(vkResetCommandBuffer(m_immediateModeCommandBuffer, 0));
 
@@ -193,6 +193,10 @@ namespace moe {
         MOE_VK_CHECK(vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, m_immediateModeFence));
 
         MOE_VK_CHECK(vkWaitForFences(m_device, 1, &m_immediateModeFence, VK_TRUE, UINT64_MAX));
+
+        if (postFn) {
+            postFn();
+        }
     }
 
     VulkanAllocatedBuffer VulkanEngine::allocateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) {
@@ -1500,6 +1504,8 @@ namespace moe {
             m_caches.materialCache.destroy();
             m_caches.meshCache.destroy();
             m_caches.imageCache.destroy();
+
+            m_caches.fontCache.destroy();
         });
     }
 

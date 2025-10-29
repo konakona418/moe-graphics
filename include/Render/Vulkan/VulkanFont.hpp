@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/ResourceCache.hpp"
+#include "Render/VUlkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanIdTypes.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
@@ -21,8 +22,6 @@ namespace moe {
             uint32_t advance;
         };
 
-        VulkanFont() = default;
-
         void init(VulkanEngine& engine, Span<uint8_t> fontData, float fontSize, StringView glyphRanges);
 
         void destroy();
@@ -30,12 +29,17 @@ namespace moe {
         UnorderedMap<char32_t, Character>& getCharacters() { return m_characters; }
         ImageId getFontImageId() const { return m_fontImageId; }
         float getFontSize() const { return m_fontSize; }
+        bool lazyLoadCharacters();
+        void addCharToLazyLoadQueue(char32_t c) {
+            m_pendingLazyLoadGlyphs << c;
+        }
 
     private:
         static constexpr int32_t CELL_PADDING = 1;
 
         struct FontImageBuffer {
             uint8_t* pixels{nullptr};
+            bool manualCleanup{false};
 
             int widthInPixels{0};
             int heightInPixels{0};
@@ -102,11 +106,63 @@ namespace moe {
                 return true;
             }
 
+            struct CopyRange {
+                size_t size;
+                size_t offset;
+            };
+
+            CopyRange getCopyRange(int lastGlyphIndex) const {
+                size_t lastRowBeginPx = std::floor(lastGlyphIndex / (float) glyphPerRow) * glyphCellSize;
+                size_t currentRowEndPx = std::ceil(currentGlyphCount / (float) glyphPerRow) * glyphCellSize;
+
+                size_t offset = lastRowBeginPx * widthInPixels;
+                size_t size = (currentRowEndPx - lastRowBeginPx) * widthInPixels;
+                return {size, offset};
+            }
+
+            uint8_t* leak() {
+                manualCleanup = true;
+                return pixels;
+            }
+
+            size_t sizeInBytes() const {
+                return static_cast<size_t>(widthInPixels) * static_cast<size_t>(heightInPixels);
+            }
+
+            size_t usedSizeInBytes() const {
+                return static_cast<size_t>(currentGlyphCount) * static_cast<size_t>(glyphCellSize) * static_cast<size_t>(glyphCellSize);
+            }
+
+            size_t getGlyphBeginDataOffset(int glyphIndex) const {
+                int row = glyphIndex / glyphPerRow;
+                int col = glyphIndex % glyphPerRow;
+
+                size_t offsetX = col * glyphCellSize;
+                size_t offsetY = row * glyphCellSize;
+
+                return offsetY * widthInPixels + offsetX;
+            }
+
+            Pair<size_t, size_t> getGlyphOffset(int glyphIndex) const {
+                int row = glyphIndex / glyphPerRow;
+                int col = glyphIndex % glyphPerRow;
+
+                size_t offsetX = col * glyphCellSize;
+                size_t offsetY = row * glyphCellSize;
+
+                return {offsetX, offsetY};
+            }
+
             ~FontImageBuffer() {
-                if (pixels) {
-                    delete[] pixels;
-                    pixels = nullptr;
+                if (manualCleanup) {
+                    return;
                 }
+                if (!pixels) {
+                    return;
+                }
+
+                delete[] pixels;
+                pixels = nullptr;
             }
         };
 
@@ -116,8 +172,17 @@ namespace moe {
 
         float m_fontSize{0.0f};
 
+        VulkanSwapBuffer m_fontImageBuffer;
+        UniquePtr<FontImageBuffer> m_fontImageBufferCPU;
+
+        uint8_t* m_fontData{nullptr};
+        size_t m_fontDataSize{0};
+
         UnorderedMap<char32_t, Character> m_characters;
         ImageId m_fontImageId{NULL_IMAGE_ID};
+        std::basic_stringstream<char32_t> m_pendingLazyLoadGlyphs;
+
+        bool loadFontInternal(std::u32string_view glyphRanges32);
     };
 
     struct VulkanFontLoader {
@@ -132,5 +197,14 @@ namespace moe {
         }
     };
 
-    struct VulkanFontCache : public ResourceCache<FontId, VulkanFont, VulkanFontLoader> {};
+    struct VulkanFontDeleter {
+        void operator()(VulkanFont* font) {
+            if (font) {
+                font->destroy();
+                delete font;
+            }
+        }
+    };
+
+    struct VulkanFontCache : public ResourceCache<FontId, VulkanFont, VulkanFontLoader, VulkanFontDeleter> {};
 }// namespace moe

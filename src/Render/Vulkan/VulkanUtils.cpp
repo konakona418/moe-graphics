@@ -93,6 +93,70 @@ namespace moe {
             vkCmdBlitImage2(cmdBuffer, &blitInfo);
         }
 
+        void copyFromBufferToImage(VkCommandBuffer cmdBuffer, VkBuffer srcBuffer, VkImage dstImage, VkExtent3D imageExtent, bool mipmap) {
+            VkUtils::transitionImage(
+                    cmdBuffer, dstImage,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            VkBufferImageCopy copyRegion{};
+            copyRegion.bufferOffset = 0;
+            copyRegion.bufferRowLength = 0;
+            copyRegion.bufferImageHeight = 0;
+
+            copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyRegion.imageSubresource.mipLevel = 0;
+            copyRegion.imageSubresource.baseArrayLayer = 0;
+            copyRegion.imageSubresource.layerCount = 1;
+            copyRegion.imageExtent = imageExtent;
+
+            vkCmdCopyBufferToImage(
+                    cmdBuffer,
+                    srcBuffer,
+                    dstImage,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1,
+                    &copyRegion);
+            if (mipmap) {
+                VkUtils::generateMipmaps(cmdBuffer, dstImage, VkExtent2D{imageExtent.width, imageExtent.height});
+            } else {
+                VkUtils::transitionImage(
+                        cmdBuffer, dstImage,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+        }
+
+        void copyFromBufferToImage(VkCommandBuffer cmdBuffer, VkBuffer srcBuffer, VkImage dstImage, VkExtent3D imageExtent, VkOffset3D imageOffset, size_t bufferOffset, size_t bufferRowLength, size_t bufferImageHeight) {
+            VkUtils::transitionImage(
+                    cmdBuffer, dstImage,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            VkBufferImageCopy copyRegion{};
+            copyRegion.bufferOffset = bufferOffset;
+            copyRegion.bufferRowLength = static_cast<uint32_t>(bufferRowLength);
+            copyRegion.bufferImageHeight = static_cast<uint32_t>(bufferImageHeight);
+
+            copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyRegion.imageSubresource.mipLevel = 0;
+            copyRegion.imageSubresource.baseArrayLayer = 0;
+            copyRegion.imageSubresource.layerCount = 1;
+            copyRegion.imageExtent = imageExtent;
+            copyRegion.imageOffset = imageOffset;
+
+            vkCmdCopyBufferToImage(
+                    cmdBuffer,
+                    srcBuffer,
+                    dstImage,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1,
+                    &copyRegion);
+
+            VkUtils::transitionImage(
+                    cmdBuffer, dstImage,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+
         void resolveImage(VkCommandBuffer cmdBuffer, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize) {
             VkImageResolve2 resolveRgn{};
             resolveRgn.sType = VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2;
