@@ -24,7 +24,7 @@ struct Light {
     uint available; // 4
 };
 
-layout(buffer_reference, std430) readonly buffer LightBuffer {
+layout(buffer_reference, scalar) readonly buffer LightBuffer {
     Light lights[];
 };
 

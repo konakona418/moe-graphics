@@ -15,7 +15,7 @@ struct Material {
     uint emissiveImageIndex;
 };
 
-layout(buffer_reference, std430) readonly buffer MaterialBuffer {
+layout(buffer_reference, scalar) readonly buffer MaterialBuffer {
     Material materials[];
 };
 
