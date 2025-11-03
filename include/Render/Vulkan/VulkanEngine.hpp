@@ -47,12 +47,15 @@ namespace moe {
         VkCommandBuffer mainCommandBuffer;
 
         VkSemaphore imageAvailableSemaphore;
-        VkSemaphore renderFinishedSemaphore;
 
         VkFence inFlightFence;
 
         DeletionQueue deletionQueue;
         VulkanDescriptorAllocatorDynamic descriptorAllocator;
+    };
+
+    struct PerSwapchainImageData {
+        VkSemaphore renderFinishedSemaphore;
     };
 
     constexpr uint32_t FRAMES_IN_FLIGHT = Constants::FRAMES_IN_FLIGHT;
@@ -96,8 +99,10 @@ namespace moe {
         Vector<VkImage> m_swapchainImages;
         Vector<VkImageView> m_swapchainImageViews;
         VkExtent2D m_swapchainExtent;
+        uint32_t m_swapchainImageCount;
 
         Array<FrameData, FRAMES_IN_FLIGHT> m_frames;
+        Vector<PerSwapchainImageData> m_perSwapchainImageData;
 
         VkQueue m_graphicsQueue;
         uint32_t m_graphicsQueueFamilyIndex;

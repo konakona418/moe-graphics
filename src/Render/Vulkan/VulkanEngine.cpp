@@ -1040,7 +1040,7 @@ namespace moe {
                         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR);
         VkSemaphoreSubmitInfo signalInfo =
                 VkInit::semaphoreSubmitInfo(
-                        currentFrame.renderFinishedSemaphore,
+                        m_perSwapchainImageData[swapchainImageIndex].renderFinishedSemaphore,
                         VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
 
         VkSubmitInfo2 submitInfo2 = VkInit::submitInfo(&submitInfo, &waitInfo, &signalInfo);
@@ -1053,7 +1053,7 @@ namespace moe {
         presentInfo.pSwapchains = &m_swapchain;
         presentInfo.swapchainCount = 1;
 
-        presentInfo.pWaitSemaphores = &currentFrame.renderFinishedSemaphore;
+        presentInfo.pWaitSemaphores = &m_perSwapchainImageData[swapchainImageIndex].renderFinishedSemaphore;
         presentInfo.waitSemaphoreCount = 1;
 
         presentInfo.pImageIndices = &swapchainImageIndex;
@@ -1087,10 +1087,14 @@ namespace moe {
                 vkDestroyCommandPool(m_device, frame.commandPool, nullptr);
 
                 vkDestroySemaphore(m_device, frame.imageAvailableSemaphore, nullptr);
-                vkDestroySemaphore(m_device, frame.renderFinishedSemaphore, nullptr);
+                // vkDestroySemaphore(m_device, frame.renderFinishedSemaphore, nullptr);
                 vkDestroyFence(m_device, frame.inFlightFence, nullptr);
 
                 frame.deletionQueue.flush();
+            }
+
+            for (auto& data: m_perSwapchainImageData) {
+                vkDestroySemaphore(m_device, data.renderFinishedSemaphore, nullptr);
             }
 
             m_mainDeletionQueue.flush();
@@ -1422,6 +1426,7 @@ namespace moe {
         m_swapchainExtent = vkbSwapchain.extent;
         m_swapchainImages = vkbSwapchain.get_images().value();
         m_swapchainImageViews = vkbSwapchain.get_image_views().value();
+        m_swapchainImageCount = static_cast<uint32_t>(m_swapchainImages.size());
     }
 
     void VulkanEngine::destroySwapchain() {
@@ -1483,9 +1488,12 @@ namespace moe {
             MOE_VK_CHECK_MSG(
                     vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_frames[i].imageAvailableSemaphore),
                     "Failed to create semaphore");
+        }
 
+        m_perSwapchainImageData.resize(m_swapchainImageCount);
+        for (int i = 0; i < m_swapchainImageCount; ++i) {
             MOE_VK_CHECK_MSG(
-                    vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_frames[i].renderFinishedSemaphore),
+                    vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_perSwapchainImageData[i].renderFinishedSemaphore),
                     "Failed to create semaphore");
         }
 
