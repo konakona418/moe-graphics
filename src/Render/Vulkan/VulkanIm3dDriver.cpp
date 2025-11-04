@@ -202,10 +202,9 @@ namespace moe {
             return;
         }
 
-        auto drawList = Im3d::GetDrawLists();
-        MOE_ASSERT(drawList->m_vertexCount <= MAX_VERTEX_COUNT, "Im3d vertex count exceeds MAX_VERTEX_COUNT");
+        uploadVertices(cmdBuffer);
 
-        // todo
+        // todo: begin rendering
     }
 
     void VulkanIm3dDriver::destroy() {
@@ -224,5 +223,32 @@ namespace moe {
 
         m_engine = nullptr;
         m_initialized = false;
+    }
+
+    void VulkanIm3dDriver::uploadVertices(VkCommandBuffer cmdBuffer) {
+        size_t currentFrameIndex = m_engine->getCurrentFrameIndex();
+
+        size_t vertexCountAccum = 0;
+        auto drawList = Im3d::GetDrawLists();
+
+        Vector<VulkanSwapBuffer::UploadInfo> uploads;
+        uploads.reserve(Im3d::GetDrawListCount());
+        for (size_t i = 0; i < Im3d::GetDrawListCount(); i++) {
+            auto& dl = drawList[i];
+            if (vertexCountAccum + dl.m_vertexCount > MAX_VERTEX_COUNT) {
+                Logger::warn("Im3d vertex count exceeds MAX_VERTEX_COUNT({}), exceeding vertices will be clamped", MAX_VERTEX_COUNT);
+                break;
+            }
+
+            uploads.push_back({
+                    .data = (void*) dl.m_vertexData,
+                    .size = dl.m_vertexCount * sizeof(Vertex),
+                    .offset = vertexCountAccum * sizeof(Vertex),
+            });
+
+            vertexCountAccum += dl.m_vertexCount;
+        }
+
+        m_vertexBuffer.uploadMany(cmdBuffer, uploads, currentFrameIndex);
     }
 }// namespace moe

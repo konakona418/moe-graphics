@@ -40,31 +40,14 @@ namespace moe {
         m_initialized = false;
     }
 
-    void VulkanSwapBuffer::upload(VkCommandBuffer cmdBuffer, void* data, size_t swapIndex, size_t size, size_t offset) {
+    void VulkanSwapBuffer::upload(VkCommandBuffer cmdBuffer, void* data, size_t swapIndex, size_t size, size_t offset, bool sync) {
         MOE_ASSERT(m_initialized, "VulkanSwapBuffer not initialized");
         MOE_ASSERT(swapIndex < m_swapCount, "Swap index out of range");
         MOE_ASSERT(size + offset <= m_bufferSize, "Upload size exceeds buffer size");
 
-        {
-            auto barrier = VkBufferMemoryBarrier2{
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-                    .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT,
-                    .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                    .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-                    .buffer = m_buffer.buffer,
-                    .offset = 0,
-                    .size = VK_WHOLE_SIZE,
-            };
-
-            auto dependency = VkDependencyInfo{
-                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                    .bufferMemoryBarrierCount = 1,
-                    .pBufferMemoryBarriers = &barrier,
-            };
-
-            vkCmdPipelineBarrier2(cmdBuffer, &dependency);
+        if (sync) {
             // sync with last read
+            syncBefore(cmdBuffer);
         }
 
         auto& stagingBuffer = m_stagingBuffers[swapIndex];
@@ -87,27 +70,63 @@ namespace moe {
 
         vkCmdCopyBuffer2(cmdBuffer, &copyInfo);
 
-        {
-            auto barrier = VkBufferMemoryBarrier2{
-                    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-                    .srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
-                    .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-                    .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-                    .buffer = m_buffer.buffer,
-                    .offset = 0,
-                    .size = VK_WHOLE_SIZE,
-            };
-
-            auto dependency = VkDependencyInfo{
-                    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                    .bufferMemoryBarrierCount = 1,
-                    .pBufferMemoryBarriers = &barrier,
-            };
-
-            vkCmdPipelineBarrier2(cmdBuffer, &dependency);
-            // sync
+        if (sync) {
+            syncAfter(cmdBuffer);
         }
+    }
+
+    void VulkanSwapBuffer::uploadMany(VkCommandBuffer cmdBuffer, const Span<UploadInfo> uploads, size_t swapIndex) {
+        MOE_ASSERT(m_initialized, "VulkanSwapBuffer not initialized");
+        MOE_ASSERT(swapIndex < m_swapCount, "Swap index out of range");
+
+        syncBefore(cmdBuffer);
+        for (const auto& upload: uploads) {
+            MOE_ASSERT(upload.size + upload.offset <= m_bufferSize, "Upload size exceeds buffer size");
+            this->upload(cmdBuffer, upload.data, swapIndex, upload.size, upload.offset, false);
+        }
+        syncAfter(cmdBuffer);
+    }
+
+    void VulkanSwapBuffer::syncBefore(VkCommandBuffer cmdBuffer) {
+        auto barrier = VkBufferMemoryBarrier2{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .buffer = m_buffer.buffer,
+                .offset = 0,
+                .size = VK_WHOLE_SIZE,
+        };
+
+        auto dependency = VkDependencyInfo{
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .bufferMemoryBarrierCount = 1,
+                .pBufferMemoryBarriers = &barrier,
+        };
+
+        vkCmdPipelineBarrier2(cmdBuffer, &dependency);
+    }
+
+    void VulkanSwapBuffer::syncAfter(VkCommandBuffer cmdBuffer) {
+        auto barrier = VkBufferMemoryBarrier2{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+                .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+                .buffer = m_buffer.buffer,
+                .offset = 0,
+                .size = VK_WHOLE_SIZE,
+        };
+
+        auto dependency = VkDependencyInfo{
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .bufferMemoryBarrierCount = 1,
+                .pBufferMemoryBarriers = &barrier,
+        };
+
+        vkCmdPipelineBarrier2(cmdBuffer, &dependency);
     }
 
     void VulkanSwapImage::init(VulkanEngine& engine, VkImageUsageFlags usage, VkFormat format, VkExtent2D extent, size_t swapCount) {

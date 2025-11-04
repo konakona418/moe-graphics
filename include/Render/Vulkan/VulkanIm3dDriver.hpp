@@ -66,5 +66,7 @@ namespace moe {
             VkPipeline trianglePipeline;
             VkPipelineLayout trianglePipelineLayout;
         } m_pipelines;
+
+        void uploadVertices(VkCommandBuffer cmdBuffer);
     };
 }// namespace moe

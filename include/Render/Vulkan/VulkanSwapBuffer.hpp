@@ -10,6 +10,12 @@ namespace moe {
 namespace moe {
     struct VulkanSwapBuffer {
     public:
+        struct UploadInfo {
+            void* data;
+            size_t size;
+            size_t offset;
+        };
+
         VulkanSwapBuffer() = default;
         ~VulkanSwapBuffer() = default;
 
@@ -17,7 +23,13 @@ namespace moe {
 
         void destroy();
 
-        void upload(VkCommandBuffer cmdBuffer, void* data, size_t swapIndex, size_t size, size_t offset = 0);
+        void upload(VkCommandBuffer cmdBuffer, void* data, size_t swapIndex, size_t size, size_t offset = 0, bool sync = true);
+
+        void upload(VkCommandBuffer cmdBuffer, UploadInfo upload, size_t swapIndex, bool sync = true) {
+            this->upload(cmdBuffer, upload.data, swapIndex, upload.size, upload.offset, sync);
+        }
+
+        void uploadMany(VkCommandBuffer cmdBuffer, const Span<UploadInfo> uploads, size_t swapIndex);
 
         VulkanAllocatedBuffer& getBuffer() { return m_buffer; }
 
@@ -29,6 +41,10 @@ namespace moe {
 
         VulkanAllocatedBuffer m_buffer;
         Vector<VulkanAllocatedBuffer> m_stagingBuffers;
+
+        void syncBefore(VkCommandBuffer cmdBuffer);
+
+        void syncAfter(VkCommandBuffer cmdBuffer);
     };
 
     struct VulkanSwapImage {
