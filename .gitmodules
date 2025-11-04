@@ -49,3 +49,6 @@
 [submodule "vendors/harfbuzz"]
 	path = vendors/harfbuzz
 	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "vendors/im3d"]
+	path = vendors/im3d
+	url = https://github.com/john-chapman/im3d.git

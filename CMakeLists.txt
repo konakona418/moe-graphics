@@ -39,6 +39,8 @@ file(GLOB IMGUI_SOURCES
   vendors/imgui/backends/imgui_impl_glfw.*
   vendors/imgui/backends/imgui_impl_vulkan.*)
 
+file(GLOB IM3D_SOURCES vendors/im3d/im3d.cpp)
+
 file(GLOB STB_IMAGES_SOURCES 
   vendors/stb/stb_image.h
 )
@@ -67,6 +69,7 @@ target_include_directories(moe-graphics PRIVATE
   vendors/span/include
   vendors/imgui
   vendors/imgui/backends
+  vendors/im3d
   vendors/stb
 )
 
