@@ -28,6 +28,11 @@ namespace moe {
 
         VulkanPipelineBuilder& addShader(VkShaderModule vert, VkShaderModule frag);
 
+        VulkanPipelineBuilder& addShader(
+                VkShaderModule vert,
+                VkShaderModule frag,
+                VkShaderModule geom);
+
         VulkanPipelineBuilder& setInputTopology(VkPrimitiveTopology topology);
 
         VulkanPipelineBuilder& setPolygonMode(VkPolygonMode mode);

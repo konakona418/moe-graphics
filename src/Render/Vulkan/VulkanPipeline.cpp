@@ -97,6 +97,25 @@ namespace moe {
         return *this;
     }
 
+    VulkanPipelineBuilder& VulkanPipelineBuilder::addShader(
+            VkShaderModule vert,
+            VkShaderModule frag,
+            VkShaderModule geom) {
+        shaderStages.clear();
+
+        shaderStages.push_back(
+                VkInit::pipelineShaderStageCreateInfo(
+                        VK_SHADER_STAGE_VERTEX_BIT, vert));
+        shaderStages.push_back(
+                VkInit::pipelineShaderStageCreateInfo(
+                        VK_SHADER_STAGE_GEOMETRY_BIT, geom));
+        shaderStages.push_back(
+                VkInit::pipelineShaderStageCreateInfo(
+                        VK_SHADER_STAGE_FRAGMENT_BIT, frag));
+
+        return *this;
+    }
+
     VulkanPipelineBuilder& VulkanPipelineBuilder::setInputTopology(VkPrimitiveTopology topology) {
         inputAssembly.topology = topology;
         inputAssembly.primitiveRestartEnable = VK_FALSE;

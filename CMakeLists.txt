@@ -53,6 +53,7 @@ add_executable(moe-graphics
   ${MATH_SOURCES}
 
   ${IMGUI_SOURCES}
+  ${IM3D_SOURCES}
   ${STB_IMAGES_SOURCES}
 )
 

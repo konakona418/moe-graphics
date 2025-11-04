@@ -34,6 +34,8 @@ namespace moe {
 
         const float getFarZ() const { return farZ; }
 
+        const bool isOrthographic() const { return false; }
+
         void setPitch(float newPitch) {
             pitch = glm::clamp(newPitch, -PITCH_LIMIT, PITCH_LIMIT);
             updateVectors();

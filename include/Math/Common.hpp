@@ -11,3 +11,9 @@
 #include <glm/packing.hpp>
 #include <glm/trigonometric.hpp>
 #include <glm/vec4.hpp>
+
+namespace moe {
+    namespace Math {
+        constexpr glm::vec3 VK_GLOBAL_UP = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+}// namespace moe
