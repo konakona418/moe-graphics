@@ -105,10 +105,12 @@ namespace moe {
             builder.setInputTopology(info.topology)
                     .setPolygonMode(VK_POLYGON_MODE_FILL)
                     .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                    .disableBlending()
-                    .disableDepthTesting()
+                    .enableBlending()
+                    .enableDepthTesting(VK_TRUE, VK_COMPARE_OP_LESS)
                     .setColorAttachmentFormat(drawImageFormat)
+                    .setDepthFormat(depthImageFormat)
                     .disableMultisampling();
+            // no culling, enable blending, enable depth test, no msaa
 
             VkShaderModule geom = VK_NULL_HANDLE;
             if (!info.geomShaderPath.empty()) {
