@@ -16,6 +16,7 @@
 #include "Render/Vulkan/VulkanDescriptors.hpp"
 #include "Render/Vulkan/VulkanEngineDrivers.hpp"
 #include "Render/Vulkan/VulkanFont.hpp"
+#include "Render/Vulkan/VulkanIm3dDriver.hpp"
 #include "Render/Vulkan/VulkanImageCache.hpp"
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
@@ -177,6 +178,8 @@ namespace moe {
             VulkanSwapBuffer sceneDataBuffer;
         } m_pipelines;
 
+        VulkanIm3dDriver m_im3dDriver;
+
         static VulkanEngine& get();
 
         void init();
@@ -261,6 +264,8 @@ namespace moe {
         void initVulkanInstance();
 
         void initImGUI();
+
+        void initIm3d();
 
         void initSwapchain();
 

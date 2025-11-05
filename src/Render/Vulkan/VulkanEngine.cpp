@@ -57,6 +57,7 @@ namespace moe {
         initPipelines();
 
         initImGUI();
+        // initIm3d();
 
         m_isInitialized = true;
     }
@@ -1388,6 +1389,17 @@ namespace moe {
             ImGui::DestroyContext();
 
             vkDestroyDescriptorPool(m_device, imguiPool, nullptr);
+        });
+    }
+
+    void VulkanEngine::initIm3d() {
+        m_im3dDriver.init(
+                *this,
+                m_drawImageFormat,
+                m_depthImageFormat);
+
+        m_mainDeletionQueue.pushFunction([&]() {
+            m_im3dDriver.destroy();
         });
     }
 

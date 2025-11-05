@@ -204,9 +204,132 @@ namespace moe {
             return;
         }
 
+        auto& appData = Im3d::GetAppData();
+
         uploadVertices(cmdBuffer);
 
-        // todo: begin rendering
+        auto colorAttachment =
+                VkInit::renderingAttachmentInfo(
+                        targetImageView,
+                        nullptr,
+                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        auto depthAttachment =
+                VkInit::renderingAttachmentInfo(
+                        depthImageView,
+                        nullptr,
+                        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        auto renderInfo =
+                VkInit::renderingInfo(
+                        extent,
+                        &colorAttachment,
+                        &depthAttachment);
+
+        vkCmdBeginRendering(cmdBuffer, &renderInfo);
+
+        auto drawList = Im3d::GetDrawLists();
+        Im3d::DrawPrimitiveType lastPrimitive = Im3d::DrawPrimitive_Count;
+
+        size_t vertexOffset = 0;
+
+        for (size_t i = 0; i < Im3d::GetDrawListCount(); i++) {
+            auto& dl = drawList[i];
+            if (dl.m_vertexCount == 0) {
+                continue;
+            }
+
+            VkPipeline pipeline{VK_NULL_HANDLE};
+            VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
+            switch (dl.m_primType) {
+                case Im3d::DrawPrimitive_Points:
+                    pipeline = m_pipelines.pointPipeline;
+                    pipelineLayout = m_pipelines.pointPipelineLayout;
+                    break;
+                case Im3d::DrawPrimitive_Lines:
+                    pipeline = m_pipelines.linePipeline;
+                    pipelineLayout = m_pipelines.linePipelineLayout;
+                    break;
+                case Im3d::DrawPrimitive_Triangles:
+                    pipeline = m_pipelines.trianglePipeline;
+                    pipelineLayout = m_pipelines.trianglePipelineLayout;
+                    break;
+                default:
+                    MOE_ASSERT(false, "Unsupported Im3d primitive type");
+            }
+
+            if (dl.m_primType != lastPrimitive) {
+                vkCmdBindPipeline(
+                        cmdBuffer,
+                        VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipeline);
+
+                auto bindlessDescriptorSet =
+                        m_engine->getBindlessSet().getDescriptorSet();
+                vkCmdBindDescriptorSets(
+                        cmdBuffer,
+                        VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelineLayout,
+                        0, 1, &bindlessDescriptorSet,
+                        0, nullptr);
+
+                lastPrimitive = dl.m_primType;
+
+                auto viewport = VkViewport{
+                        .x = 0,
+                        .y = 0,
+                        .width = (float) extent.width,
+                        .height = (float) extent.height,
+                        .minDepth = 0.f,
+                        .maxDepth = 1.f,
+                };
+                vkCmdSetViewport(
+                        cmdBuffer,
+                        0, 1,
+                        &viewport);
+
+                auto scissor = VkRect2D{
+                        .offset = {},
+                        .extent = extent,
+                };
+                vkCmdSetScissor(
+                        cmdBuffer,
+                        0, 1,
+                        &scissor);
+            }
+
+            auto viewport = glm::vec2{
+                    appData.m_viewportSize.x,
+                    appData.m_viewportSize.y,
+            };
+
+            glm::mat4 viewProj = camera->projectionMatrix(viewport.x / viewport.y) *
+                                 camera->viewMatrix();
+
+            auto pcs = PushConstants{
+                    .vertexBufferAddr = m_vertexBuffer.getBuffer().address,
+                    .viewProjection = viewProj,
+            };
+
+            vkCmdPushConstants(
+                    cmdBuffer,
+                    pipelineLayout,
+                    VK_SHADER_STAGE_VERTEX_BIT |
+                            VK_SHADER_STAGE_FRAGMENT_BIT |
+                            VK_SHADER_STAGE_GEOMETRY_BIT,
+                    0,
+                    sizeof(PushConstants),
+                    &pcs);
+
+            vkCmdDraw(
+                    cmdBuffer,
+                    dl.m_vertexCount,
+                    1,
+                    vertexOffset,
+                    0);
+
+            vertexOffset += dl.m_vertexCount;
+        }
+
+        vkCmdEndRendering(cmdBuffer);
     }
 
     void VulkanIm3dDriver::destroy() {
