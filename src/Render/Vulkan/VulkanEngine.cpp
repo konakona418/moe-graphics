@@ -922,8 +922,8 @@ namespace moe {
         // barrier previous write
         VkUtils::transitionImage(
                 commandBuffer,
-                depthImage.image,
-                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                m_pipelines.gBufferPipeline.gDepth.image,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
         // todo: implement
@@ -934,14 +934,17 @@ namespace moe {
                 &getDefaultCamera(),
                 {});
 
+        Im3d::SetColor(Im3d::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+        Im3d::DrawSphereFilled(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
+
+        m_im3dDriver.endFrame();
+
         m_im3dDriver.render(
                 commandBuffer,
                 &getDefaultCamera(),
                 drawImage.imageView,
-                depthImage.imageView,
+                m_pipelines.gBufferPipeline.gDepth.imageView,
                 m_drawExtent);
-
-        m_im3dDriver.endFrame();
 
         // ! sprites
 

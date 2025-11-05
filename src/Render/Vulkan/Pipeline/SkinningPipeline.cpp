@@ -28,9 +28,9 @@ namespace moe {
             auto pipelineLayoutInfo = VkInit::pipelineLayoutCreateInfo(descriptorLayouts, pushRanges);
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-            m_pipeline = VulkanComputePipelineBuilder{m_pipelineLayout}
-                                 .setShader(shader)
-                                 .build(m_engine->m_device);
+            auto builder = VulkanComputePipelineBuilder{m_pipelineLayout};
+            builder.setShader(shader);
+            m_pipeline = builder.build(m_engine->m_device);
 
             vkDestroyShaderModule(engine.m_device, shader, nullptr);
 

@@ -1,7 +1,7 @@
 #include "Render/Vulkan/VulkanFont.hpp"
 #include "Render/Vulkan/VulkanEngine.hpp"
 
-#include "Render/VUlkan/VulkanUtils.hpp"
+#include "Render/Vulkan/VulkanUtils.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -16,12 +16,12 @@ namespace moe {
             return cached;
         }
 
-        std::basic_stringstream<char32_t> ss;
+        Vector<char32_t> ss;
         // ascii
         for (int i = 0; i < DEFAULT_GLYPH_CODEPOINT_RANGE; i++) {
-            ss << static_cast<char32_t>(i);
+            ss.push_back(static_cast<char32_t>(i));
         }
-        cached = ss.str();
+        cached = std::u32string(ss.begin(), ss.end());
 
         return cached;
     }
@@ -159,13 +159,13 @@ namespace moe {
     }
 
     bool VulkanFont::lazyLoadCharacters() {
-        if (m_pendingLazyLoadGlyphs.str().empty()) {
+        if (m_pendingLazyLoadGlyphs.empty()) {
             return true;
         }
 
-        Logger::debug("Lazy loading {} glyphs for font", m_pendingLazyLoadGlyphs.str().size());
-        std::u32string glyphRanges32 = m_pendingLazyLoadGlyphs.str();
-        m_pendingLazyLoadGlyphs.str(U"");
+        Logger::debug("Lazy loading {} glyphs for font", m_pendingLazyLoadGlyphs.size());
+        std::u32string glyphRanges32(m_pendingLazyLoadGlyphs.begin(), m_pendingLazyLoadGlyphs.end());
+        m_pendingLazyLoadGlyphs.clear();
 
         size_t originalGlyphCount = m_fontImageBufferCPU->currentGlyphCount;
         loadFontInternal(glyphRanges32);

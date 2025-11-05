@@ -105,14 +105,14 @@ namespace moe {
                     VkUtils::createShaderModuleFromFile(engine.m_device, info.fragShaderPath);
 
             VulkanPipelineBuilder builder{*info.outPipelineLayout};
-            builder.setInputTopology(info.topology)
-                    .setPolygonMode(VK_POLYGON_MODE_FILL)
-                    .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                    .enableBlending()
-                    .enableDepthTesting(VK_TRUE, VK_COMPARE_OP_LESS)
-                    .setColorAttachmentFormat(drawImageFormat)
-                    .setDepthFormat(depthImageFormat)
-                    .disableMultisampling();
+            builder.setInputTopology(info.topology);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            builder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.enableBlending();
+            builder.enableDepthTesting(VK_TRUE, VK_COMPARE_OP_LESS);
+            builder.setColorAttachmentFormat(drawImageFormat);
+            builder.setDepthFormat(depthImageFormat);
+            builder.disableMultisampling();
             // no culling, enable blending, enable depth test, no msaa
 
             VkShaderModule geom = VK_NULL_HANDLE;
@@ -290,7 +290,7 @@ namespace moe {
                         &viewport);
 
                 auto scissor = VkRect2D{
-                        .offset = {},
+                        .offset = {0, 0},
                         .extent = extent,
                 };
                 vkCmdSetScissor(

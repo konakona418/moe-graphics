@@ -26,27 +26,27 @@ namespace moe {
 
         VkPipeline build(VkDevice device);
 
-        VulkanPipelineBuilder& addShader(VkShaderModule vert, VkShaderModule frag);
+        void addShader(VkShaderModule vert, VkShaderModule frag);
 
-        VulkanPipelineBuilder& addShader(
+        void addShader(
                 VkShaderModule vert,
                 VkShaderModule frag,
                 VkShaderModule geom);
 
-        VulkanPipelineBuilder& setInputTopology(VkPrimitiveTopology topology);
+        void setInputTopology(VkPrimitiveTopology topology);
 
-        VulkanPipelineBuilder& setPolygonMode(VkPolygonMode mode);
+        void setPolygonMode(VkPolygonMode mode);
 
-        VulkanPipelineBuilder& setCullMode(VkCullModeFlags mode, VkFrontFace frontFace);
+        void setCullMode(VkCullModeFlags mode, VkFrontFace frontFace);
 
         // todo: multisampling
-        VulkanPipelineBuilder& disableMultisampling();
+        void disableMultisampling();
 
-        VulkanPipelineBuilder& enableMultisampling(VkSampleCountFlagBits samples);
+        void enableMultisampling(VkSampleCountFlagBits samples);
 
-        VulkanPipelineBuilder& disableBlending();
+        void disableBlending();
 
-        VulkanPipelineBuilder& enableBlending(
+        void enableBlending(
                 VkBlendFactor srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
                 VkBlendFactor dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
                 VkBlendFactor srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
@@ -56,15 +56,15 @@ namespace moe {
                         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
 
-        VulkanPipelineBuilder& setColorAttachmentFormat(VkFormat format);
+        void setColorAttachmentFormat(VkFormat format);
 
-        VulkanPipelineBuilder& addColorAttachmentFormat(VkFormat format);
+        void addColorAttachmentFormat(VkFormat format);
 
-        VulkanPipelineBuilder& setDepthFormat(VkFormat format);
+        void setDepthFormat(VkFormat format);
 
-        VulkanPipelineBuilder& disableDepthTesting();
+        void disableDepthTesting();
 
-        VulkanPipelineBuilder& enableDepthTesting(bool depthWriteEnabled, VkCompareOp compareOp);
+        void enableDepthTesting(bool depthWriteEnabled, VkCompareOp compareOp);
     };
 
     class VulkanComputePipelineBuilder {
@@ -73,7 +73,7 @@ namespace moe {
             pipelineLayout = layout;
         }
 
-        VulkanComputePipelineBuilder& setShader(VkShaderModule computeShader) {
+        void setShader(VkShaderModule computeShader) {
             shaderStage = {};
             shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             shaderStage.pNext = nullptr;
@@ -81,8 +81,6 @@ namespace moe {
             shaderStage.pName = "main";
             shaderStage.module = computeShader;
             shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-
-            return *this;
         }
 
         VkPipeline build(VkDevice device) {

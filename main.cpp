@@ -259,23 +259,23 @@ int main() {
     engine.init();
 
     auto zhcnGlyphRangeGenerator = []() -> moe::String {
-        std::basic_stringstream<char32_t> ss;
+        moe::Vector<char32_t> ss;
         for (char32_t c = 0x0000; c <= 0x007F; ++c) {
             if (!std::isprint(static_cast<char>(c))) {
                 continue;
             }
-            ss << c;
+            ss.push_back(c);
         }
         for (char32_t c = 0x4E00; c <= 0x9FFF; ++c) {
-            ss << c;
+            ss.push_back(c);
         }
         for (char32_t c = 0x3000; c <= 0x303F; ++c) {
-            ss << c;
+            ss.push_back(c);
         }
         for (char32_t c = 0xFF00; c <= 0xFFEF; ++c) {
-            ss << c;
+            ss.push_back(c);
         }
-        return utf8::utf32to8(ss.str());
+        return utf8::utf32to8(std::u32string(ss.begin(), ss.end()));
     };
     moe::String zhcnGlyphRange = zhcnGlyphRangeGenerator();
 
@@ -304,7 +304,9 @@ int main() {
 
     float elapsed = 0.0f;
 
-    /*auto sceneId = engine.loadGLTF("anim/anim.gltf");
+    auto& loader = engine.getResourceLoader();
+
+    auto sceneId = loader.load("anim/anim.gltf", moe::Loader::Gltf);
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
     auto* animatableRenderable = scene->checkedAs<moe::VulkanSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
@@ -312,9 +314,7 @@ int main() {
     auto usedAnimation = animations.begin()->second;
 
     float animationTime = 0.0f;
-    int animationIndex = 0;*/
-
-    auto& loader = engine.getResourceLoader();
+    int animationIndex = 0;
 
     auto plane = loader.load("phy/plane/plane.gltf", moe::Loader::Gltf);
     auto sphere = loader.load("phy/sphere/sphere.gltf", moe::Loader::Gltf);
@@ -424,7 +424,7 @@ int main() {
                 ImGui::SliderFloat("Plane Friction", &planeFriction, 0.0f, 1.0f);
                 ImGui::SliderFloat("Sphere Restitution", &sphereRestitution, 0.0f, 1.0f);
                 ImGui::SliderFloat("Sphere Friction", &sphereFriction, 0.0f, 1.0f);
-                /*ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
+                ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
                 if (ImGui::BeginListBox("Animation Select")) {
                     int i = 0;
                     for (auto& [name, animation]: animations) {
@@ -435,7 +435,7 @@ int main() {
                         i++;
                     }
                     ImGui::EndListBox();
-                }*/
+                }
                 ImGui::End();
             }
         });
@@ -453,13 +453,13 @@ int main() {
         moe::Transform objectTransform{};
         objectTransform.setScale(glm::vec3(1.0f));
 
-        /*auto computeHandle = renderBus.submitComputeSkin(sceneId, usedAnimation, animationTime);
+        auto computeHandle = renderBus.submitComputeSkin(sceneId, usedAnimation, animationTime);
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
                 objectTransform.setPosition(glm::vec3((i - 2) * 2.0f, 0.0f, (j - 2) * 2.0f));
                 renderBus.submitRender(sceneId, objectTransform, computeHandle);
             }
-        }*/
+        }
 
         bodyInterface.SetFriction(floorBody, planeFriction);
         renderBus.submitRender(plane, moe::Transform{});

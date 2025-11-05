@@ -84,7 +84,7 @@ namespace moe {
         return pipeline;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::addShader(VkShaderModule vert, VkShaderModule frag) {
+    void VulkanPipelineBuilder::addShader(VkShaderModule vert, VkShaderModule frag) {
         shaderStages.clear();
 
         shaderStages.push_back(
@@ -93,11 +93,9 @@ namespace moe {
         shaderStages.push_back(
                 VkInit::pipelineShaderStageCreateInfo(
                         VK_SHADER_STAGE_FRAGMENT_BIT, frag));
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::addShader(
+    void VulkanPipelineBuilder::addShader(
             VkShaderModule vert,
             VkShaderModule frag,
             VkShaderModule geom) {
@@ -112,62 +110,48 @@ namespace moe {
         shaderStages.push_back(
                 VkInit::pipelineShaderStageCreateInfo(
                         VK_SHADER_STAGE_FRAGMENT_BIT, frag));
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::setInputTopology(VkPrimitiveTopology topology) {
+    void VulkanPipelineBuilder::setInputTopology(VkPrimitiveTopology topology) {
         inputAssembly.topology = topology;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::setPolygonMode(VkPolygonMode mode) {
+    void VulkanPipelineBuilder::setPolygonMode(VkPolygonMode mode) {
         rasterizer.polygonMode = mode;
         rasterizer.lineWidth = 1.f;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::setCullMode(VkCullModeFlags mode, VkFrontFace frontFace) {
+    void VulkanPipelineBuilder::setCullMode(VkCullModeFlags mode, VkFrontFace frontFace) {
         rasterizer.cullMode = mode;
         rasterizer.frontFace = frontFace;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::disableMultisampling() {
+    void VulkanPipelineBuilder::disableMultisampling() {
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
         multisampling.minSampleShading = 1.0f;
         multisampling.pSampleMask = nullptr;
         multisampling.alphaToCoverageEnable = VK_FALSE;
         multisampling.alphaToOneEnable = VK_FALSE;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::enableMultisampling(VkSampleCountFlagBits samples) {
+    void VulkanPipelineBuilder::enableMultisampling(VkSampleCountFlagBits samples) {
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = samples;
         multisampling.minSampleShading = 1.0f;
         multisampling.pSampleMask = nullptr;
         multisampling.alphaToCoverageEnable = VK_FALSE;
         multisampling.alphaToOneEnable = VK_FALSE;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::disableBlending() {
+    void VulkanPipelineBuilder::disableBlending() {
         colorBlendAttachment.blendEnable = VK_FALSE;
         colorBlendAttachment.colorWriteMask =
                 VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-        return *this;
     }
-    VulkanPipelineBuilder& VulkanPipelineBuilder::enableBlending(
+    void VulkanPipelineBuilder::enableBlending(
             VkBlendFactor srcColorBlendFactor,
             VkBlendFactor dstColorBlendFactor,
             VkBlendFactor srcAlphaBlendFactor,
@@ -185,37 +169,29 @@ namespace moe {
         colorBlendAttachment.alphaBlendOp = blendOp;
 
         colorBlendAttachment.colorWriteMask = colorWriteMask;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::setColorAttachmentFormat(VkFormat format) {
+    void VulkanPipelineBuilder::setColorAttachmentFormat(VkFormat format) {
         colorAttachmentFormats = {format};
         rendering.colorAttachmentCount = 1;
         rendering.pColorAttachmentFormats = colorAttachmentFormats.data();
 
         colorAttachmentCount = 1;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::addColorAttachmentFormat(VkFormat format) {
+    void VulkanPipelineBuilder::addColorAttachmentFormat(VkFormat format) {
         MOE_ASSERT(colorAttachmentCount < colorAttachmentFormats.size(), "Exceeded maximum number of color attachments");
 
         colorAttachmentFormats[colorAttachmentCount++] = format;
         rendering.colorAttachmentCount = colorAttachmentCount;
         rendering.pColorAttachmentFormats = colorAttachmentFormats.data();
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::setDepthFormat(VkFormat format) {
+    void VulkanPipelineBuilder::setDepthFormat(VkFormat format) {
         rendering.depthAttachmentFormat = format;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::disableDepthTesting() {
+    void VulkanPipelineBuilder::disableDepthTesting() {
         depthStencil.depthTestEnable = VK_FALSE;
         depthStencil.depthWriteEnable = VK_FALSE;
         depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
@@ -225,11 +201,9 @@ namespace moe {
         depthStencil.back = {};
         depthStencil.minDepthBounds = 0.f;
         depthStencil.maxDepthBounds = 1.f;
-
-        return *this;
     }
 
-    VulkanPipelineBuilder& VulkanPipelineBuilder::enableDepthTesting(bool depthWriteEnabled, VkCompareOp compareOp) {
+    void VulkanPipelineBuilder::enableDepthTesting(bool depthWriteEnabled, VkCompareOp compareOp) {
         depthStencil.depthTestEnable = VK_TRUE;
         depthStencil.depthWriteEnable = depthWriteEnabled;
         depthStencil.depthCompareOp = compareOp;
@@ -239,7 +213,5 @@ namespace moe {
         depthStencil.back = {};
         depthStencil.minDepthBounds = 0.f;
         depthStencil.maxDepthBounds = 1.f;
-
-        return *this;
     }
 }// namespace moe

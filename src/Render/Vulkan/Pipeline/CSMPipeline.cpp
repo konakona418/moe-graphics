@@ -47,18 +47,19 @@ namespace moe {
                     VkInit::pipelineLayoutCreateInfo(descriptorLayouts, ranges);
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayout, nullptr, &m_pipelineLayout));
 
-            m_pipeline =
-                    VulkanPipelineBuilder(m_pipelineLayout)
-                            .addShader(vert, frag)
-                            .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                            .setPolygonMode(VK_POLYGON_MODE_FILL)
-                            // ! use front face culling for shadow map
-                            .setCullMode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                            .disableMultisampling()
-                            .disableBlending()
-                            .enableDepthTesting(true, VK_COMPARE_OP_LESS)
-                            .setDepthFormat(VK_FORMAT_D32_SFLOAT)
-                            .build(engine.m_device);
+            auto builder =
+                    VulkanPipelineBuilder(m_pipelineLayout);
+            builder.addShader(vert, frag);
+            builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            // ! use front face culling for shadow map
+            builder.setCullMode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.disableMultisampling();
+            builder.disableBlending();
+            builder.enableDepthTesting(true, VK_COMPARE_OP_LESS);
+            builder.setDepthFormat(VK_FORMAT_D32_SFLOAT);
+
+            m_pipeline = builder.build(engine.m_device);
 
             auto csmImageInfo =
                     VkInit::imageCreateInfo(

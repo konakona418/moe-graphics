@@ -40,16 +40,16 @@ namespace moe {
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
             Logger::info("Sprite rendering antialiasing is currently disabled");
-            auto builder = VulkanPipelineBuilder(m_pipelineLayout)
-                                   .addShader(vert, frag)
-                                   .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                                   .setPolygonMode(VK_POLYGON_MODE_FILL)
-                                   .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                   .enableBlending()
-                                   .setColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT)
-                                   .setDepthFormat(VK_FORMAT_D32_SFLOAT)
-                                   .disableMultisampling()
-                                   .disableDepthTesting();
+            auto builder = VulkanPipelineBuilder(m_pipelineLayout);
+            builder.addShader(vert, frag);
+            builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            builder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.enableBlending();
+            builder.setColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+            builder.setDepthFormat(VK_FORMAT_D32_SFLOAT);
+            builder.disableMultisampling();
+            builder.disableDepthTesting();
 
             m_pipeline = builder.build(engine.m_device);
 

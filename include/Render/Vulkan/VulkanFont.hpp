@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Core/ResourceCache.hpp"
-#include "Render/VUlkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanIdTypes.hpp"
+#include "Render/Vulkan/VulkanSwapBuffer.hpp"
 #include "Render/Vulkan/VulkanTypes.hpp"
 
 #include <utf8.h>
@@ -31,7 +31,7 @@ namespace moe {
         float getFontSize() const { return m_fontSize; }
         bool lazyLoadCharacters();
         void addCharToLazyLoadQueue(char32_t c) {
-            m_pendingLazyLoadGlyphs << c;
+            m_pendingLazyLoadGlyphs.push_back(c);
         }
 
     private:
@@ -180,7 +180,7 @@ namespace moe {
 
         UnorderedMap<char32_t, Character> m_characters;
         ImageId m_fontImageId{NULL_IMAGE_ID};
-        std::basic_stringstream<char32_t> m_pendingLazyLoadGlyphs;
+        Vector<char32_t> m_pendingLazyLoadGlyphs;
 
         bool loadFontInternal(std::u32string_view glyphRanges32);
     };

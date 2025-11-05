@@ -41,18 +41,18 @@ namespace moe {
 
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-            auto builder = VulkanPipelineBuilder(m_pipelineLayout)
-                                   .addShader(vert, frag)
-                                   .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                                   .setPolygonMode(VK_POLYGON_MODE_FILL)
-                                   .setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                   .disableBlending()
-                                   .enableDepthTesting(true, VK_COMPARE_OP_LESS)
-                                   .addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT)
-                                   .addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT)
-                                   .addColorAttachmentFormat(VK_FORMAT_R8G8B8A8_UNORM)
-                                   .addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT)
-                                   .setDepthFormat(VK_FORMAT_D32_SFLOAT);
+            auto builder = VulkanPipelineBuilder(m_pipelineLayout);
+            builder.addShader(vert, frag);
+            builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            builder.setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.disableBlending();
+            builder.enableDepthTesting(true, VK_COMPARE_OP_LESS);
+            builder.addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+            builder.addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+            builder.addColorAttachmentFormat(VK_FORMAT_R8G8B8A8_UNORM);
+            builder.addColorAttachmentFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+            builder.setDepthFormat(VK_FORMAT_D32_SFLOAT);
 
             if (engine.isMultisamplingEnabled()) {
                 Logger::error("Enabling multisampling in deferred rendering is of no use");

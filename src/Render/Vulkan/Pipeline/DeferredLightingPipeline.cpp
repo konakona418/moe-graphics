@@ -37,15 +37,15 @@ namespace moe {
 
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-            auto builder = VulkanPipelineBuilder(m_pipelineLayout)
-                                   .addShader(vert, frag)
-                                   .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                                   .setPolygonMode(VK_POLYGON_MODE_FILL)
-                                   .setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                   .disableBlending()
-                                   .disableDepthTesting()
-                                   .setColorAttachmentFormat(engine.m_drawImageFormat)
-                                   .disableMultisampling();
+            auto builder = VulkanPipelineBuilder(m_pipelineLayout);
+            builder.addShader(vert, frag);
+            builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            builder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.disableBlending();
+            builder.disableDepthTesting();
+            builder.setColorAttachmentFormat(engine.m_drawImageFormat);
+            builder.disableMultisampling();
 
             if (engine.isMultisamplingEnabled()) {
                 Logger::error("Enabling multisampling in deferred rendering is of no use");

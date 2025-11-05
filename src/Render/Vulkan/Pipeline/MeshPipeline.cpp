@@ -39,16 +39,17 @@ namespace moe {
 
             MOE_VK_CHECK(vkCreatePipelineLayout(engine.m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-            auto builder = VulkanPipelineBuilder(m_pipelineLayout)
-                                   .addShader(vert, frag)
-                                   .setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                                   .setPolygonMode(VK_POLYGON_MODE_FILL)
-                                   // ! no idea why counter-clockwise works here
-                                   .setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                                   .disableBlending()
-                                   .enableDepthTesting(true, VK_COMPARE_OP_LESS)
-                                   .setColorAttachmentFormat(engine.m_drawImageFormat)
-                                   .setDepthFormat(engine.m_depthImageFormat);
+            auto builder =
+                    VulkanPipelineBuilder(m_pipelineLayout);
+            builder.addShader(vert, frag);
+            builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            builder.setPolygonMode(VK_POLYGON_MODE_FILL);
+            // ! no idea why counter-clockwise works here
+            builder.setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.disableBlending();
+            builder.enableDepthTesting(true, VK_COMPARE_OP_LESS);
+            builder.setColorAttachmentFormat(engine.m_drawImageFormat);
+            builder.setDepthFormat(engine.m_depthImageFormat);
 
             if (engine.isMultisamplingEnabled()) {
                 builder.enableMultisampling(engine.m_msaaSamples);
