@@ -139,7 +139,7 @@ namespace moe {
         m_vertexBuffer.init(
                 engine,
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                MAX_VERTEX_COUNT * sizeof(Vertex),
+                MAX_VERTEX_COUNT * sizeof(Im3d::VertexData),
                 FRAMES_IN_FLIGHT);
 
         m_initialized = true;
@@ -371,8 +371,8 @@ namespace moe {
 
             uploads.push_back({
                     .data = (void*) dl.m_vertexData,
-                    .size = dl.m_vertexCount * sizeof(Vertex),
-                    .offset = vertexCountAccum * sizeof(Vertex),
+                    .size = dl.m_vertexCount * sizeof(Im3d::VertexData),
+                    .offset = vertexCountAccum * sizeof(Im3d::VertexData),
             });
 
             vertexCountAccum += dl.m_vertexCount;
