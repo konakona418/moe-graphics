@@ -8,8 +8,8 @@
 
 #include <VkBootstrap.h>
 
-#define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
+#include "Render/Vulkan/VmaImpl.hpp"
+#include "Render/Vulkan/VolkImpl.hpp"
 
 #include <chrono>
 #include <thread>
@@ -306,7 +306,7 @@ namespace moe {
     VulkanAllocatedImage VulkanEngine::allocateImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
         size_t imageSize = extent.width * extent.height * extent.depth * VkUtils::getChannelsFromFormat(format);
         VulkanAllocatedBuffer stagingBuffer = allocateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        std::memcpy(stagingBuffer.vmaAllocation->GetMappedData(), data, imageSize);
+        std::memcpy(stagingBuffer.vmaAllocationInfo.pMappedData, data, imageSize);
 
         VulkanAllocatedImage image = allocateImage(
                 extent, format,
@@ -390,9 +390,9 @@ namespace moe {
     VulkanAllocatedImage VulkanEngine::allocateCubeMapImage(Array<void*, 6> data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmap) {
         size_t imageSize = extent.width * extent.height * extent.depth * VkUtils::getChannelsFromFormat(format);
         VulkanAllocatedBuffer stagingBuffer = allocateBuffer(imageSize * 6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        MOE_ASSERT(stagingBuffer.vmaAllocation->GetMappedData() != nullptr, "Failed to map staging buffer");
+        MOE_ASSERT(stagingBuffer.vmaAllocationInfo.pMappedData != nullptr, "Failed to map staging buffer");
         for (size_t i = 0; i < 6; ++i) {
-            std::memcpy(static_cast<uint8_t*>(stagingBuffer.vmaAllocation->GetMappedData()) + imageSize * i, data[i], imageSize);
+            std::memcpy(static_cast<uint8_t*>(stagingBuffer.vmaAllocationInfo.pMappedData) + imageSize * i, data[i], imageSize);
         }
 
         VulkanAllocatedImage image = allocateCubeMapImage(
@@ -574,7 +574,7 @@ namespace moe {
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VMA_MEMORY_USAGE_CPU_ONLY);
 
-        void* data = stagingBuffer.vmaAllocation->GetMappedData();
+        void* data = stagingBuffer.vmaAllocationInfo.pMappedData;
 
         std::memcpy(data, vertices.data(), vertBufferSize);
         std::memcpy(static_cast<uint8_t*>(data) + vertBufferSize,
@@ -926,16 +926,29 @@ namespace moe {
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-        // todo: implement
+        // todo: separate im3d related calls
         auto extent = glm::vec2{m_drawExtent.width, m_drawExtent.height};
         m_im3dDriver.beginFrame(
-                0.0f,
+                1.0f,
                 extent,
                 &getDefaultCamera(),
                 {});
 
-        Im3d::SetColor(Im3d::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
-        Im3d::DrawSphereFilled(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
+        Im3d::PushDrawState();
+        Im3d::SetSize(10.0f);
+        Im3d::BeginLineLoop();
+        {
+            Im3d::Vertex(-1.0f, 1.0f, 0.0f, Im3d::Color_Magenta);
+            Im3d::Vertex(1.0f, 1.0f, 0.0f, Im3d::Color_Yellow);
+            Im3d::Vertex(0.0f, 1.0f, 2.0f, Im3d::Color_Cyan);
+        }
+        Im3d::End();
+        Im3d::PopDrawState();
+        Im3d::PushDrawState();
+        Im3d::SetSize(5.0f);
+        Im3d::SetColor(Im3d::Color_Red);
+        Im3d::DrawSphere(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
+        Im3d::PopDrawState();
 
         m_im3dDriver.endFrame();
 
@@ -1253,6 +1266,9 @@ namespace moe {
     void VulkanEngine::initVulkanInstance() {
         vkb::InstanceBuilder builder;
 
+        Logger::info("Initializing Volk...");
+        MOE_VK_CHECK(volkInitialize());
+
         Logger::info("Initializing Vulkan instance...");
         Logger::info("Using Vulkan api version {}.{}.{}", 1, 3, 0);
 
@@ -1288,6 +1304,10 @@ namespace moe {
         auto vkbInstance = *result;
 
         m_instance = vkbInstance.instance;
+
+        Logger::info("Loading Volk for Vulkan instance...");
+        volkLoadInstance(m_instance);
+
         m_debugMessenger = vkbInstance.debug_messenger;
 
         Logger::info("Vulkan instance created.");
@@ -1349,15 +1369,24 @@ namespace moe {
         }
 
         m_device = deviceResult->device;
+        Logger::info("Loading Volk for Vulkan device...");
+        volkLoadDevice(m_device);
 
         m_graphicsQueue = deviceResult->get_queue(vkb::QueueType::graphics).value();
         m_graphicsQueueFamilyIndex = deviceResult->get_queue_index(vkb::QueueType::graphics).value();
 
+        Logger::info("Creating VMA instance...");
         VmaAllocatorCreateInfo allocatorInfo{};
         allocatorInfo.physicalDevice = m_physicalDevice;
         allocatorInfo.device = m_device;
         allocatorInfo.instance = m_instance;
         allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+        // pass in necessary function ptrs
+        VmaVulkanFunctions vulkanFunctions{};
+        vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+        vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+        allocatorInfo.pVulkanFunctions = &vulkanFunctions;
 
         vmaCreateAllocator(&allocatorInfo, &m_allocator);
 

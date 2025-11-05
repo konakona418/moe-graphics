@@ -8,6 +8,8 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include "Render/Vulkan/VolkImpl.hpp"
+
 #include "Math/Common.hpp"
 #include "Render/Common.hpp"
 

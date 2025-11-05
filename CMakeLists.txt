@@ -74,8 +74,13 @@ target_include_directories(moe-graphics PRIVATE
   vendors/stb
 )
 
-find_package(Vulkan REQUIRED)
-target_link_libraries(moe-graphics PRIVATE ${Vulkan_LIBRARIES})
+#find_package(Vulkan REQUIRED)
+#target_link_libraries(moe-graphics PRIVATE ${Vulkan_LIBRARIES})
+
+target_compile_definitions(moe-graphics PRIVATE 
+  VK_NO_PROTOTYPES
+  IMGUI_IMPL_VULKAN_USE_VOLK # for imgui volk integration
+)
 
 include(CTest)
 enable_testing()
