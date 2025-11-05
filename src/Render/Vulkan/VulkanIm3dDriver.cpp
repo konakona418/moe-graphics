@@ -75,7 +75,10 @@ namespace moe {
         }
 
         auto pushRange = VkPushConstantRange{
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                .stageFlags =
+                        VK_SHADER_STAGE_VERTEX_BIT |
+                        VK_SHADER_STAGE_FRAGMENT_BIT |
+                        VK_SHADER_STAGE_GEOMETRY_BIT,
                 .offset = 0,
                 .size = sizeof(PushConstants),
         };
@@ -307,6 +310,7 @@ namespace moe {
             auto pcs = PushConstants{
                     .vertexBufferAddr = m_vertexBuffer.getBuffer().address,
                     .viewProjection = viewProj,
+                    .viewportSize = viewport,
             };
 
             vkCmdPushConstants(

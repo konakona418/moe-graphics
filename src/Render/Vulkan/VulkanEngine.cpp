@@ -57,7 +57,7 @@ namespace moe {
         initPipelines();
 
         initImGUI();
-        // initIm3d();
+        initIm3d();
 
         m_isInitialized = true;
     }
@@ -911,6 +911,38 @@ namespace moe {
 
         vkCmdEndRendering(commandBuffer);
 
+        // ! im3d
+        // im3d pipeline requires the draw image to be in color attachment optimal layout
+        VkUtils::transitionImage(
+                commandBuffer,
+                drawImage.image,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+        // barrier previous write
+        VkUtils::transitionImage(
+                commandBuffer,
+                depthImage.image,
+                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+        // todo: implement
+        auto extent = glm::vec2{m_drawExtent.width, m_drawExtent.height};
+        m_im3dDriver.beginFrame(
+                0.0f,
+                extent,
+                &getDefaultCamera(),
+                {});
+
+        m_im3dDriver.render(
+                commandBuffer,
+                &getDefaultCamera(),
+                drawImage.imageView,
+                depthImage.imageView,
+                m_drawExtent);
+
+        m_im3dDriver.endFrame();
+
         // ! sprites
 
         // ! fixme: the sprite layer should not use fxaa
@@ -919,7 +951,8 @@ namespace moe {
         VkUtils::transitionImage(
                 commandBuffer,
                 drawImage.image,
-                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_GENERAL);
 
         auto uiViewportW = static_cast<float>(m_drawExtent.width);
         auto uiViewportH = static_cast<float>(m_drawExtent.height);

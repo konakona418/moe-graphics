@@ -49,6 +49,7 @@ namespace moe {
         struct PushConstants {
             VkDeviceAddress vertexBufferAddr;
             glm::mat4 viewProjection;
+            glm::vec2 viewportSize;
         };
 
         VulkanEngine* m_engine{nullptr};
