@@ -936,7 +936,8 @@ namespace moe {
             mouseState.position = glm::vec2{static_cast<float>(x), static_cast<float>(y)};
         }
 
-        auto extent = glm::vec2{m_drawExtent.width, m_drawExtent.height};
+        // this requires the region of the real (i.e. scaled for high-dpi, e.g. render image -> swapchain) framebuffer
+        auto extent = glm::vec2{m_swapchainExtent.width, m_swapchainExtent.height};
         m_im3dDriver.beginFrame(
                 extent,
                 &defaultCamera,

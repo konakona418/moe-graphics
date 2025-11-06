@@ -323,6 +323,10 @@ int main() {
     glm::vec2 spriteTexOffset(0.0f, 0.0f);
     moe::String text;
 
+    glm::vec3 gizmoTranslation(0.0f);
+    float gizmoHeight = 50.0f;
+    float gizmoSize = 5.0f;
+
     moe::Logger::debug("Starting main loop");
     while (running) {
         engine.beginFrame();
@@ -424,6 +428,9 @@ int main() {
                 ImGui::SliderFloat("Plane Friction", &planeFriction, 0.0f, 1.0f);
                 ImGui::SliderFloat("Sphere Restitution", &sphereRestitution, 0.0f, 1.0f);
                 ImGui::SliderFloat("Sphere Friction", &sphereFriction, 0.0f, 1.0f);
+
+                ImGui::Separator();
+                ImGui::Text("Skeletal Animation");
                 ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
                 if (ImGui::BeginListBox("Animation Select")) {
                     int i = 0;
@@ -436,6 +443,12 @@ int main() {
                     }
                     ImGui::EndListBox();
                 }
+
+                ImGui::Separator();
+                ImGui::Text("Im3d Gizmo");
+                ImGui::SliderFloat("Gizmo Height", &gizmoHeight, 10.0f, 200.0f);
+                ImGui::SliderFloat("Gizmo Size", &gizmoSize, 1.0f, 20.0f);
+
                 ImGui::End();
             }
         });
@@ -455,6 +468,12 @@ int main() {
             Im3d::SetSize(5.0f);
             Im3d::SetColor(Im3d::Color_Red);
             Im3d::DrawSphere(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
+            Im3d::PopDrawState();
+            Im3d::PushDrawState();
+            Im3d::GetContext().m_gizmoHeightPixels = gizmoHeight;
+            Im3d::GetContext().m_gizmoSizePixels = gizmoSize;
+            if (Im3d::Gizmo("gizmo", (float*) &gizmoTranslation, nullptr, nullptr)) {
+            }
             Im3d::PopDrawState();
         });
 
@@ -496,6 +515,10 @@ int main() {
             sphereTransform.setScale(glm::vec3(sphereScale));
             sphereTransform.setRotation(rotation);
             renderBus.submitRender(sphere, sphereTransform);
+        }
+
+        {
+            renderBus.submitRender(sphere, moe::Transform{}.setPosition(gizmoTranslation).setScale(glm::vec3(0.2f)));
         }
 
         physicsSystem.Update(deltaTime, 3, &tempAllocator, &jobSystem);
