@@ -146,11 +146,20 @@ namespace moe {
     }
 
     void VulkanIm3dDriver::beginFrame(
-            float deltaTime,
             glm::vec2 viewportSize,
             const VulkanCamera* camera,
             MouseState mouseState) {
         MOE_ASSERT(m_initialized, "VulkanIm3dDriver not initialized");
+
+        float deltaTime = 0.0f;
+        {
+            auto now = std::chrono::high_resolution_clock::now();
+            if (m_islastUploadTimeValid) {
+                deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(now - m_lastUploadTime).count();
+            }
+            m_lastUploadTime = now;
+            m_islastUploadTimeValid = true;
+        }
 
         Im3d::AppData& appData = Im3d::GetAppData();
         appData.m_deltaTime = deltaTime;

@@ -292,7 +292,7 @@ int main() {
     constexpr float cameraMoveSpeed = 5.f;
     CameraMovementMask movementMask;
 
-    std::chrono::high_resolution_clock::time_point lastTime = std::chrono::high_resolution_clock::now();
+    auto lastTime = std::chrono::high_resolution_clock::now();
 
     bool running = true;
     glm::vec3 cameraMovement = glm::vec3(0.0f);
@@ -327,7 +327,7 @@ int main() {
     while (running) {
         engine.beginFrame();
         auto now = std::chrono::high_resolution_clock::now();
-        auto deltaTime = (float) std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count() / 1000.0f;
+        auto deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(now - lastTime).count();
         lastTime = now;
 
         elapsed += deltaTime;
@@ -438,6 +438,24 @@ int main() {
                 }
                 ImGui::End();
             }
+        });
+
+        engine.addIm3dDrawCommand([&] {
+            Im3d::PushDrawState();
+            Im3d::SetSize(10.0f);
+            Im3d::BeginLineLoop();
+            {
+                Im3d::Vertex(-1.0f, 1.0f, 0.0f, Im3d::Color_Magenta);
+                Im3d::Vertex(1.0f, 1.0f, 0.0f, Im3d::Color_Yellow);
+                Im3d::Vertex(0.0f, 1.0f, 2.0f, Im3d::Color_Cyan);
+            }
+            Im3d::End();
+            Im3d::PopDrawState();
+            Im3d::PushDrawState();
+            Im3d::SetSize(5.0f);
+            Im3d::SetColor(Im3d::Color_Red);
+            Im3d::DrawSphere(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
+            Im3d::PopDrawState();
         });
 
 

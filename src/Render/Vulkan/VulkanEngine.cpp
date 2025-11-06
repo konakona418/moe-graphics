@@ -926,37 +926,35 @@ namespace moe {
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-        // todo: separate im3d related calls
+        // acquire input state
+        VulkanIm3dDriver::MouseState mouseState{};
+        {
+            mouseState.leftButtonDown =
+                    glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+            double x, y;
+            glfwGetCursorPos(m_window, &x, &y);
+            mouseState.position = glm::vec2{static_cast<float>(x), static_cast<float>(y)};
+        }
+
         auto extent = glm::vec2{m_drawExtent.width, m_drawExtent.height};
         m_im3dDriver.beginFrame(
-                1.0f,
                 extent,
-                &getDefaultCamera(),
-                {});
+                &defaultCamera,
+                mouseState);
 
-        Im3d::PushDrawState();
-        Im3d::SetSize(10.0f);
-        Im3d::BeginLineLoop();
-        {
-            Im3d::Vertex(-1.0f, 1.0f, 0.0f, Im3d::Color_Magenta);
-            Im3d::Vertex(1.0f, 1.0f, 0.0f, Im3d::Color_Yellow);
-            Im3d::Vertex(0.0f, 1.0f, 2.0f, Im3d::Color_Cyan);
+        while (!m_im3dDrawQueue.empty()) {
+            auto& cmd = m_im3dDrawQueue.front();
+            cmd();
+            m_im3dDrawQueue.pop();
         }
-        Im3d::End();
-        Im3d::PopDrawState();
-        Im3d::PushDrawState();
-        Im3d::SetSize(5.0f);
-        Im3d::SetColor(Im3d::Color_Red);
-        Im3d::DrawSphere(Im3d::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
-        Im3d::PopDrawState();
 
         m_im3dDriver.endFrame();
 
         m_im3dDriver.render(
                 commandBuffer,
-                &getDefaultCamera(),
+                &defaultCamera,
                 drawImage.imageView,
-                m_pipelines.gBufferPipeline.gDepth.imageView,
+                m_pipelines.gBufferPipeline.gDepth.imageView,// requires depth info
                 m_drawExtent);
 
         // ! sprites

@@ -14,7 +14,7 @@ namespace moe {
     struct VulkanIm3dDriver {
     public:
         struct MouseState {
-            glm::ivec2 position;
+            glm::vec2 position;
             bool leftButtonDown{false};
         };
 
@@ -27,7 +27,6 @@ namespace moe {
                 VkFormat depthImageFormat);
 
         void beginFrame(
-                float deltaTime,
                 glm::vec2 viewportSize,
                 const VulkanCamera* camera,
                 MouseState mouseState);
@@ -56,6 +55,9 @@ namespace moe {
         bool m_initialized{false};
 
         VulkanSwapBuffer m_vertexBuffer;
+
+        std::chrono::high_resolution_clock::time_point m_lastUploadTime;
+        bool m_islastUploadTimeValid{false};
 
         struct {
             VkPipeline pointPipeline;

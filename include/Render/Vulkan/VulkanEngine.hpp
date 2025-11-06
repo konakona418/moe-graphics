@@ -132,6 +132,7 @@ namespace moe {
         VulkanLoader m_resourceLoader{};
 
         Queue<Function<void()>> m_imguiDrawQueue;
+        Queue<Function<void()>> m_im3dDrawQueue;
 
         RenderTargetId m_defaultRenderTargetId{NULL_RENDER_TARGET_ID};
         RenderViewId m_defaultRenderViewId{NULL_RENDER_VIEW_ID};
@@ -195,6 +196,8 @@ namespace moe {
         void endFrame();
 
         void addImGuiDrawCommand(Function<void()>&& fn) { m_imguiDrawQueue.push(std::move(fn)); }
+
+        void addIm3dDrawCommand(Function<void()>&& fn) { m_im3dDrawQueue.push(std::move(fn)); }
 
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
