@@ -969,15 +969,6 @@ namespace moe {
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_GENERAL);
 
-        auto uiViewportW = static_cast<float>(m_drawExtent.width);
-        auto uiViewportH = static_cast<float>(m_drawExtent.height);
-        auto uiCamProj = glm::ortho(
-                -uiViewportW / 2.0f, uiViewportW / 2.0f,
-                uiViewportH / 2.0f, -uiViewportH / 2.0f,
-                -1.f, 1.f);
-        uiCamProj[1][1] *= -1;
-        auto uiCamViewProj = uiCamProj * glm::mat4(1.0f);
-
         auto& sprites = m_renderBus.getSpriteRenderCommands();
         m_pipelines.spritePipeline.draw(
                 commandBuffer,
