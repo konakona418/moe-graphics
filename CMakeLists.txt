@@ -25,10 +25,10 @@ add_subdirectory(vendors/JoltPhysics/Build)
 add_subdirectory(vendors/harfbuzz)
 add_subdirectory(vendors/freetype)
 add_subdirectory(vendors/utfcpp)
+add_subdirectory(vendors/openal-soft)
 
 include_directories(include)
 
-file(GLOB_RECURSE ENGINE_SOURCES src/Engine/*.cpp)
 file(GLOB_RECURSE RENDER_SOURCES src/Render/*.cpp)
 file(GLOB_RECURSE CORE_SOURCES src/Core/*.cpp)
 file(GLOB_RECURSE MATH_SOURCES src/Math/*.cpp)
@@ -47,7 +47,6 @@ file(GLOB STB_IMAGES_SOURCES
 
 add_executable(moe-graphics 
   main.cpp
-  ${ENGINE_SOURCES}
   ${RENDER_SOURCES}
   ${CORE_SOURCES}
   ${MATH_SOURCES}
@@ -64,6 +63,7 @@ target_link_libraries(moe-graphics PRIVATE
   tinygltf
   Jolt
   utf8cpp freetype harfbuzz
+  OpenAL::OpenAL
 )
 
 target_include_directories(moe-graphics PRIVATE
