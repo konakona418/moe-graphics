@@ -120,3 +120,6 @@ namespace moe {
             throw std::runtime_error(std::string(msg)); \
         }                                               \
     } while (false)
+
+#define MOE_BEGIN_NAMESPACE namespace moe {
+#define MOE_END_NAMESPACE }
