@@ -15,6 +15,35 @@ namespace Meta {
 
     template<typename T>
     using EnableIfT = typename EnableIf<T::value, T>::type;
+
+    template<typename T>
+    struct AddRValueRef {
+        using type = T&&;
+    };
+
+    template<typename T>
+    struct AddRValueRef<T&> {
+        using type = T&&;
+    };
+
+    template<typename T>
+    struct AddRValueRef<T&&> {
+        using type = T&&;
+    };
+
+    template<typename T>
+    using AddRValueRefT = typename AddRValueRef<T>::type;
+
+    template<typename T>
+    AddRValueRefT<T> DeclareValue() noexcept;
+
+    template<typename T = int, T v = T{}>
+    struct IntegralConstant {
+        static constexpr T value = v;
+    };
+
+    using TrueType = IntegralConstant<bool, true>;
+    using FalseType = IntegralConstant<bool, false>;
 }// namespace Meta
 
 MOE_END_NAMESPACE

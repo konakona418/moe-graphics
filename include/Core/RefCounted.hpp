@@ -4,8 +4,12 @@
 
 MOE_BEGIN_NAMESPACE
 
+template<typename T>
 struct RefCounted {
 public:
+    // ! fixme: use CRTP to avoid virtual overhead
+    virtual ~RefCounted() = default;
+
     void retain() {
         ++m_refCount;
     }
@@ -18,12 +22,19 @@ public:
         }
     }
 
+    size_t getRefCount() const {
+        return m_refCount;
+    }
+
 private:
     size_t m_refCount{0};
 };
 
+template<typename T>
 struct AtomicRefCounted {
 public:
+    virtual ~AtomicRefCounted() = default;
+
     void retain() {
         m_refCount.fetch_add(1, std::memory_order_relaxed);
     }
@@ -34,6 +45,10 @@ public:
         if (oldCount == 1) {
             delete this;
         }
+    }
+
+    size_t getRefCount() const {
+        return m_refCount.load(std::memory_order_relaxed);
     }
 
 private:
