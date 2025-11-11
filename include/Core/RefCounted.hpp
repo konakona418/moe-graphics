@@ -7,9 +7,6 @@ MOE_BEGIN_NAMESPACE
 template<typename T>
 struct RefCounted {
 public:
-    // ! fixme: use CRTP to avoid virtual overhead
-    virtual ~RefCounted() = default;
-
     void retain() {
         ++m_refCount;
     }
@@ -17,9 +14,10 @@ public:
     void release() {
         MOE_ASSERT(m_refCount > 0, "release called on object with zero ref count");
         --m_refCount;
-        if (m_refCount == 0) {
-            delete this;
+        if (m_refCount != 0) {
+            return;
         }
+        delete static_cast<T*>(this);
     }
 
     size_t getRefCount() const {
@@ -33,8 +31,6 @@ private:
 template<typename T>
 struct AtomicRefCounted {
 public:
-    virtual ~AtomicRefCounted() = default;
-
     void retain() {
         m_refCount.fetch_add(1, std::memory_order_relaxed);
     }
@@ -42,9 +38,10 @@ public:
     void release() {
         size_t oldCount = m_refCount.fetch_sub(1, std::memory_order_acq_rel);
         MOE_ASSERT(oldCount > 0, "release called on object with zero ref count");
-        if (oldCount == 1) {
-            delete this;
+        if (oldCount != 1) {
+            return;
         }
+        delete static_cast<T*>(this);
     }
 
     size_t getRefCount() const {

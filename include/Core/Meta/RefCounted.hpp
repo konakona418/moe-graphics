@@ -11,7 +11,6 @@ namespace Meta {
         static auto test(int)
                 -> decltype(Meta::DeclareValue<T>().retain(),
                             Meta::DeclareValue<T>().release(),
-                            Meta::DeclareValue<T>().getRefCount(),
                             Meta::TrueType{});
 
         static auto test(...) -> Meta::FalseType;
