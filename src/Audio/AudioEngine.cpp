@@ -32,6 +32,11 @@ void AudioEngine::init() {
         return;
     }
 
+    Logger::info("Audio engine initialized successfully.");
+
+    Logger::info("Initializing default audio listener...");
+    m_listener.init();
+
     m_initialized = true;
 }
 
@@ -40,6 +45,8 @@ void AudioEngine::cleanup() {
     MOE_ASSERT(m_initialized, "AudioEngine not initialized");
 
     Logger::info("Cleaning up audio engine...");
+
+    m_listener.destroy();
 
     auto context = alcGetCurrentContext();
     auto device = alcGetContextsDevice(context);

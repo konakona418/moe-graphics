@@ -2,6 +2,8 @@
 
 #include "Audio/Common.hpp"
 
+#include "Audio/AudioListener.hpp"
+
 MOE_BEGIN_NAMESPACE
 
 class AudioEngine {
@@ -14,11 +16,17 @@ public:
         return m_instance;
     }
 
+    AudioListener& getListener() {
+        return m_listener;
+    }
+
 private:
     bool m_initialized{false};
     bool m_eaxSupported{false};
 
     static AudioEngine* m_instance;
+
+    AudioListener m_listener;
 };
 
 MOE_END_NAMESPACE
