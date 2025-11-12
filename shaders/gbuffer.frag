@@ -20,6 +20,8 @@ layout(location = 1) out vec4 outFragNormal;
 layout(location = 2) out vec4 outFragORMA;
 layout(location = 3) out vec4 outFragEmissive;
 
+#define SAMPLE_ALPHA_DISCARD_THRESHOLD 0.5
+
 void main() {
     vec2 uv = inUV;
 
@@ -31,6 +33,16 @@ void main() {
     vec4 sampledEmissive = sampleTextureLinear(material.emissiveImageIndex, uv);
 
     vec3 baseColor = material.baseColor.rgb * sampledDiffuse.rgb;
+
+    // ! fixme: this is too naive, need to do proper alpha blending
+    // ! however, G-buffer, by nature, does not support blending well
+    // ! but i don't want to combine forward pipeline and deferred either
+    // !
+    // ! found on complex models, e.g. exported from vroid studio
+    // ! which blends multiple layers for facial expressions
+    if (material.baseColor.a * sampledDiffuse.a < SAMPLE_ALPHA_DISCARD_THRESHOLD) {
+        discard;
+    }
 
     vec3 normal = normalize(inNormal).rgb;
     if (inTangent != vec3(0.0)) {
