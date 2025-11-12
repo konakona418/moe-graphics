@@ -7,6 +7,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/packing.hpp>
 #include <glm/trigonometric.hpp>
@@ -14,6 +15,6 @@
 
 namespace moe {
     namespace Math {
-        constexpr glm::vec3 VK_GLOBAL_UP = glm::vec3(0.0f, 1.0f, 0.0f);
+        static constexpr glm::vec3 VK_GLOBAL_UP = glm::vec3(0.0f, 1.0f, 0.0f);
     }
 }// namespace moe
