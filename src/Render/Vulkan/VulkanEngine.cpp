@@ -1043,21 +1043,68 @@ namespace moe {
             VkUtils::transitionImage(
                     commandBuffer,
                     m_postFxImages.fxaaImage.image,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.gammaCorrectedImage.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            {
+                auto colorAttachment =
+                        VkInit::renderingAttachmentInfo(
+                                m_postFxImages.gammaCorrectedImage.imageView,
+                                &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, nullptr);
+                vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+                m_pipelines.gammaCorrectionPipeline.draw(
+                        commandBuffer, m_postFxImages.fxaaImageId);
+
+                vkCmdEndRendering(commandBuffer);
+            }
+
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.gammaCorrectedImage.image,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_postFxImages.fxaaImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_postFxImages.gammaCorrectedImage.image, m_swapchainImages[swapchainImageIndex],
                     m_drawExtent, m_swapchainExtent);
         } else {
             VkUtils::transitionImage(
                     commandBuffer,
                     m_postFxImages.topOfPostFxImage.image,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.gammaCorrectedImage.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            {
+                auto colorAttachment =
+                        VkInit::renderingAttachmentInfo(
+                                m_postFxImages.gammaCorrectedImage.imageView,
+                                &clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                auto renderInfo = VkInit::renderingInfo(m_drawExtent, &colorAttachment, nullptr);
+                vkCmdBeginRendering(commandBuffer, &renderInfo);
+                m_pipelines.gammaCorrectionPipeline.draw(
+                        commandBuffer, m_postFxImages.topOfPostFxImageId);
+                vkCmdEndRendering(commandBuffer);
+            }
+            VkUtils::transitionImage(
+                    commandBuffer,
+                    m_postFxImages.gammaCorrectedImage.image,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
             VkUtils::copyImage(
                     commandBuffer,
-                    m_postFxImages.topOfPostFxImage.image, m_swapchainImages[swapchainImageIndex],
+                    m_postFxImages.gammaCorrectedImage.image, m_swapchainImages[swapchainImageIndex],
                     m_drawExtent, m_swapchainExtent);
         }
 
@@ -1637,6 +1684,7 @@ namespace moe {
         m_pipelines.deferredLightingPipeline.init(*this);
         m_pipelines.spritePipeline.init(*this);
         m_pipelines.fxaaPipeline.init(*this);
+        m_pipelines.gammaCorrectionPipeline.init(*this);
 
         // init default render target and view
         m_defaultRenderTargetId = m_caches.renderTargetCache.load(VulkanRenderTarget{}).first;
@@ -1675,6 +1723,7 @@ namespace moe {
         m_mainDeletionQueue.pushFunction([&] {
             m_pipelines.sceneDataBuffer.destroy();
 
+            m_pipelines.gammaCorrectionPipeline.destroy();
             m_pipelines.fxaaPipeline.destroy();
             m_pipelines.spritePipeline.destroy();
             m_pipelines.deferredLightingPipeline.destroy();
@@ -1711,6 +1760,13 @@ namespace moe {
         auto fxaaImageId = m_caches.imageCache.addImage(std::move(fxaaImage));
         m_postFxImages.fxaaImageId = fxaaImageId;
         m_postFxImages.fxaaImage = m_caches.imageCache.getImage(fxaaImageId).value();
+
+        auto gammaCorrectionImageInfo = postFXImageInfo;
+        gammaCorrectionImageInfo.format = m_swapchainImageFormat;
+        auto gammaCorrectedImage = allocateImage(gammaCorrectionImageInfo);
+        auto gammaCorrectedImageId = m_caches.imageCache.addImage(std::move(gammaCorrectedImage));
+        m_postFxImages.gammaCorrectedImageId = gammaCorrectedImageId;
+        m_postFxImages.gammaCorrectedImage = m_caches.imageCache.getImage(gammaCorrectedImageId).value();
     }
 
     void VulkanEngine::queueEvent(WindowEvent event) {

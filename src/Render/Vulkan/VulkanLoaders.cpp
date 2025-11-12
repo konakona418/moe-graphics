@@ -240,7 +240,7 @@ namespace moe {
                 if (hasMetallicRoughnessTexture(gltfMaterial)) {
                     const auto metalRoughnessPath =
                             getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.metallicRoughnessTexture = imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.metallicRoughnessTexture = imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 } else {
                     material.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
@@ -250,7 +250,7 @@ namespace moe {
                 if (hasEmissiveTexture(gltfMaterial)) {
                     const auto emissivePath =
                             getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.emissiveTexture = imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.emissiveTexture = imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
                 } else {
                     // if the object is not emissive, use white texture
                     material.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);

@@ -36,5 +36,35 @@ namespace moe {
             VkPipelineLayout m_pipelineLayout;
             VkPipeline m_pipeline;
         };
+
+        struct GammaCorrectionPipeline {
+        public:
+            static constexpr float DEFAULT_GAMMA = 2.2f;
+
+            GammaCorrectionPipeline() = default;
+            ~GammaCorrectionPipeline() = default;
+
+            void init(VulkanEngine& engine);
+
+            void draw(
+                    VkCommandBuffer cmdBuffer,
+                    ImageId inputImageId,
+                    float gamma = DEFAULT_GAMMA);
+
+            void destroy();
+
+        private:
+            struct PushConstants {
+                ImageId inputImageId;
+                float gamma;
+            };
+
+            VulkanEngine* m_engine{nullptr};
+            bool m_initialized{false};
+
+            VkPipelineLayout m_pipelineLayout;
+            VkPipeline m_pipeline;
+        };
+
     }// namespace Pipeline
 }// namespace moe

@@ -15,7 +15,7 @@ namespace moe {
         MOE_ASSERT(m_engine, "VulkanLoader not initialized");
         return m_engine->m_caches.imageCache.loadImageFromFile(
                 path,
-                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_FORMAT_R8G8B8A8_SRGB,
                 VK_IMAGE_USAGE_SAMPLED_BIT);
     }
 

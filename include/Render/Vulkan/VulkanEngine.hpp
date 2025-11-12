@@ -118,6 +118,9 @@ namespace moe {
 
             VulkanAllocatedImage fxaaImage;
             ImageId fxaaImageId{NULL_IMAGE_ID};
+
+            VulkanAllocatedImage gammaCorrectedImage;
+            ImageId gammaCorrectedImageId{NULL_IMAGE_ID};
         } m_postFxImages;
 
         VkFence m_immediateModeFence;
@@ -174,6 +177,7 @@ namespace moe {
             Pipeline::SpritePipeline spritePipeline;
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
             Pipeline::FXAAPipeline fxaaPipeline;
+            Pipeline::GammaCorrectionPipeline gammaCorrectionPipeline;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
