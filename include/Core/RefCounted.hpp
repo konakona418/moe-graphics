@@ -1,8 +1,11 @@
 #pragma once
 
 #include "Core/Common.hpp"
+#include "Core/Ref.hpp"
 
 MOE_BEGIN_NAMESPACE
+
+typedef void (*RefCountedDeleterFn)(void*);
 
 template<typename T>
 struct RefCounted {
@@ -17,6 +20,11 @@ public:
         if (m_refCount != 0) {
             return;
         }
+
+        if (m_deleter) {
+            m_deleter(this);
+            return;
+        }
         delete static_cast<T*>(this);
     }
 
@@ -24,8 +32,20 @@ public:
         return m_refCount;
     }
 
+    Ref<T> intoRef() {
+        MOE_ASSERT(m_refCount > 0,
+                   "intoRef called on object with zero ref count. "
+                   "It should only be called on objects that are already Ref<T> managed.");
+        return Ref<T>(static_cast<T*>(this));
+    }
+
+    void setDeleter(RefCountedDeleterFn deleter) {
+        m_deleter = deleter;
+    }
+
 private:
     size_t m_refCount{0};
+    RefCountedDeleterFn m_deleter{nullptr};
 };
 
 template<typename T>
@@ -41,6 +61,11 @@ public:
         if (oldCount != 1) {
             return;
         }
+
+        if (m_deleter) {
+            m_deleter(this);
+            return;
+        }
         delete static_cast<T*>(this);
     }
 
@@ -48,8 +73,20 @@ public:
         return m_refCount.load(std::memory_order_relaxed);
     }
 
+    Ref<T> intoRef() {
+        MOE_ASSERT(m_refCount.load(std::memory_order_relaxed) > 0,
+                   "intoRef called on object with zero ref count. "
+                   "It should only be called on objects that are already Ref<T> managed.");
+        return Ref<T>(static_cast<T*>(this));
+    }
+
+    void setDeleter(RefCountedDeleterFn deleter) {
+        m_deleter = deleter;
+    }
+
 private:
     std::atomic<size_t> m_refCount{0};
+    RefCountedDeleterFn m_deleter{nullptr};
 };
 
 MOE_END_NAMESPACE

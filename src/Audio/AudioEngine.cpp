@@ -4,6 +4,7 @@ MOE_BEGIN_NAMESPACE
 
 void AudioEngine::init() {
     MOE_ASSERT(!m_initialized, "AudioEngine already initialized");
+    m_instance = this;
 
     auto device = alcOpenDevice(nullptr);// default
 
@@ -33,6 +34,7 @@ void AudioEngine::init() {
 }
 
 void AudioEngine::cleanup() {
+    MOE_ASSERT(m_instance == this, "AudioEngine instance mismatch");
     MOE_ASSERT(m_initialized, "AudioEngine not initialized");
 
     Logger::info("Cleaning up audio engine...");

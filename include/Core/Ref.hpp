@@ -7,7 +7,7 @@
 
 MOE_BEGIN_NAMESPACE
 
-template<typename T, typename = Meta::EnableIfT<Meta::IsRefCounted<T>>>
+template<typename T, typename = Meta::EnableIfT<(Meta::IsRefCountedV<T> || !Meta::IsCompleteTypeV<T>)>>
 struct Ref {
 public:
     Ref() = default;

@@ -13,8 +13,8 @@ namespace Meta {
     template<typename T>
     struct EnableIf<false, T> {};
 
-    template<typename T>
-    using EnableIfT = typename EnableIf<T::value, T>::type;
+    template<bool B, typename T = void>
+    using EnableIfT = typename EnableIf<B, T>::type;
 
     template<typename T>
     struct AddRValueRef {
@@ -44,6 +44,20 @@ namespace Meta {
 
     using TrueType = IntegralConstant<bool, true>;
     using FalseType = IntegralConstant<bool, false>;
+
+    template<typename T>
+    struct IsCompleteType {
+        template<typename U>
+        static auto test(int) -> decltype(sizeof(DeclareValue<U>()), TrueType{});
+
+        template<typename U>
+        static auto test(...) -> FalseType;
+
+        static constexpr bool value = decltype(test<T>(0))::value;
+    };
+
+    template<typename T>
+    constexpr bool IsCompleteTypeV = IsCompleteType<T>::value;
 }// namespace Meta
 
 MOE_END_NAMESPACE
