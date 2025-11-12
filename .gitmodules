@@ -55,3 +55,6 @@
 [submodule "vendors/openal-soft"]
 	path = vendors/openal-soft
 	url = https://github.com/kcat/openal-soft.git
+[submodule "vendors/Catch2"]
+	path = vendors/Catch2
+	url = https://github.com/catchorg/Catch2.git
