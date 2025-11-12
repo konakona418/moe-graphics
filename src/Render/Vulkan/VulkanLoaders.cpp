@@ -518,7 +518,11 @@ namespace moe {
                     for (JointId jointId = 0; jointId < skeleton.joints.size(); ++jointId) {
                         const auto& jointNode = model.nodes[skin.joints[jointId]];
                         for (const auto& childIdx: jointNode.children) {
-                            const auto childJointId = nodeIdxToJointId.at(childIdx);
+                            auto it = nodeIdxToJointId.find(childIdx);
+                            if (it == nodeIdxToJointId.end()) {
+                                continue;// not a joint
+                            }
+                            JointId childJointId = it->second;
                             skeleton.hierarchy[jointId].children.push_back(childJointId);
                         }
                     }
