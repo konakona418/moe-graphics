@@ -2,6 +2,8 @@
 
 MOE_BEGIN_NAMESPACE
 
+AudioEngine* AudioEngine::m_instance{nullptr};
+
 void AudioEngine::init() {
     MOE_ASSERT(!m_initialized, "AudioEngine already initialized");
     m_instance = this;

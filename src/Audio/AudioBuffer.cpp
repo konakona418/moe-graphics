@@ -32,6 +32,8 @@ void AudioBuffer::destroy() {
     bufferId = INVALID_BUFFER_ID;
 }
 
+AudioBufferPool* AudioBufferPool::m_instance{nullptr};
+
 void AudioBufferPool::init() {
     MOE_ASSERT(m_instance == nullptr, "AudioBufferPool already initialized");
     m_instance = this;
@@ -79,8 +81,8 @@ void AudioBufferPool::allocBuffer() {
     buffer->init();
     buffer->setDeleter(AudioBufferPool::bufferDeleter);
 
-    m_buffers.push_back(buffer);
     m_freeBuffers.push_back(buffer.get());
+    m_buffers.push_back(std::move(buffer));
 }
 
 MOE_END_NAMESPACE
