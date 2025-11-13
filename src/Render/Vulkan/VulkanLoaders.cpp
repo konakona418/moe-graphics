@@ -569,7 +569,11 @@ namespace moe {
                         }
 
                         const auto nodeId = channel.target_node;
-                        const auto jointId = gltfNodeIdxToJointId.at(nodeId);
+                        auto it = gltfNodeIdxToJointId.find(nodeId);
+                        if (it == gltfNodeIdxToJointId.end()) {
+                            continue;// not a joint
+                        }
+                        const auto jointId = it->second;
 
                         auto& animationTrack = animation.tracks[jointId];
 
