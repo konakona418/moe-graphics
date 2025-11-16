@@ -211,11 +211,27 @@ namespace moe {
                 return 1.0f;
             }
 
+            ImageId loadImageOrReuse(
+                    VulkanImageCache& imageCache,
+                    const std::filesystem::path& imagePath,
+                    UnorderedMap<String, ImageId>& loadedTextures) {
+                if (loadedTextures.find(imagePath.string()) != loadedTextures.end()) {
+                    Logger::debug("Reusing loaded texture: {}", imagePath.string());
+                    return loadedTextures[imagePath.string()];
+                } else {
+                    ImageId imageId =
+                            imageCache.loadImageFromFile(imagePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    loadedTextures[imagePath.string()] = imageId;
+                    return imageId;
+                }
+            }
+
             VulkanCPUMaterial loadMaterial(
                     VulkanImageCache& imageCache,
                     const tinygltf::Model& gltfModel,
                     const tinygltf::Material& gltfMaterial,
-                    const std::filesystem::path& parentPath) {
+                    const std::filesystem::path& parentPath,
+                    UnorderedMap<String, ImageId>& loadedTextures) {
                 VulkanCPUMaterial material{};
                 material.baseColor = getColor(gltfMaterial);
                 material.metallic = static_cast<float>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
@@ -223,16 +239,14 @@ namespace moe {
 
                 if (hasDiffuseTexture(gltfMaterial)) {
                     const auto diffusePath = getDiffuseTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.diffuseTexture =
-                            imageCache.loadImageFromFile(diffusePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.diffuseTexture = loadImageOrReuse(imageCache, diffusePath, loadedTextures);
                 } else {
                     material.diffuseTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
 
                 if (hasNormalMapTexture(gltfMaterial)) {
                     const auto normalMapPath = getNormalMapTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.normalTexture =
-                            imageCache.loadImageFromFile(normalMapPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.normalTexture = loadImageOrReuse(imageCache, normalMapPath, loadedTextures);
                 } else {
                     material.normalTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::FlatNormal);
                 }
@@ -240,7 +254,7 @@ namespace moe {
                 if (hasMetallicRoughnessTexture(gltfMaterial)) {
                     const auto metalRoughnessPath =
                             getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.metallicRoughnessTexture = imageCache.loadImageFromFile(metalRoughnessPath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.metallicRoughnessTexture = loadImageOrReuse(imageCache, metalRoughnessPath, loadedTextures);
                 } else {
                     material.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
                 }
@@ -250,7 +264,7 @@ namespace moe {
                 if (hasEmissiveTexture(gltfMaterial)) {
                     const auto emissivePath =
                             getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.emissiveTexture = imageCache.loadImageFromFile(emissivePath.string(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+                    material.emissiveTexture = loadImageOrReuse(imageCache, emissivePath, loadedTextures);
                 } else {
                     // if the object is not emissive, use white texture
                     material.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
@@ -670,9 +684,10 @@ namespace moe {
                 UnorderedMap<GLTFInternalId, MaterialId> materialMap;
 
                 {
+                    UnorderedMap<String, ImageId> loadedTextures;
                     for (GLTFInternalId i = 0; i < model.materials.size(); ++i) {
                         auto& mat = model.materials[i];
-                        MaterialId id = materialCache.loadMaterial(loadMaterial(imageCache, model, mat, parentPath));
+                        MaterialId id = materialCache.loadMaterial(loadMaterial(imageCache, model, mat, parentPath, loadedTextures));
                         materialMap[i] = id;
                     }
                 }
