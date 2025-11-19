@@ -58,6 +58,87 @@ namespace Meta {
 
     template<typename T>
     constexpr bool IsCompleteTypeV = IsCompleteType<T>::value;
+
+    template<typename T>
+    struct RemoveReference {
+        using type = T;
+    };
+
+    template<typename T>
+    struct RemoveReference<T&> {
+        using type = T;
+    };
+
+    template<typename T>
+    struct RemoveReference<T&&> {
+        using type = T;
+    };
+
+    template<typename T>
+    using RemoveReferenceT = typename RemoveReference<T>::type;
+
+    template<typename T>
+    struct RemoveQualifiers {
+        using type = T;
+    };
+
+    template<typename T>
+    struct RemoveQualifiers<const T> {
+        using type = T;
+    };
+
+    template<typename T>
+    struct RemoveQualifiers<volatile T> {
+        using type = T;
+    };
+
+    template<typename T>
+    struct RemoveQualifiers<const volatile T> {
+        using type = T;
+    };
+
+    template<typename T>
+    using RemoveQualifiersT = typename RemoveQualifiers<T>::type;
+
+    template<typename T>
+    struct IsVoid : FalseType {};
+
+    template<>
+    struct IsVoid<void> : TrueType {};
+
+    template<typename T>
+    constexpr bool IsVoidV = IsVoid<T>::value;
+
+    template<typename T, typename U>
+    struct IsSame : FalseType {};
+
+    template<typename T>
+    struct IsSame<T, T> : TrueType {};
+
+    template<typename T, typename U>
+    constexpr bool IsSameV = IsSame<T, U>::value;
+
+    template<typename Fn, typename... Args>
+    struct IsInvocable {
+        struct NonInvocable {};
+
+    private:
+        template<typename F, typename... A>
+        static auto test(int) -> decltype(DeclareValue<F>()(DeclareValue<A>()...));
+
+        template<typename F, typename... A>
+        static auto test(...) -> NonInvocable;
+
+    public:
+        static constexpr bool value = !IsSameV<decltype(test<Fn, Args...>(0)), NonInvocable>;
+        using type = decltype(test<Fn, Args...>(0));
+    };
+
+    template<typename Fn, typename... Args>
+    constexpr bool IsInvocableV = IsInvocable<Fn, Args...>::value;
+
+    template<typename Fn, typename... Args>
+    using IsInvocableT = typename IsInvocable<Fn, Args...>::type;
 }// namespace Meta
 
 MOE_END_NAMESPACE

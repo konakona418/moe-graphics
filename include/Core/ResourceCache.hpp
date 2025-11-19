@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Common.hpp"
+#include "Core/Meta/TypeTraits.hpp"
 
 // common resource cache
 
@@ -37,9 +38,8 @@ namespace moe {
         }
 
         template<typename... Args>
-        using EnableIfInvocable = std::enable_if_t<
-                std::is_invocable_v<
-                        LoaderFunctorT, Args...>>;
+        using EnableIfInvocable = Meta::EnableIf<
+                Meta::IsInvocableV<LoaderFunctorT, Args...>>;
 
         template<typename... Args, typename = EnableIfInvocable<Args...>>
         Pair<ResIdT, SharedResource<ResT>> load(Args&&... args) {
@@ -51,7 +51,7 @@ namespace moe {
                 id = idCounter++;
             }
 
-            if constexpr (std::is_void_v<DeleterT>) {
+            if constexpr (Meta::IsVoidV<DeleterT>) {
                 return *resources.emplace(id, SharedResource<ResT>{LoaderFunctorT{}(std::forward<Args>(args)...)}).first;
             } else {
                 auto loadedResource = LoaderFunctorT{}(std::forward<Args>(args)...);
