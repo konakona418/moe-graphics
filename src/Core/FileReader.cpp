@@ -6,7 +6,7 @@ MOE_BEGIN_NAMESPACE
 
 FileReader* FileReader::s_instance = nullptr;
 
-Optional<UniquePtr<Vector<uint8_t>>> DefaultFileReader::readFile(
+Optional<Vector<uint8_t>> DefaultFileReader::readFile(
         StringView filename, size_t& outFileSize) {
     std::ifstream file(std::string(filename),
                        std::ios::binary |
@@ -29,7 +29,7 @@ Optional<UniquePtr<Vector<uint8_t>>> DefaultFileReader::readFile(
         return std::nullopt;
     }
 
-    return std::make_unique<Vector<uint8_t>>(std::move(buffer));
+    return Vector<uint8_t>(std::move(buffer));
 }
 
 MOE_END_NAMESPACE

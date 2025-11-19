@@ -20,12 +20,12 @@ struct FileReader {
 
     virtual ~FileReader() = default;
 
-    virtual Optional<UniquePtr<Vector<uint8_t>>> readFile(
+    virtual Optional<Vector<uint8_t>> readFile(
             StringView filename, size_t& outFileSize) = 0;
 };
 
 struct DefaultFileReader : public FileReader {
-    Optional<UniquePtr<Vector<uint8_t>>> readFile(
+    Optional<Vector<uint8_t>> readFile(
             StringView filename, size_t& outFileSize) override;
 };
 
@@ -48,10 +48,14 @@ public:
         m_filenamePrinter = FilenamePrinterT{};
     }
 
-    Optional<UniquePtr<Vector<uint8_t>>> readFile(
+    Optional<Vector<uint8_t>> readFile(
             StringView filename, size_t& outFileSize) override {
         m_filenamePrinter(filename);
         return m_innerReader->readFile(filename, outFileSize);
+    }
+
+    ~DebugFileReader() override {
+        delete m_innerReader;
     }
 
 private:

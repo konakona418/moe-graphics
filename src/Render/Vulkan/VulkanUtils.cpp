@@ -201,7 +201,7 @@ namespace moe {
             createInfo.pNext = nullptr;
 
             createInfo.codeSize = fileSize;
-            createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer->get()->data());
+            createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer->data());
 
             VkShaderModule shaderModule;
             MOE_VK_CHECK(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));

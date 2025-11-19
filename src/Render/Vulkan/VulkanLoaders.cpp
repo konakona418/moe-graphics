@@ -21,7 +21,7 @@ namespace moe {
             }
 
             auto* buf = stbi_load_from_memory(
-                    fileBuf->get()->data(),
+                    fileBuf->data(),
                     fileSize, width, height,
                     channels, desiredChannels);
             //MOE_ASSERT(*channels == 4, "Only 4-channel images are supported");
@@ -97,7 +97,7 @@ namespace moe {
                 auto fileBuf = FileReader::s_instance->readFile(path.string(), bufSize);
                 bool success = loader.LoadASCIIFromString(
                         &model, &err, &warn,
-                        reinterpret_cast<const char*>(fileBuf->get()->data()),
+                        reinterpret_cast<const char*>(fileBuf->data()),
                         bufSize, parentDir.string());
                 if (!warn.empty()) {
                     Logger::warn("GLTF loader warning: {}", warn);
