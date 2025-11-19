@@ -1,6 +1,6 @@
 #include "Render/Vulkan/VulkanUtils.hpp"
 
-#include <fstream>
+#include "Core/FileReader.hpp"
 
 namespace moe {
     namespace VkUtils {
@@ -193,25 +193,15 @@ namespace moe {
         }
 
         VkShaderModule createShaderModuleFromFile(VkDevice device, StringView filename) {
-            std::ifstream file(filename.data(), std::ios::ate | std::ios::binary);
-
-            if (!file.is_open()) {
-                MOE_LOG_AND_THROW(
-                        fmt::format("Failed to open shader file: {}", filename).c_str());
-            }
-
-            size_t fileSize = static_cast<size_t>(file.tellg());
-            file.seekg(0);
-            std::vector<char> buffer(fileSize);
-            file.read(buffer.data(), fileSize);
-            file.close();
+            size_t fileSize = 0;
+            auto buffer = FileReader::s_instance->readFile(filename, fileSize);
 
             VkShaderModuleCreateInfo createInfo{};
             createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             createInfo.pNext = nullptr;
 
-            createInfo.codeSize = buffer.size();
-            createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
+            createInfo.codeSize = fileSize;
+            createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer->get()->data());
 
             VkShaderModule shaderModule;
             MOE_VK_CHECK(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));

@@ -2,6 +2,8 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 
+#include "Core/FileReader.hpp"
+
 #include <tiny_gltf.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -11,7 +13,17 @@
 namespace moe {
     namespace VkLoaders {
         UniqueRawImage loadImage(StringView filename, int* width, int* height, int* channels, int desiredChannels) {
-            auto* buf = stbi_load(filename.data(), width, height, channels, desiredChannels);
+            size_t fileSize = 0;
+            auto fileBuf = FileReader::s_instance->readFile(filename, fileSize);
+            if (!fileBuf) {
+                Logger::error("Failed to read image file: {}", filename);
+                return nullptr;
+            }
+
+            auto* buf = stbi_load_from_memory(
+                    fileBuf->get()->data(),
+                    fileSize, width, height,
+                    channels, desiredChannels);
             //MOE_ASSERT(*channels == 4, "Only 4-channel images are supported");
 
             // todo: implement more robust image loading
@@ -76,12 +88,17 @@ namespace moe {
                 };
             }
 
-            void loadGltfFile(tinygltf::Model& model, std::filesystem::path path) {
+            void loadGltfFile(tinygltf::Model& model, std::filesystem::path path, std::filesystem::path parentDir) {
                 tinygltf::TinyGLTF loader;
                 std::string err;
                 std::string warn;
 
-                bool success = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+                size_t bufSize = 0;
+                auto fileBuf = FileReader::s_instance->readFile(path.string(), bufSize);
+                bool success = loader.LoadASCIIFromString(
+                        &model, &err, &warn,
+                        reinterpret_cast<const char*>(fileBuf->get()->data()),
+                        bufSize, parentDir.string());
                 if (!warn.empty()) {
                     Logger::warn("GLTF loader warning: {}", warn);
                 }
@@ -677,7 +694,7 @@ namespace moe {
                 const auto parentPath = path.parent_path();
 
                 tinygltf::Model model;
-                loadGltfFile(model, path);
+                loadGltfFile(model, path, parentPath);
 
                 //Logger::debug("GLTF file contains {} scenes", model.scenes.size());
                 auto& scene = model.scenes[model.defaultScene];

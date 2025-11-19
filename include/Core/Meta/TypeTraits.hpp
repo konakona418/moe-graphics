@@ -139,6 +139,35 @@ namespace Meta {
 
     template<typename Fn, typename... Args>
     using IsInvocableT = typename IsInvocable<Fn, Args...>::type;
+
+    template<typename T, typename... Args>
+    struct IsConstructible {
+    private:
+        template<typename U, typename... A>
+        static auto test(int) -> decltype(U(DeclareValue<A>()...), TrueType{});
+
+        template<typename U, typename... A>
+        static auto test(...) -> FalseType;
+
+    public:
+        static constexpr bool value = decltype(test<T, Args...>(0))::value;
+    };
+
+    template<typename T, typename... Args>
+    constexpr bool IsConstructibleV = IsConstructible<T, Args...>::value;
+
+    template<typename Base, typename Derived>
+    struct IsBaseOf {
+    private:
+        static TrueType test(const Base*);
+        static FalseType test(...);
+
+    public:
+        static constexpr bool value = decltype(test(static_cast<Derived*>(nullptr)))::value;
+    };
+
+    template<typename Base, typename Derived>
+    constexpr bool IsBaseOfV = IsBaseOf<Base, Derived>::value;
 }// namespace Meta
 
 MOE_END_NAMESPACE
