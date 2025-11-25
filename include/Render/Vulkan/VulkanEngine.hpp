@@ -21,6 +21,7 @@
 #include "Render/Vulkan/VulkanMaterialCache.hpp"
 #include "Render/Vulkan/VulkanMeshCache.hpp"
 #include "Render/Vulkan/VulkanObjectCache.hpp"
+#include "Render/Vulkan/VulkanPostFXGraph.hpp"
 #include "Render/Vulkan/VulkanRenderTarget.hpp"
 #include "Render/Vulkan/VulkanScene.hpp"
 #include "Render/Vulkan/VulkanSwapBuffer.hpp"
@@ -112,17 +113,6 @@ namespace moe {
         VkFormat m_drawImageFormat{VK_FORMAT_R16G16B16A16_SFLOAT};
         VkFormat m_depthImageFormat{VK_FORMAT_D32_SFLOAT};
 
-        struct {
-            VulkanAllocatedImage topOfPostFxImage;
-            ImageId topOfPostFxImageId;
-
-            VulkanAllocatedImage fxaaImage;
-            ImageId fxaaImageId{NULL_IMAGE_ID};
-
-            VulkanAllocatedImage gammaCorrectedImage;
-            ImageId gammaCorrectedImageId{NULL_IMAGE_ID};
-        } m_postFxImages;
-
         VkFence m_immediateModeFence;
         VkCommandBuffer m_immediateModeCommandBuffer;
         VkCommandPool m_immediateModeCommandPool;
@@ -178,6 +168,8 @@ namespace moe {
             Pipeline::DeferredLightingPipeline deferredLightingPipeline;
             Pipeline::FXAAPipeline fxaaPipeline;
             Pipeline::GammaCorrectionPipeline gammaCorrectionPipeline;
+
+            VulkanPostFXGraph postFxGraph;
 
             ImageId skyBoxImageId{NULL_IMAGE_ID};
             VulkanSwapBuffer sceneDataBuffer;
@@ -294,7 +286,7 @@ namespace moe {
 
         void initPipelines();
 
-        void initPostFXImages();
+        void initAndCompilePostFXGraph();
 
         void drawImGUI(VkCommandBuffer commandBuffer, VkImageView drawTarget);
 
