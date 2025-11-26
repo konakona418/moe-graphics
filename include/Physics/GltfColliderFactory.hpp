@@ -1,0 +1,14 @@
+#pragma once
+
+#include "Core/Common.hpp"
+
+#include "Physics/JoltIncludes.hpp"
+#include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
+
+MOE_BEGIN_NAMESPACE
+
+struct GltfColliderFactory {
+    static JPH::StaticCompoundShapeSettings* shapeFromGltf(StringView filePath);
+};
+
+MOE_END_NAMESPACE

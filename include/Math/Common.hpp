@@ -13,6 +13,9 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec4.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
+
 namespace moe {
     namespace Math {
         static constexpr glm::vec3 VK_GLOBAL_UP = glm::vec3(0.0f, 1.0f, 0.0f);
