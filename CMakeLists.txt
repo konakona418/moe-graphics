@@ -89,3 +89,7 @@ target_compile_definitions(moe-graphics PRIVATE
 include(CTest)
 enable_testing()
 
+# tools
+message(STATUS "Configuring moe-graphics utilities...")
+add_subdirectory(tools/hako-ify)
+
