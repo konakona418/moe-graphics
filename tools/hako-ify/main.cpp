@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -5,7 +6,7 @@
 #include <string>
 #include <vector>
 
-constexpr static char TOOL_NAME[] = "📦 hako-ify";
+constexpr static char TOOL_NAME[] = "hako-ify";
 constexpr static char TOOL_VERSION[] = "0.1.0";
 constexpr static char USAGE_MESSAGE[] =
         "📦 hako-ify - A resource packaging tool for moe-graphics\n"
@@ -46,6 +47,99 @@ std::string prettifyFileSize(size_t sizeInBytes) {
     }
     return std::string(buffer);
 }
+
+namespace details {
+    namespace colors {
+        const std::string RESET = "\033[0m";
+        const std::string RED = "\033[31m";
+        const std::string GREEN = "\033[32m";
+        const std::string YELLOW = "\033[33m";
+        const std::string BLUE = "\033[34m";
+        const std::string MAGENTA = "\033[35m";
+        const std::string CYAN = "\033[36m";
+        const std::string WHITE = "\033[37m";
+    }// namespace colors
+
+#include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
+
+    static inline size_t visible_length(const std::string& s) {
+        size_t count = 0;
+        bool in_escape = false;
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (!in_escape) {
+                if (s[i] == '\x1b') {
+                    in_escape = true;
+                } else {
+                    count++;
+                }
+            } else {
+                if (s[i] == 'm') {
+                    in_escape = false;
+                }
+            }
+        }
+        return count;
+    }
+
+    static inline void append_rainbow_char(std::ostringstream& o, char c, float offset) {
+        float r = std::sin(offset + 0.0f) * 127 + 128;
+        float g = std::sin(offset + 2.0f) * 127 + 128;
+        float b = std::sin(offset + 4.0f) * 127 + 128;
+
+        o << "\x1b[38;2;" << (int) r << ";" << (int) g << ";" << (int) b << "m" << c << "\x1b[0m";
+    }
+
+    void progress_bar(float progress, const std::string& info) {
+        static size_t last_visible = 0;
+
+        int width = 50;
+        int pos = progress * width;
+
+        std::ostringstream oss;
+        oss << "\r[";
+
+        const float freq = 0.10f;
+        for (int i = 0; i < width; ++i) {
+            float offset = freq * i;
+            char c = (i < pos ? '=' : (i == pos ? '>' : ' '));
+            append_rainbow_char(oss, c, offset);
+        }
+
+        oss << "] ";
+
+        oss << std::fixed << std::setprecision(1) << (progress * 100.0f) << "% ";
+        oss << info;
+
+        std::string out = oss.str();
+
+        size_t vis = visible_length(out);
+        if (vis < last_visible) {
+            out.append(last_visible - vis, ' ');
+        }
+
+        last_visible = vis;
+
+        std::cout << out << std::flush;
+    }
+
+
+    void print_rainbow(const std::string& text) {
+        const float freq = 0.3f;
+        for (size_t i = 0; i < text.size(); ++i) {
+            float r = std::sin(freq * i + 0.0f) * 127 + 128;
+            float g = std::sin(freq * i + 2.0f) * 127 + 128;
+            float b = std::sin(freq * i + 4.0f) * 127 + 128;
+
+            std::cout << "\x1b[38;2;"
+                      << (int) r << ";" << (int) g << ";" << (int) b << "m"
+                      << text[i];
+        }
+        std::cout << "\x1b[0m";
+    }
+}// namespace details
 
 struct HakoifierMetadataEntry {
     uint16_t pathLength;
@@ -136,7 +230,8 @@ public:
         bool err;
         auto resources = enumerateResources(inputDir, &err);
         if (err) {
-            std::cerr << "Failed to enumerate resources in directory: " << inputDir << std::endl;
+            std::cerr << details::colors::RED << "Failed to enumerate resources in directory: "
+                      << inputDir << details::colors::RESET << std::endl;
             return false;
         }
 
@@ -146,24 +241,27 @@ public:
         std::ofstream outFile(outputFile, std::ios::binary);
         std::ofstream outMetaData(outputFile + ".meta", std::ios::binary);
         if (!outFile.is_open()) {
-            std::cerr << "Failed to open output file: " << outputFile << std::endl;
+            std::cerr << details::colors::RED << "Failed to open output file: "
+                      << outputFile << details::colors::RESET << std::endl;
             return false;
         }
 
         if (!outMetaData.is_open()) {
-            std::cerr << "Failed to open output metadata file: " << outputFile
-                      << ".meta" << std::endl;
+            std::cerr << details::colors::RED << "Failed to open output metadata file: " << outputFile
+                      << ".meta" << details::colors::RESET << std::endl;
             return false;
         }
 
         int count = 0;
         int total = static_cast<int>(resources.size());
-        std::cout << "Packaging " << total << " resources...\n";
+        std::cout << details::colors::CYAN << "Packaging " << total << " resources..."
+                  << details::colors::RESET << std::endl;
 
         for (const auto& resourcePath: resources) {
             std::ifstream inFile(resourcePath, std::ios::binary);
             if (!inFile.is_open()) {
-                std::cerr << "Failed to open resource file: " << resourcePath << std::endl;
+                std::cerr << details::colors::RED << "Failed to open resource file: " << resourcePath
+                          << details::colors::RESET << std::endl;
                 return false;
             }
 
@@ -175,25 +273,32 @@ public:
             inFile.read(buffer.data(), fileSize);
             inFile.close();
 
-            std::cout << "  - Adding resource: "
-                      << replaceAllReversedSlashes(resourcePath)
-                      << " (" << prettifyFileSize(fileSize) << "), "
-                      << (++count) << " of " << total << "\n";
+            auto path = replaceAllReversedSlashes(
+                    std::filesystem::relative(
+                            resourcePath,
+                            inputDir)
+                            .string());
+
+            details::progress_bar(
+                    static_cast<float>(++count) / total,
+                    details::colors::YELLOW + "Packing: " + path +
+                            details::colors::RESET +
+                            " (" + prettifyFileSize(fileSize) + ")");
 
             outFile.write(buffer.data(), fileSize);
 
             HakoifierMetadataEntry entry = HakoifierMetadataEntry::from(
-                    replaceAllReversedSlashes(
-                            std::filesystem::relative(
-                                    resourcePath,
-                                    inputDir)
-                                    .string()),
+                    path,
                     currentOffset,
                     fileSize);
             metadataEntries.push_back(entry);
 
             currentOffset += fileSize;
         }
+        std::cout << std::endl
+                  << details::colors::CYAN
+                  << "Packaging complete. Writing metadata..."
+                  << details::colors::RESET << std::endl;
 
         for (const auto& entry: metadataEntries) {
             auto bytes = entry.toBytes();
@@ -235,15 +340,24 @@ int main(int argc, char** argv) {
     std::string inputDir = argv[1];
     std::string outputFile = argv[2];
 
-    std::cout << TOOL_NAME << " v" << TOOL_VERSION << '\n';
-    std::cout << "Packaging resources from '" << inputDir
-              << "' into '" << outputFile << "'...\n";
+    std::cout << "📦 ";
+    details::print_rainbow(
+            std::string(TOOL_NAME) + " v" + std::string(TOOL_VERSION) +
+            std::string(" - A resource packaging tool for moe-graphics\n"));
+
+    std::cout << details::colors::CYAN
+              << "Packaging resources from '" << inputDir
+              << "' into '" << outputFile
+              << "'...\n"
+              << details::colors::RESET;
 
     if (!Hakoifier::runPackaging(inputDir, outputFile)) {
-        std::cerr << "Packaging failed.\n";
+        std::cerr << details::colors::RED << "Packaging failed.\n"
+                  << details::colors::RESET;
         return 1;
     }
 
-    std::cout << "Packaging completed successfully.\n";
+    std::cout << details::colors::GREEN << "All tasks completed successfully.\n"
+              << details::colors::RESET;
     return 0;
 }
