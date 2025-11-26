@@ -22,15 +22,6 @@ namespace Details {
         return {vec[0], vec[1], vec[2]};
     }
 
-    glm::vec4 cvtTinyGltfVec4(const std::vector<double>& vec) {
-        if (vec.size() == 4) {
-            return {vec[0], vec[1], vec[2], vec[3]};
-        }
-
-        assert(vec.size() == 3);
-        return {vec[0], vec[1], vec[2], 1.f};
-    }
-
     glm::quat cvtTinyGltfQuat(const std::vector<double>& vec) {
         assert(vec.size() == 4);
         return {
@@ -39,6 +30,29 @@ namespace Details {
                 static_cast<float>(vec[1]),
                 static_cast<float>(vec[2]),
         };
+    }
+
+    std::tuple<glm::vec3, glm::quat, glm::vec3> splitTransform(const glm::mat4& transform) {
+        glm::vec3 T;
+        glm::quat R;
+        glm::vec3 S;
+
+        // translation
+        T = glm::vec3(transform[3]);
+
+        // scale
+        S.x = glm::length(glm::vec3(transform[0]));
+        S.y = glm::length(glm::vec3(transform[1]));
+        S.z = glm::length(glm::vec3(transform[2]));
+
+        // rotation
+        glm::mat4 rotMat(1.0f);
+        rotMat[0] = transform[0] / S.x;
+        rotMat[1] = transform[1] / S.y;
+        rotMat[2] = transform[2] / S.z;
+        R = glm::quat_cast(rotMat);
+
+        return {T, R, S};
     }
 
     void loadGltfFile(tinygltf::Model& model, std::filesystem::path path, std::filesystem::path parentDir) {
@@ -104,38 +118,34 @@ namespace Details {
         return getPackedBufferSpan<T>(model, accessor);
     }
 
-    // T x R x S, S
-    Pair<glm::mat4, glm::vec3> loadTransform(const tinygltf::Node& node) {
+    glm::mat4 loadTransform(const tinygltf::Node& node) {
         glm::mat4 transform(1.0f);
 
+        glm::vec3 T(0.0f);
+        glm::quat R(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 S(1.0f);
+
         if (!node.matrix.empty()) {
-            for (int i = 0; i < 16; ++i) {
-                transform[i / 4][i % 4] = static_cast<float>(node.matrix[i]);
-            }
-            return {transform, glm::vec3(1.0)};
+            Logger::warn("Matrix not supported for ColliderFactory");
+            return transform;
         }
 
-        glm::mat4 T(1.0f), R(1.0f), S(1.0f);
-        glm::vec3 scale(1.0f);
         if (!node.scale.empty()) {
-            scale = cvtTinyGltfVec3(node.scale);
-            S = glm::scale(S, scale);
+            S = cvtTinyGltfVec3(node.scale);
         }
 
         if (!node.rotation.empty()) {
-            glm::quat rotation = cvtTinyGltfQuat(node.rotation);
-            R *= glm::toMat4(rotation);
+            R = cvtTinyGltfQuat(node.rotation);
         }
 
         if (!node.translation.empty()) {
-            glm::vec3 translation = cvtTinyGltfVec3(node.translation);
-            T = glm::translate(T, translation);
+            T = cvtTinyGltfVec3(node.translation);
         }
 
-        // ! glTF spec
-        transform = T * R * S;
-
-        return {transform, scale};
+        transform = glm::translate(glm::mat4(1.0f), T) *
+                    glm::toMat4(R) *
+                    glm::scale(glm::mat4(1.0f), S);
+        return transform;
     }
 
     bool isMesh(const tinygltf::Node& node) {
@@ -143,8 +153,9 @@ namespace Details {
     }
 
     struct NodeData {
-        glm::mat4 localTransformTR;
-        glm::vec3 localScale;
+        glm::mat4 localTransform = glm::mat4(1.0f);
+        glm::mat4 globalTransform = glm::mat4(1.0f);
+
         int meshIndex = -1;
         Vector<size_t> childrenIndices;
     };
@@ -152,12 +163,12 @@ namespace Details {
     void loadNodesRecursively(
             Vector<NodeData>& outNodes,
             const tinygltf::Model& model,
-            const tinygltf::Node& gltfNode) {
+            const tinygltf::Node& gltfNode,
+            const glm::mat4& parentTransform = glm::mat4(1.0f)) {
         NodeData nodeData{};
-        auto [localTransformTR, localScale] =
-                loadTransform(gltfNode);
-        nodeData.localTransformTR = localTransformTR;
-        nodeData.localScale = localScale;
+
+        nodeData.localTransform = Details::loadTransform(gltfNode);
+        nodeData.globalTransform = parentTransform * nodeData.localTransform;
 
         if (isMesh(gltfNode)) {
             nodeData.meshIndex = gltfNode.mesh;
@@ -169,7 +180,9 @@ namespace Details {
             const auto& childNode = model.nodes[childIdx];
 
             size_t childStartIndex = outNodes.size();
-            loadNodesRecursively(outNodes, model, childNode);
+            loadNodesRecursively(
+                    outNodes, model, childNode,
+                    nodeData.globalTransform);
             outNodes[currentNodeIndex].childrenIndices.push_back(childStartIndex);
         }
     }
@@ -324,32 +337,20 @@ JPH::Ref<JPH::StaticCompoundShapeSettings> GltfColliderFactory::shapeFromGltf(St
                     nodeData.meshIndex < static_cast<int>(meshShapes.size()),
                     "Invalid mesh index in node");
 
-            JPH::Mat44 transformMat;
-            for (int i = 0; i < 4; ++i) {
-                for (int j = 0; j < 4; ++j) {
-                    transformMat.SetColumn4(
-                            i,
-                            JPH::Vec4(
-                                    nodeData.localTransformTR[0][i],
-                                    nodeData.localTransformTR[1][i],
-                                    nodeData.localTransformTR[2][i],
-                                    nodeData.localTransformTR[3][i]));
-                }
-            }
+            auto [glmTranslation, glmRotation, glmScale] =
+                    Details::splitTransform(nodeData.globalTransform);
 
-            JPH::Quat rotation = transformMat.GetRotation().GetQuaternion().Normalized();
-            JPH::Vec3 position = transformMat.GetTranslation();
+            JPH::Quat rotation = JPH::Quat(glmRotation.x, glmRotation.y, glmRotation.z, glmRotation.w).Normalized();
+            JPH::Vec3 position = JPH::Vec3(glmTranslation.x, glmTranslation.y, glmTranslation.z);
 
             JPH::Ref<JPH::ShapeSettings> finalShapeSettings;
 
-            if (nodeData.localScale != glm::vec3(1.0f)) {
+            auto scale = JPH::Vec3(glmScale.x, glmScale.y, glmScale.z);
+            if (scale != JPH::Vec3{1.0f, 1.0f, 1.0f}) {
                 JPH::Ref<JPH::ScaledShapeSettings> scaledShapeSettings =
                         new JPH::ScaledShapeSettings(
                                 meshShapes[nodeData.meshIndex],
-                                JPH::Vec3(
-                                        nodeData.localScale.x,
-                                        nodeData.localScale.y,
-                                        nodeData.localScale.z));
+                                scale);
                 finalShapeSettings = scaledShapeSettings;
             } else {
                 finalShapeSettings = meshShapes[nodeData.meshIndex];
