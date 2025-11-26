@@ -8,7 +8,7 @@
 MOE_BEGIN_NAMESPACE
 
 struct GltfColliderFactory {
-    static JPH::StaticCompoundShapeSettings* shapeFromGltf(StringView filePath);
+    static JPH::Ref<JPH::StaticCompoundShapeSettings> shapeFromGltf(StringView filePath);
 };
 
 MOE_END_NAMESPACE

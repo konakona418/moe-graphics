@@ -12,24 +12,10 @@ MOE_BEGIN_NAMESPACE
 
 namespace Details {
     static const String GLTF_POSITIONS_ACCESSOR{"POSITION"};
-    static const String GLTF_NORMALS_ACCESSOR{"NORMAL"};
-    static const String GLTF_TANGENTS_ACCESSOR{"TANGENT"};
-    static const String GLTF_UVS_ACCESSOR{"TEXCOORD_0"};
-    static const String GLTF_JOINTS_ACCESSOR{"JOINTS_0"};
-    static const String GLTF_WEIGHTS_ACCESSOR{"WEIGHTS_0"};
 
     static const String GLTF_SAMPLER_PATH_TRANSLATION{"translation"};
     static const String GLTF_SAMPLER_PATH_ROTATION{"rotation"};
     static const String GLTF_SAMPLER_PATH_SCALE{"scale"};
-
-    // illumination extension
-    static const String GLTF_LIGHTS_PUNCTUAL_KEY{"KHR_lights_punctual"};
-    static const String GLTF_LIGHTS_PUNCTUAL_POINT_NAME{"point"};
-    static const String GLTF_LIGHTS_PUNCTUAL_DIRECTIONAL_NAME{"directional"};
-    static const String GLTF_LIGHTS_PUNCTUAL_SPOT_NAME{"spot"};
-
-    static const String GLTF_EMISSIVE_STRENGTH_KHR_KEY{"KHR_materials_emissive_strength"};
-    static const String GLTF_EMISSIVE_STRENGTH_PARAM_NAME{"emissiveStrength"};
 
     glm::vec3 cvtTinyGltfVec3(const std::vector<double>& vec) {
         assert(vec.size() == 3);
@@ -189,7 +175,7 @@ namespace Details {
     }
 }// namespace Details
 
-JPH::StaticCompoundShapeSettings* GltfColliderFactory::shapeFromGltf(StringView filePath) {
+JPH::Ref<JPH::StaticCompoundShapeSettings> GltfColliderFactory::shapeFromGltf(StringView filePath) {
     tinygltf::Model model;
 
     std::filesystem::path pathStr{filePath.data()};
@@ -213,6 +199,15 @@ JPH::StaticCompoundShapeSettings* GltfColliderFactory::shapeFromGltf(StringView 
         meshData.primitives.resize(mesh.primitives.size());
         for (size_t pi = 0; pi < mesh.primitives.size(); ++pi) {
             const auto& primitive = mesh.primitives[pi];
+
+            if (primitive.mode != TINYGLTF_MODE_TRIANGLES) {
+                Logger::error(
+                        "Only triangle primitives are supported in GltfColliderFactory; "
+                        "Other primitives will be ignored. primitive mode: {}",
+                        primitive.mode);
+                continue;
+            }
+
             // load positions
             JPH::VertexList vertices;
             const auto positions =
@@ -290,18 +285,20 @@ JPH::StaticCompoundShapeSettings* GltfColliderFactory::shapeFromGltf(StringView 
         meshesData.push_back(std::move(meshData));
     }
 
-    Vector<JPH::StaticCompoundShapeSettings*> meshShapes;
+    Vector<JPH::Ref<JPH::StaticCompoundShapeSettings>> meshShapes;
     for (const auto& meshData: meshesData) {
-        JPH::StaticCompoundShapeSettings* compoundShapeSettings =
+        JPH::Ref<JPH::StaticCompoundShapeSettings> compoundShapeSettings =
                 new JPH::StaticCompoundShapeSettings();
 
         for (const auto& primitiveData: meshData.primitives) {
-            JPH::MeshShapeSettings* meshShapeSettings =
+            JPH::Ref<JPH::MeshShapeSettings> meshShapeSettings =
                     new JPH::MeshShapeSettings(
                             primitiveData.vertices,
                             primitiveData.triangles);
 
             // mesh primitive itself is not mutable
+            // (at least let's assume so here anyway)
+            // ヾ(≧▽≦*)o
             compoundShapeSettings->AddShape(
                     JPH::Vec3::sZero(),
                     JPH::Quat::sIdentity(),
@@ -318,7 +315,7 @@ JPH::StaticCompoundShapeSettings* GltfColliderFactory::shapeFromGltf(StringView 
         Details::loadNodesRecursively(nodesData, model, rootNode);
     }
 
-    JPH::StaticCompoundShapeSettings* rootCompoundShapeSettings =
+    JPH::Ref<JPH::StaticCompoundShapeSettings> rootCompoundShapeSettings =
             new JPH::StaticCompoundShapeSettings();
 
     for (const auto& nodeData: nodesData) {
@@ -343,10 +340,10 @@ JPH::StaticCompoundShapeSettings* GltfColliderFactory::shapeFromGltf(StringView 
             JPH::Quat rotation = transformMat.GetRotation().GetQuaternion().Normalized();
             JPH::Vec3 position = transformMat.GetTranslation();
 
-            JPH::ShapeSettings* finalShapeSettings = nullptr;
+            JPH::Ref<JPH::ShapeSettings> finalShapeSettings;
 
             if (nodeData.localScale != glm::vec3(1.0f)) {
-                JPH::ScaledShapeSettings* scaledShapeSettings =
+                JPH::Ref<JPH::ScaledShapeSettings> scaledShapeSettings =
                         new JPH::ScaledShapeSettings(
                                 meshShapes[nodeData.meshIndex],
                                 JPH::Vec3(
