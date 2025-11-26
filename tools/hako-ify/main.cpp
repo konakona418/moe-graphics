@@ -9,8 +9,6 @@
 constexpr static char TOOL_NAME[] = "hako-ify";
 constexpr static char TOOL_VERSION[] = "0.1.0";
 constexpr static char USAGE_MESSAGE[] =
-        "📦 hako-ify - A resource packaging tool for moe-graphics\n"
-        "\n"
         "Usage: hako-ify <input_directory> <output_file>\n"
         "\n"
         "Arguments:\n"
@@ -59,11 +57,6 @@ namespace details {
         const std::string CYAN = "\033[36m";
         const std::string WHITE = "\033[37m";
     }// namespace colors
-
-#include <cmath>
-#include <iostream>
-#include <sstream>
-#include <string>
 
     static inline size_t visible_length(const std::string& s) {
         size_t count = 0;
@@ -333,6 +326,10 @@ private:
 
 int main(int argc, char** argv) {
     if (argc != 3) {
+        std::cout << "📦 ";
+        details::print_rainbow(
+                std::string(TOOL_NAME) + " v" + std::string(TOOL_VERSION) +
+                std::string(" - A resource packaging tool for moe-graphics\n"));
         std::cout << USAGE_MESSAGE;
         return 1;
     }

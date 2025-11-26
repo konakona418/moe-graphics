@@ -1,22 +1,19 @@
 #include "Render/Vulkan/VulkanEngine.hpp"
 #include "Render/Vulkan/VulkanFont.hpp"
+
+#include "Audio/AudioEngine.hpp"
+
+#include "Physics/GltfColliderFactory.hpp"
+#include "Physics/JoltIncludes.hpp"
+
+#include "Core/FileReader.hpp"
+#include "Core/Ref.hpp"
+#include "Core/RefCounted.hpp"
+
 #include "imgui.h"
 
 #include <iostream>
 
-
-#include <Jolt/Jolt.h>
-
-#include <Jolt/Core/Factory.h>
-#include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-#include <Jolt/Physics/PhysicsSettings.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/RegisterTypes.h>
 
 static void TraceImpl(const char* inFMT, ...) {
     // Format the message
@@ -181,7 +178,34 @@ struct CameraMovementMask {
     }
 };
 
+void testRefcount() {
+    struct RefCountedObject : public moe::RefCounted<RefCountedObject> {
+        RefCountedObject() {
+            moe::Logger::debug("RefCountedObject created");
+        }
+
+        ~RefCountedObject() {
+            moe::Logger::debug("RefCountedObject destroyed");
+        }
+    };
+
+    auto ref1 = moe::Ref(new RefCountedObject());
+    {
+        auto ref2 = ref1;
+        {
+            auto ref3 = ref2;
+            moe::Logger::debug("Ref count after 3 refs: {}", ref3->getRefCount());
+        }
+        moe::Logger::debug("Ref count after ref3 out of scope: {}", ref2->getRefCount());
+    }
+    moe::Logger::debug("Ref count after ref2 out of scope: {}", ref1->getRefCount());
+}
+
 int main() {
+    testRefcount();
+
+    moe::FileReader::initReader(new moe::DebugFileReader<moe::DefaultFileReader>());
+
     JPH::RegisterDefaultAllocator();
 
     JPH::Trace = TraceImpl;
@@ -210,9 +234,11 @@ int main() {
 
     JPH::BodyInterface& bodyInterface = physicsSystem.GetBodyInterface();
 
+    //auto floorShape = new JPH::BoxShape({10.0f, 0.1f, 10.0f});
+    auto floorShape = moe::GltfColliderFactory::shapeFromGltf("phy/complex-scene/scene.gltf");
     auto floorSettings = JPH::BodyCreationSettings(
-            new JPH::BoxShape({10.0f, 0.1f, 10.0f}),
-            JPH::RVec3(0.0f, -0.08f, 0.0f),
+            floorShape,
+            JPH::RVec3(0.0f, 0.0f, 0.0f),
             JPH::Quat::sIdentity(),
             JPH::EMotionType::Static,
             Layers::NON_MOVING);
@@ -257,6 +283,9 @@ int main() {
 
     moe::VulkanEngine engine;
     engine.init();
+
+    moe::AudioEngine audioEngine;
+    audioEngine.init();
 
     auto zhcnGlyphRangeGenerator = []() -> moe::String {
         moe::Vector<char32_t> ss;
@@ -306,7 +335,7 @@ int main() {
 
     auto& loader = engine.getResourceLoader();
 
-    auto sceneId = loader.load("anim/anim.gltf", moe::Loader::Gltf);
+    auto sceneId = loader.load("vrm0/vroid.gltf", moe::Loader::Gltf);
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
     auto* animatableRenderable = scene->checkedAs<moe::VulkanSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
@@ -316,7 +345,7 @@ int main() {
     float animationTime = 0.0f;
     int animationIndex = 0;
 
-    auto plane = loader.load("phy/plane/plane.gltf", moe::Loader::Gltf);
+    auto plane = loader.load("phy/complex-scene/scene.gltf", moe::Loader::Gltf);
     auto sphere = loader.load("phy/sphere/sphere.gltf", moe::Loader::Gltf);
 
     auto spriteImageId = loader.load("test_sprite.jpg", moe::Loader::Image);
@@ -431,7 +460,7 @@ int main() {
 
                 ImGui::Separator();
                 ImGui::Text("Skeletal Animation");
-                ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 1.0f);
+                ImGui::SliderFloat("Animation Time", &animationTime, 0.0f, 5.0f);
                 if (ImGui::BeginListBox("Animation Select")) {
                     int i = 0;
                     for (auto& [name, animation]: animations) {
@@ -517,10 +546,6 @@ int main() {
             renderBus.submitRender(sphere, sphereTransform);
         }
 
-        {
-            renderBus.submitRender(sphere, moe::Transform{}.setPosition(gizmoTranslation).setScale(glm::vec3(0.2f)));
-        }
-
         physicsSystem.Update(deltaTime, 3, &tempAllocator, &jobSystem);
 
         {
@@ -580,6 +605,8 @@ int main() {
     }
 
     engine.cleanup();
+    audioEngine.cleanup();
+    moe::FileReader::destroyReader();
 
     bodyInterface.RemoveBody(floorBody);
     bodyInterface.RemoveBodies(sphereBodies.data(), (JPH::uint) sphereBodies.size());
