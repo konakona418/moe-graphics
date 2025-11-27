@@ -168,6 +168,39 @@ namespace Meta {
 
     template<typename Base, typename Derived>
     constexpr bool IsBaseOfV = IsBaseOf<Base, Derived>::value;
+
+    template<typename T>
+    struct HasValueType {
+    private:
+        template<typename U>
+        static auto test(int) -> decltype(typename U::value_type{}, TrueType{});
+
+        template<typename U>
+        static auto test(...) -> FalseType;
+
+    public:
+        static constexpr bool value = decltype(test<T>(0))::value;
+    };
+
+    template<typename T>
+    constexpr bool HasValueTypeV = HasValueType<T>::value;
+
+    template<typename T, typename... Args>
+    struct InvokeResult {
+    private:
+        template<typename U, typename... A>
+        static auto test(int) -> decltype(DeclareValue<U>()(DeclareValue<A>()...));
+
+        template<typename U, typename... A>
+        static auto test(...) -> void;
+
+    public:
+        using type = decltype(test<T, Args...>(0));
+    };
+
+    template<typename T, typename... Args>
+    using InvokeResultT = typename InvokeResult<T, Args...>::type;
+
 }// namespace Meta
 
 MOE_END_NAMESPACE
