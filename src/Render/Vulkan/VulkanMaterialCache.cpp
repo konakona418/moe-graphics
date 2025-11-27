@@ -54,8 +54,6 @@ namespace moe {
         m_materials[id] = material;
         loadMaterial(material, id);
 
-        Logger::debug("Loaded material with id {}", id);
-
         return id;
     }
 
