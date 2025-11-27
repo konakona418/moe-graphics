@@ -137,32 +137,34 @@ namespace details {
 struct HakoifierMetadataEntry {
     uint16_t pathLength;
     std::string resourcePathAligned;
-    uint64_t offset;
-    uint64_t size;
+    uint32_t offset;
+    uint32_t size;
 
     static HakoifierMetadataEntry from(
             const std::string& path,
-            uint64_t offset, uint64_t size,
+            uint32_t offset, uint32_t size,
             bool* err = nullptr) {
         HakoifierMetadataEntry entry;
         if (path.size() > std::numeric_limits<uint16_t>::max()) {
             if (err) *err = true;
             return entry;
         }
-        entry.pathLength = static_cast<uint16_t>(path.size());
 
-        size_t padded = ((entry.pathLength + 3) / 4) * 4;
+        size_t pathSize = path.size();
+        size_t padded = ((pathSize + 3) / 4) * 4;
         entry.resourcePathAligned.assign(padded, '\0');
-        std::memcpy(&entry.resourcePathAligned[0], path.data(), entry.pathLength);
+        std::memcpy(&entry.resourcePathAligned[0], path.data(), pathSize);
+
+        entry.pathLength = static_cast<uint16_t>(padded);
         entry.offset = offset;
         entry.size = size;
         return entry;
     }
 
     std::vector<uint8_t> toBytes() const {
-        // format: [u16 pathLen little-endian][padded path bytes][u64 offset LE][u64 size LE]
+        // format: [u16 pathLen little-endian][padded path bytes][u32 offset LE][u32 size LE]
         std::vector<uint8_t> bytes;
-        bytes.reserve(2 + resourcePathAligned.size() + 8 + 8);
+        bytes.reserve(2 + resourcePathAligned.size() + 4 + 4);
 
         uint16_t pl = pathLength;
         bytes.push_back(static_cast<uint8_t>(pl & 0xFF));
@@ -170,11 +172,11 @@ struct HakoifierMetadataEntry {
 
         bytes.insert(bytes.end(), resourcePathAligned.begin(), resourcePathAligned.end());
 
-        uint64_t off = offset;
-        for (size_t i = 0; i < 8; ++i) bytes.push_back(static_cast<uint8_t>((off >> (i * 8)) & 0xFF));
+        uint32_t off = offset;
+        for (size_t i = 0; i < 4; ++i) bytes.push_back(static_cast<uint8_t>((off >> (i * 8)) & 0xFF));
 
-        uint64_t sz = size;
-        for (size_t i = 0; i < 8; ++i) bytes.push_back(static_cast<uint8_t>((sz >> (i * 8)) & 0xFF));
+        uint32_t sz = size;
+        for (size_t i = 0; i < 4; ++i) bytes.push_back(static_cast<uint8_t>((sz >> (i * 8)) & 0xFF));
 
         return bytes;
     }
@@ -193,7 +195,7 @@ struct HakoifierMetadataEntry {
         outConsumed = 2;
 
         size_t padded = ((static_cast<size_t>(pl) + 3) / 4) * 4;
-        if (dataSize < outConsumed + padded + 8 + 8) {
+        if (dataSize < outConsumed + padded + 4 + 4) {
             if (err) *err = true;
             return {};
         };
@@ -203,20 +205,24 @@ struct HakoifierMetadataEntry {
         entry.resourcePathAligned.assign(reinterpret_cast<const char*>(data + outConsumed), padded);
         outConsumed += padded;
 
-        uint64_t off = 0;
-        for (size_t i = 0; i < 8; ++i) off |= static_cast<uint64_t>(data[outConsumed + i]) << (i * 8);
-        outConsumed += 8;
+        uint32_t off = 0;
+        for (size_t i = 0; i < 4; ++i) off |= static_cast<uint32_t>(data[outConsumed + i]) << (i * 8);
+        outConsumed += 4;
 
-        uint64_t sz = 0;
-        for (size_t i = 0; i < 8; ++i) sz |= static_cast<uint64_t>(data[outConsumed + i]) << (i * 8);
-        outConsumed += 8;
-
+        uint32_t sz = 0;
+        for (size_t i = 0; i < 4; ++i) sz |= static_cast<uint32_t>(data[outConsumed + i]) << (i * 8);
+        outConsumed += 4;
         entry.offset = off;
         entry.size = sz;
         return entry;
     }
 };
 
+
+// Metadata format:
+// [u16 numEntries LE][entries...]
+// Metadata entry format:
+// [u16 pathLen LE][padded path bytes][u32 offset LE][u32 size LE]
 struct Hakoifier {
 public:
     static bool runPackaging(const std::string& inputDir, const std::string& outputFile) {
@@ -225,6 +231,19 @@ public:
         if (err) {
             std::cerr << details::colors::RED << "Failed to enumerate resources in directory: "
                       << inputDir << details::colors::RESET << std::endl;
+            return false;
+        }
+
+        if (resources.empty()) {
+            std::cerr << details::colors::YELLOW << "No resources found in directory: "
+                      << inputDir << details::colors::RESET << std::endl;
+            return true;
+        }
+
+        if (resources.size() > std::numeric_limits<uint16_t>::max()) {
+            std::cerr << details::colors::RED << "Too many resources to package (max "
+                      << std::numeric_limits<uint16_t>::max() << "): "
+                      << resources.size() << details::colors::RESET << std::endl;
             return false;
         }
 
@@ -293,6 +312,7 @@ public:
                   << "Packaging complete. Writing metadata..."
                   << details::colors::RESET << std::endl;
 
+        writeU16(outMetaData, metadataEntries.size());
         for (const auto& entry: metadataEntries) {
             auto bytes = entry.toBytes();
             outMetaData.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
@@ -305,6 +325,11 @@ public:
     }
 
 private:
+    static void writeU16(std::ofstream& outFile, uint16_t value) {
+        outFile.put(static_cast<char>(value & 0xFF));
+        outFile.put(static_cast<char>((value >> 8) & 0xFF));
+    }
+
     static std::vector<std::string> enumerateResources(
             const std::string& inputDir, bool* err = nullptr) {
         std::filesystem::path inputPath{inputDir};
