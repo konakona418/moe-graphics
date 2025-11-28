@@ -88,17 +88,52 @@ namespace moe {
                 };
             }
 
-            void loadGltfFile(tinygltf::Model& model, std::filesystem::path path, std::filesystem::path parentDir) {
+            enum class ModelType {
+                Gltf,
+                Glb
+            };
+
+            ModelType selectModelType(std::filesystem::path path) {
+                auto ext = path.extension().string();
+                if (ext == ".gltf") {
+                    return ModelType::Gltf;
+                } else if (ext == ".glb") {
+                    return ModelType::Glb;
+                } else {
+                    Logger::error("Unsupported glTF file extension: {}", ext);
+                    MOE_ASSERT(false, "Unsupported glTF file extension");
+                }
+            }
+
+            ModelType loadGltfFile(tinygltf::Model& model, std::filesystem::path path, std::filesystem::path parentDir) {
                 tinygltf::TinyGLTF loader;
                 std::string err;
                 std::string warn;
 
                 size_t bufSize = 0;
-                auto fileBuf = FileReader::s_instance->readFile(path.string(), bufSize);
-                bool success = loader.LoadASCIIFromString(
-                        &model, &err, &warn,
-                        reinterpret_cast<const char*>(fileBuf->data()),
-                        bufSize, parentDir.string());
+                auto fileBuf =
+                        FileReader::s_instance->readFile(path.string(), bufSize);
+
+                ModelType modelType = selectModelType(path);
+                bool success;
+                if (modelType == ModelType::Gltf) {
+                    success = loader.LoadASCIIFromString(
+                            &model,
+                            &err,
+                            &warn,
+                            reinterpret_cast<const char*>(fileBuf->data()),
+                            bufSize,
+                            parentDir.string());
+                } else {
+                    success = loader.LoadBinaryFromMemory(
+                            &model,
+                            &err,
+                            &warn,
+                            reinterpret_cast<const unsigned char*>(fileBuf->data()),
+                            bufSize);
+                    // glb has all files embedded
+                }
+
                 if (!warn.empty()) {
                     Logger::warn("GLTF loader warning: {}", warn);
                 }
@@ -107,6 +142,8 @@ namespace moe {
                     Logger::error("Failed to load glTF: {}", err);
                     MOE_ASSERT(false, "Failed to load glTF");
                 }
+
+                return modelType;
             }
 
             int findAttributeAccessor(const tinygltf::Primitive& primitive, StringView attributeName) {
@@ -189,6 +226,7 @@ namespace moe {
                 const auto& image = model.images[textureId.source];
                 return fileDir / image.uri;
             }
+
             std::filesystem::path getNormalMapTexturePath(
                     const tinygltf::Model& model,
                     const tinygltf::Material& material,
@@ -243,7 +281,162 @@ namespace moe {
                 }
             }
 
-            VulkanCPUMaterial loadMaterial(
+            void loadMaterialImagesText(
+                    VulkanImageCache& imageCache,
+                    const tinygltf::Model& gltfModel,
+                    const tinygltf::Material& gltfMaterial,
+                    const std::filesystem::path& parentPath,
+                    UnorderedMap<String, ImageId>& loadedTextures,
+                    VulkanCPUMaterial& outMaterial) {
+                if (hasDiffuseTexture(gltfMaterial)) {
+                    const auto diffusePath = getDiffuseTexturePath(gltfModel, gltfMaterial, parentPath);
+                    outMaterial.diffuseTexture = loadImageOrReuse(imageCache, diffusePath, loadedTextures);
+                } else {
+                    outMaterial.diffuseTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+
+                if (hasNormalMapTexture(gltfMaterial)) {
+                    const auto normalMapPath = getNormalMapTexturePath(gltfModel, gltfMaterial, parentPath);
+                    outMaterial.normalTexture = loadImageOrReuse(imageCache, normalMapPath, loadedTextures);
+                } else {
+                    outMaterial.normalTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::FlatNormal);
+                }
+
+                if (hasMetallicRoughnessTexture(gltfMaterial)) {
+                    const auto metalRoughnessPath =
+                            getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
+                    outMaterial.metallicRoughnessTexture = loadImageOrReuse(imageCache, metalRoughnessPath, loadedTextures);
+                } else {
+                    outMaterial.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+
+                if (hasEmissiveTexture(gltfMaterial)) {
+                    const auto emissivePath =
+                            getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
+                    outMaterial.emissiveTexture = loadImageOrReuse(imageCache, emissivePath, loadedTextures);
+                } else {
+                    // if the object is not emissive, use white texture
+                    outMaterial.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+            }
+
+            ImageId loadImageOrReuse(
+                    VulkanImageCache& imageCache,
+                    const tinygltf::Model& model,
+                    int imageIndex,
+                    UnorderedMap<int, ImageId>& loadedTextures) {
+                const auto& gltfImage = model.images[imageIndex];
+                auto& imageName = gltfImage.name;
+                auto imageData = Span<uint8_t>{
+                        const_cast<uint8_t*>(gltfImage.image.data()),
+                        gltfImage.image.size(),
+                };
+                VkExtent2D extent{
+                        static_cast<uint32_t>(gltfImage.width),
+                        static_cast<uint32_t>(gltfImage.height),
+                };
+
+                if (loadedTextures.find(imageIndex) != loadedTextures.end()) {
+                    Logger::debug("Reusing loaded texture: {}, index {}", imageName, imageIndex);
+                    return loadedTextures[imageIndex];
+                } else {
+                    ImageId imageId =
+                            imageCache.loadImageFromMemory(
+                                    imageData,
+                                    extent,
+                                    VK_FORMAT_R8G8B8A8_SRGB,
+                                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                                    true);
+                    loadedTextures[imageIndex] = imageId;
+                    return imageId;
+                }
+            }
+
+            int getDiffuseTextureImage(
+                    const tinygltf::Model& model,
+                    const tinygltf::Material& material) {
+                const auto textureIndex = material.pbrMetallicRoughness.baseColorTexture.index;
+                const auto& texture = model.textures[textureIndex];
+                return texture.source;
+            }
+
+            int getNormalMapTextureImage(
+                    const tinygltf::Model& model,
+                    const tinygltf::Material& material) {
+                const auto textureIndex = material.normalTexture.index;
+                const auto& texture = model.textures[textureIndex];
+                return texture.source;
+            }
+
+            int getMetallicRoughnessTextureImage(
+                    const tinygltf::Model& model,
+                    const tinygltf::Material& material) {
+                const auto textureIndex = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+                const auto& texture = model.textures[textureIndex];
+                return texture.source;
+            }
+
+            int getEmissiveTextureImage(
+                    const tinygltf::Model& model,
+                    const tinygltf::Material& material) {
+                const auto textureIndex = material.emissiveTexture.index;
+                const auto& texture = model.textures[textureIndex];
+                return texture.source;
+            }
+
+            void loadMaterialImagesBinary(
+                    VulkanImageCache& imageCache,
+                    const tinygltf::Model& gltfModel,
+                    const tinygltf::Material& gltfMaterial,
+                    UnorderedMap<int, ImageId>& loadedTextures,
+                    VulkanCPUMaterial& outMaterial) {
+                if (hasDiffuseTexture(gltfMaterial)) {
+                    const auto diffuseImage =
+                            getDiffuseTextureImage(
+                                    gltfModel,
+                                    gltfMaterial);
+                    outMaterial.diffuseTexture =
+                            loadImageOrReuse(imageCache, gltfModel, diffuseImage, loadedTextures);
+                } else {
+                    outMaterial.diffuseTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+
+                if (hasNormalMapTexture(gltfMaterial)) {
+                    const auto normalMapImage =
+                            getNormalMapTextureImage(
+                                    gltfModel,
+                                    gltfMaterial);
+                    outMaterial.normalTexture =
+                            loadImageOrReuse(imageCache, gltfModel, normalMapImage, loadedTextures);
+                } else {
+                    outMaterial.normalTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::FlatNormal);
+                }
+
+                if (hasMetallicRoughnessTexture(gltfMaterial)) {
+                    const auto metalRoughnessImage =
+                            getMetallicRoughnessTextureImage(
+                                    gltfModel,
+                                    gltfMaterial);
+                    outMaterial.metallicRoughnessTexture =
+                            loadImageOrReuse(imageCache, gltfModel, metalRoughnessImage, loadedTextures);
+                } else {
+                    outMaterial.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+
+                if (hasEmissiveTexture(gltfMaterial)) {
+                    const auto emissiveImage =
+                            getEmissiveTextureImage(
+                                    gltfModel,
+                                    gltfMaterial);
+                    outMaterial.emissiveTexture =
+                            loadImageOrReuse(imageCache, gltfModel, emissiveImage, loadedTextures);
+                } else {
+                    // if the object is not emissive, use white texture
+                    outMaterial.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
+                }
+            }
+
+            VulkanCPUMaterial loadMaterialText(
                     VulkanImageCache& imageCache,
                     const tinygltf::Model& gltfModel,
                     const tinygltf::Material& gltfMaterial,
@@ -253,39 +446,38 @@ namespace moe {
                 material.baseColor = getColor(gltfMaterial);
                 material.metallic = static_cast<float>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
                 material.roughness = static_cast<float>(gltfMaterial.pbrMetallicRoughness.roughnessFactor);
-
-                if (hasDiffuseTexture(gltfMaterial)) {
-                    const auto diffusePath = getDiffuseTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.diffuseTexture = loadImageOrReuse(imageCache, diffusePath, loadedTextures);
-                } else {
-                    material.diffuseTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
-                }
-
-                if (hasNormalMapTexture(gltfMaterial)) {
-                    const auto normalMapPath = getNormalMapTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.normalTexture = loadImageOrReuse(imageCache, normalMapPath, loadedTextures);
-                } else {
-                    material.normalTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::FlatNormal);
-                }
-
-                if (hasMetallicRoughnessTexture(gltfMaterial)) {
-                    const auto metalRoughnessPath =
-                            getMetallicRoughnessTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.metallicRoughnessTexture = loadImageOrReuse(imageCache, metalRoughnessPath, loadedTextures);
-                } else {
-                    material.metallicRoughnessTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
-                }
-
                 material.emissive = getEmissiveStrength(gltfMaterial);
                 material.emissiveColor = cvtTinyGltfVec4(gltfMaterial.emissiveFactor);
-                if (hasEmissiveTexture(gltfMaterial)) {
-                    const auto emissivePath =
-                            getEmissiveTexturePath(gltfModel, gltfMaterial, parentPath);
-                    material.emissiveTexture = loadImageOrReuse(imageCache, emissivePath, loadedTextures);
-                } else {
-                    // if the object is not emissive, use white texture
-                    material.emissiveTexture = imageCache.getDefaultImage(VulkanImageCache::DefaultResourceType::White);
-                }
+
+                loadMaterialImagesText(
+                        imageCache,
+                        gltfModel,
+                        gltfMaterial,
+                        parentPath,
+                        loadedTextures,
+                        material);
+
+                return material;
+            }
+
+            VulkanCPUMaterial loadMaterialBinary(
+                    VulkanImageCache& imageCache,
+                    const tinygltf::Model& gltfModel,
+                    const tinygltf::Material& gltfMaterial,
+                    UnorderedMap<int, ImageId>& loadedTextures) {
+                VulkanCPUMaterial material{};
+                material.baseColor = getColor(gltfMaterial);
+                material.metallic = static_cast<float>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
+                material.roughness = static_cast<float>(gltfMaterial.pbrMetallicRoughness.roughnessFactor);
+                material.emissive = getEmissiveStrength(gltfMaterial);
+                material.emissiveColor = cvtTinyGltfVec4(gltfMaterial.emissiveFactor);
+
+                loadMaterialImagesBinary(
+                        imageCache,
+                        gltfModel,
+                        gltfMaterial,
+                        loadedTextures,
+                        material);
 
                 return material;
             }
@@ -620,6 +812,10 @@ namespace moe {
                             // however we don't care,
                             // as this can simplify the interpolation implementation
                             tc.reserve(translationKeys.size());
+                            // ! if something went wrong here,
+                            // ! it might due to the malformed glTF file
+                            // ! check if the animations are exported with correct settings
+                            // ! (e.g. prefer 'NLA strips' than 'action' in Blender)
                             tc.assign(translationKeys.begin(), translationKeys.end());
 
                             animationTrack.keyTimes.translations.reserve(times.size());
@@ -694,17 +890,24 @@ namespace moe {
                 const auto parentPath = path.parent_path();
 
                 tinygltf::Model model;
-                loadGltfFile(model, path, parentPath);
+                auto modelType = loadGltfFile(model, path, parentPath);
 
                 //Logger::debug("GLTF file contains {} scenes", model.scenes.size());
                 auto& scene = model.scenes[model.defaultScene];
                 UnorderedMap<GLTFInternalId, MaterialId> materialMap;
 
-                {
+                if (modelType == ModelType::Gltf) {
                     UnorderedMap<String, ImageId> loadedTextures;
                     for (GLTFInternalId i = 0; i < model.materials.size(); ++i) {
                         auto& mat = model.materials[i];
-                        MaterialId id = materialCache.loadMaterial(loadMaterial(imageCache, model, mat, parentPath, loadedTextures));
+                        MaterialId id = materialCache.loadMaterial(loadMaterialText(imageCache, model, mat, parentPath, loadedTextures));
+                        materialMap[i] = id;
+                    }
+                } else {
+                    UnorderedMap<int, ImageId> loadedTextures;
+                    for (GLTFInternalId i = 0; i < model.materials.size(); ++i) {
+                        auto& mat = model.materials[i];
+                        MaterialId id = materialCache.loadMaterial(loadMaterialBinary(imageCache, model, mat, loadedTextures));
                         materialMap[i] = id;
                     }
                 }
