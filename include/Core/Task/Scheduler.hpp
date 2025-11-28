@@ -81,6 +81,15 @@ public:
 
     static Scheduler& getInstance() {
         static Scheduler instance;
+        if (!instance.m_running.load()) {
+            Logger::warn("Scheduler instance requested but not initialized. Forcing initialization");
+            std::call_once(
+                    instance.m_initFlag,
+                    [instance = std::ref(instance)]() {
+                        instance.get().start(std::thread::hardware_concurrency());
+                    });
+        }
+
         return instance;
     }
 
@@ -91,6 +100,8 @@ public:
 
         struct WaitForAllContext {
             std::atomic_size_t pendingTasks;
+            std::mutex mutex;
+            std::once_flag setFlag;
             ResultTuple results;
 
             explicit WaitForAllContext(size_t taskCount)
@@ -103,10 +114,15 @@ public:
         auto context = std::make_shared<WaitForAllContext>(sizeof...(Futures));
         auto bindTasks = [context, promise](auto&& future, auto idxValue) {
             future.then([context, promise, idxValue](auto&& value) {
-                std::get<decltype(idxValue)::value>(context->results) = std::move(value);
+                {
+                    std::scoped_lock<std::mutex> lk(context->mutex);
+                    std::get<decltype(idxValue)::value>(context->results) = std::move(value);
+                }
 
-                if (--context->pendingTasks == 0) {
-                    promise->setValue(std::move(context->results));
+                if (context->pendingTasks.fetch_sub(1) == 1) {
+                    std::call_once(context->setFlag, [context, promise]() {
+                        promise->setValue(std::move(context->results));
+                    });
                 }
             });
         };
