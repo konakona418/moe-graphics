@@ -9,7 +9,10 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct DefaultScheduler;
+struct Scheduler;
+
+template<typename T, typename SchedulerT = Scheduler>
+struct Future;
 
 template<typename T>
 struct Promise {
@@ -26,8 +29,8 @@ public:
         m_promise.set_value(std::move(value));
     }
 
-    std::future<T> getFuture() {
-        return m_promise.get_future();
+    Future<T> getFuture() {
+        return Future<T>(m_promise.get_future());
     }
 
 private:
@@ -52,9 +55,6 @@ public:
 private:
     std::promise<void> m_promise;
 };
-
-template<typename T, typename SchedulerT = DefaultScheduler>
-struct Future;
 
 namespace Detail {
     template<typename MaybeFutureT>
@@ -106,7 +106,7 @@ public:
         auto promise = std::make_shared<Promise<FinalU>>();
         auto nextFuture = promise->getFuture();
 
-        SchedulerT::get()->schedule(
+        SchedulerT::getInstance().schedule(
                 [fut = m_future,
                  func = std::forward<Fn>(func),
                  prom = promise]() mutable {
@@ -181,7 +181,7 @@ public:
         auto promise = std::make_shared<Promise<FinalU>>();
         auto nextFuture = promise->getFuture();
 
-        SchedulerT::get()->schedule(
+        SchedulerT::getInstance().schedule(
                 [fut = m_future,
                  func = std::forward<Fn>(func),
                  prom = promise]() mutable {

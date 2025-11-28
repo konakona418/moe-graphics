@@ -11,30 +11,27 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct DefaultScheduler {
+namespace Detail {
+    template<typename F, typename Tuple, size_t... I>
+    void applyToTupleImpl(F&& f, Tuple&& t, std::index_sequence<I...>) {
+        (f(std::get<I>(std::forward<Tuple>(t)), Meta::IntegralConstant<size_t, I>{}), ...);
+    }
+
+    template<typename F, typename... Args>
+    void applyToTuple(F&& f, std::tuple<Args...>&& t) {
+        constexpr size_t tupleSize = sizeof...(Args);
+        applyToTupleImpl(
+                std::forward<F>(f),
+                std::forward<std::tuple<Args...>>(t),
+                std::make_index_sequence<tupleSize>{});
+    }
+}// namespace Detail
+
+struct Scheduler {
 public:
-    static void init(size_t threadCount = std::thread::hardware_concurrency()) {
-        auto& inst = getInstance();
-        threadCount = threadCount == 0 ? 1 : threadCount;
-        std::call_once(inst.m_initFlag, [threadCount, &inst]() {
-            Logger::info("Initializing Scheduler with {} threads", threadCount);
-            inst.start(threadCount);
-        });
-    }
+    static void init(size_t threadCount = std::thread::hardware_concurrency());
 
-    static DefaultScheduler* get() {
-        init();
-        return &getInstance();
-    }
-
-    static void shutdown() {
-        Logger::info("Shutting down Scheduler");
-
-        auto& inst = getInstance();
-        std::call_once(inst.m_shutdownFlag, [&inst]() {
-            inst.stop();
-        });
-    }
+    static void shutdown();
 
     template<typename F>
     void schedule(F&& task) {
@@ -50,8 +47,7 @@ public:
             typename F,
             typename RawR = Meta::InvokeResultT<std::decay_t<F>>,
             typename UnwrappedR = UnwrapFutureT<std::decay_t<RawR>>>
-    Future<UnwrappedR, DefaultScheduler> scheduleAsync(F&& task) {
-
+    Future<UnwrappedR, Scheduler> scheduleAsync(F&& task) {
         auto promise = std::make_shared<Promise<UnwrappedR>>();
         auto fut = promise->getFuture();
 
@@ -76,19 +72,48 @@ public:
             }
         });
 
-        return Future<UnwrappedR, DefaultScheduler>(std::move(fut));
+        return Future<UnwrappedR, Scheduler>(std::move(fut));
     }
 
-    void schedule(Function<void()> task) {
-        {
-            std::lock_guard<std::mutex> lk(m_mutex);
-            if (!m_running) return;
-            m_tasks.emplace(std::move(task));
-        }
-        m_cv.notify_one();
-    }
+    void schedule(Function<void()> task);
 
     size_t workerCount() const { return m_workers.size(); }
+
+    static Scheduler& getInstance() {
+        static Scheduler instance;
+        return instance;
+    }
+
+    template<typename... Futures>
+    auto waitForAll(Futures&&... futures) {
+        using ResultTuple = std::tuple<UnwrapFutureT<typename std::decay_t<Futures>::value_type>...>;
+        using OutFuture = Future<ResultTuple, Scheduler>;
+
+        struct WaitForAllContext {
+            std::atomic_size_t pendingTasks;
+            ResultTuple results;
+
+            explicit WaitForAllContext(size_t taskCount)
+                : pendingTasks(taskCount) {}
+        };
+
+        auto promise = std::make_shared<Promise<ResultTuple>>();
+        OutFuture outFuture = promise->getFuture();
+
+        auto context = std::make_shared<WaitForAllContext>(sizeof...(Futures));
+        auto bindTasks = [context, promise](auto&& future, auto idxValue) {
+            future.then([context, promise, idxValue](auto&& value) {
+                std::get<decltype(idxValue)::value>(context->results) = std::move(value);
+
+                if (--context->pendingTasks == 0) {
+                    promise->setValue(std::move(context->results));
+                }
+            });
+        };
+
+        Detail::applyToTuple(bindTasks, std::make_tuple(std::forward<Futures>(futures)...));
+        return outFuture;
+    }
 
 private:
     Vector<std::thread> m_workers;
@@ -99,67 +124,20 @@ private:
     std::once_flag m_initFlag;
     std::once_flag m_shutdownFlag;
 
-    DefaultScheduler() = default;
-    ~DefaultScheduler() {
+    Scheduler() = default;
+
+    ~Scheduler() {
         stop();
     }
 
-    DefaultScheduler(const DefaultScheduler&) = delete;
-    DefaultScheduler& operator=(const DefaultScheduler&) = delete;
+    Scheduler(const Scheduler&) = delete;
+    Scheduler& operator=(const Scheduler&) = delete;
 
-    static DefaultScheduler& getInstance() {
-        static DefaultScheduler instance;
-        return instance;
-    }
+    void start(size_t threadCount);
 
-    void start(size_t threadCount) {
-        {
-            std::lock_guard<std::mutex> lk(m_mutex);
-            if (m_running) return;
-            m_running = true;
-        }
+    void stop();
 
-        m_workers.reserve(threadCount);
-        for (size_t i = 0; i < threadCount; ++i) {
-            m_workers.emplace_back([this]() {
-                workerMain();
-            });
-        }
-    }
-
-    void stop() {
-        {
-            std::lock_guard<std::mutex> lk(m_mutex);
-            if (!m_running) return;
-            m_running = false;
-        }
-        m_cv.notify_all();
-        for (auto& t: m_workers) {
-            if (t.joinable()) t.join();
-        }
-        m_workers.clear();
-
-        Queue<Function<void()>> empty;
-        {
-            std::lock_guard<std::mutex> lk(m_mutex);
-            std::swap(m_tasks, empty);
-        }
-    }
-
-    void workerMain() {
-        while (true) {
-            Function<void()> task;
-            {
-                std::unique_lock<std::mutex> lk(m_mutex);
-                m_cv.wait(lk, [this]() { return !m_running || !m_tasks.empty(); });
-                if (!m_running && m_tasks.empty()) return;
-                task = std::move(m_tasks.front());
-                m_tasks.pop();
-            }
-
-            task();
-        }
-    }
+    void workerMain();
 };
 
 MOE_END_NAMESPACE
