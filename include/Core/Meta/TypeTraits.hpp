@@ -201,6 +201,19 @@ namespace Meta {
     template<typename T, typename... Args>
     using InvokeResultT = typename InvokeResult<T, Args...>::type;
 
+    template<bool BCond, typename TSatisfied, typename TUnsatisfied>
+    struct Conditional {
+        using type = TSatisfied;
+    };
+
+    template<typename TSatisfied, typename TUnsatisfied>
+    struct Conditional<false, TSatisfied, TUnsatisfied> {
+        using type = TUnsatisfied;
+    };
+
+    template<bool BCond, typename TSatisfied, typename TUnsatisfied>
+    using ConditionalT = typename Conditional<BCond, TSatisfied, TUnsatisfied>::type;
+
 }// namespace Meta
 
 MOE_END_NAMESPACE
