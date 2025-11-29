@@ -12,6 +12,17 @@
 
 MOE_BEGIN_NAMESPACE
 
+namespace Detail {
+    template<typename MaybeVectorOfFutures>
+    struct IsVectorOfFutures : Meta::FalseType {};
+
+    template<typename T, typename SchedulerT>
+    struct IsVectorOfFutures<Vector<Future<T, SchedulerT>>> : Meta::TrueType {};
+
+    template<typename MaybeVectorOfFutures>
+    constexpr bool IsVectorOfFuturesV = IsVectorOfFutures<MaybeVectorOfFutures>::value;
+}// namespace Detail
+
 struct Scheduler {
 public:
     static Scheduler& getInstance();
@@ -61,7 +72,11 @@ public:
         return Future<UnwrappedR, Scheduler>(std::move(fut));
     }
 
-    template<typename... Futures>
+    template<
+            typename... Futures,
+            typename = Meta::EnableIfT<
+                    sizeof...(Futures) >= 2 &&
+                    !Detail::IsVectorOfFuturesV<Vector<std::decay_t<Futures>...>>>>
     auto whenAll(Futures&&... futures) {
         using ResultTuple = std::tuple<UnwrapFutureT<typename std::decay_t<Futures>::value_type>...>;
         using OutFuture = Future<ResultTuple, Scheduler>;
@@ -99,7 +114,11 @@ public:
         return outFuture;
     }
 
-    template<typename... Futures>
+    template<
+            typename... Futures,
+            typename = Meta::EnableIfT<
+                    sizeof...(Futures) >= 2 &&
+                    !Detail::IsVectorOfFuturesV<Vector<std::decay_t<Futures>...>>>>
     auto whenAny(Futures&&... futures) {
         using ResultVariant = Variant<UnwrapFutureT<typename std::decay_t<Futures>::value_type>...>;
         using OutFuture = Future<ResultVariant, Scheduler>;
@@ -132,10 +151,11 @@ public:
 
     template<typename T>
     auto whenAll(Vector<Future<T, Scheduler>>&& futures) {
-        using OutFuture = Future<T, Scheduler>;
+        using OutFuture = Future<Vector<T>, Scheduler>;
 
         struct WhenAllContext {
             std::atomic_size_t pendingTasks;
+            std::mutex mutex;
             std::once_flag setFlag;
             Vector<T> results;
 
@@ -148,10 +168,10 @@ public:
 
         auto context = std::make_shared<WhenAllContext>(futures.size());
         for (auto& future: futures) {
-            future.then([context, promise, future = std::move(future)]() {
+            future.then([context, promise](auto&& value) mutable {
                 {
                     std::scoped_lock<std::mutex> lk(context->mutex);
-                    context->results.push_back(future.get());
+                    context->results.push_back(std::move(value));
                 }
 
                 if (context->pendingTasks.fetch_sub(1) == 1) {
@@ -179,11 +199,11 @@ public:
 
         auto context = std::make_shared<WhenAnyContext>();
         for (auto& future: futures) {
-            future.then([context, promise, future = std::move(future)]() {
+            future.then([context, promise](auto&& value) {
                 if (!context->isSet.load()) {
-                    std::call_once(context->setFlag, [context, promise, future = std::move(future)]() mutable {
+                    std::call_once(context->setFlag, [context, promise, value = std::move(value)]() mutable {
                         context->isSet.store(true);
-                        promise->setValue(future.get());
+                        promise->setValue(std::move(value));
                     });
                 }
             });
