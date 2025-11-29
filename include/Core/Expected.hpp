@@ -22,12 +22,17 @@ namespace Detail {
     constexpr bool IsInfallible = Meta::IsSameV<E, Infallible>;
 }// namespace Detail
 
+using Infallible = Detail::Infallible;
+
 template<
         typename T,
         typename E = Detail::Infallible,
         typename = Meta::EnableIf<!Meta::IsVoidV<T>>>
 struct Expected {
 public:
+    using value_type = T;
+    using error_type = E;
+
     Expected(const Detail::OkWrapper<T>& ok)
         : m_isOk(true) {
         if constexpr (Detail::IsInfallible<E>) {
@@ -129,6 +134,15 @@ public:
         }
     }
 
+    static auto Ok(T value) {
+        return Expected<T, E>{Detail::OkWrapper<T>{std::move(value)}};
+    }
+
+    static auto Err(E error) {
+        static_assert(!Detail::IsInfallible<E>, "Cannot create Err Expected when E is Detail::Infallible");
+        return Expected<T, E>{Detail::ErrWrapper<E>{std::move(error)}};
+    }
+
 private:
     bool m_isOk;
     Meta::ConditionalT<
@@ -145,6 +159,38 @@ Expected<T, E> Ok(T value) {
 template<typename E>
 Detail::ErrWrapper<E> Err(E error) {
     return Detail::ErrWrapper<E>{std::move(error)};
+}
+
+template<
+        typename T, typename E,
+        template<typename...> class ContainerT,
+        typename = Meta::EnableIfT<Meta::IsIterableV<ContainerT<Expected<T, E>>>>>
+Expected<Vector<T>, E> collectExpected(ContainerT<Expected<T, E>>&& expecteds) {
+    using ReturnT = Expected<Vector<T>, E>;
+
+    Vector<T> results;
+    results.reserve(expecteds.size());
+
+    for (const auto& expected: expecteds) {
+        if constexpr (!Detail::IsInfallible<E>) {
+            if (expected.isErr()) {
+                return ReturnT::Err(expected.unwrapErr());
+            }
+        }
+        results.push_back(expected.unwrap());
+    }
+
+    return ReturnT::Ok(std::move(results));
+}
+
+template<typename T, typename E>
+auto tryFromOptional(const Optional<T>& opt, E error) {
+    using ReturnT = Expected<T, E>;
+    if (opt.has_value()) {
+        return ReturnT::Ok(opt.value());
+    } else {
+        return ReturnT::Err(std::move(error));
+    }
 }
 
 MOE_END_NAMESPACE

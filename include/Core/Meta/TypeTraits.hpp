@@ -250,6 +250,25 @@ namespace Meta {
     template<bool B>
     constexpr bool NegationV = Negation<B>::value;
 
+    template<typename MaybeIterable>
+    struct IsIterable {
+    private:
+        template<typename U>
+        static auto test(int)
+                -> decltype(std::begin(Meta::DeclareValue<U>()),
+                            std::end(Meta::DeclareValue<U>()),
+                            TrueType{});
+
+        template<typename U>
+        static auto test(...) -> FalseType;
+
+    public:
+        static constexpr bool value = decltype(test<MaybeIterable>(0))::value;
+    };
+
+    template<typename MaybeIterable>
+    constexpr bool IsIterableV = IsIterable<MaybeIterable>::value;
+
 }// namespace Meta
 
 MOE_END_NAMESPACE
