@@ -2,6 +2,20 @@
 
 MOE_BEGIN_NAMESPACE
 
+Scheduler& Scheduler::getInstance() {
+    static Scheduler instance;
+    if (!instance.m_running.load()) {
+        Logger::warn("Scheduler instance requested but not initialized. Forcing initialization");
+        std::call_once(
+                instance.m_initFlag,
+                [instance = std::ref(instance)]() {
+                    instance.get().start(std::thread::hardware_concurrency());
+                });
+    }
+
+    return instance;
+}
+
 void Scheduler::init(size_t threadCount) {
     auto& inst = getInstance();
     threadCount = threadCount == 0 ? 1 : threadCount;

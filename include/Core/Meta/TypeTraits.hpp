@@ -214,6 +214,42 @@ namespace Meta {
     template<bool BCond, typename TSatisfied, typename TUnsatisfied>
     using ConditionalT = typename Conditional<BCond, TSatisfied, TUnsatisfied>::type;
 
+    template<bool... Bs>
+    struct Conjunction;
+
+    template<>
+    struct Conjunction<> : TrueType {};
+
+    template<bool B>
+    struct Conjunction<B> : IntegralConstant<bool, B> {};
+
+    template<bool B1, bool... Bs>
+    struct Conjunction<B1, Bs...> : Conditional<B1, Conjunction<Bs...>, FalseType> {};
+
+    template<bool... Bs>
+    constexpr bool ConjunctionV = Conjunction<Bs...>::value;
+
+    template<bool... Bs>
+    struct Disjunction;
+
+    template<>
+    struct Disjunction<> : FalseType {};
+
+    template<bool B>
+    struct Disjunction<B> : IntegralConstant<bool, B> {};
+
+    template<bool B1, bool... Bs>
+    struct Disjunction<B1, Bs...> : Conditional<B1, TrueType, Disjunction<Bs...>> {};
+
+    template<bool... Bs>
+    constexpr bool DisjunctionV = Disjunction<Bs...>::value;
+
+    template<bool B>
+    struct Negation : IntegralConstant<bool, !B> {};
+
+    template<bool B>
+    constexpr bool NegationV = Negation<B>::value;
+
 }// namespace Meta
 
 MOE_END_NAMESPACE
