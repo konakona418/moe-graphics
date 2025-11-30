@@ -96,6 +96,14 @@ public:
         return m_future.get();
     }
 
+    bool isReady() const {
+        return m_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    }
+
+    bool isValid() const {
+        return m_future.valid();
+    }
+
     template<typename Fn,
              typename RawU = Meta::ConditionalT<
                      Meta::IsVoidV<T>,
@@ -172,6 +180,14 @@ public:
 
     void get() {
         m_future.get();
+    }
+
+    bool isReady() const {
+        return m_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    }
+
+    bool isValid() const {
+        return m_future.valid();
     }
 
     template<typename Fn,
