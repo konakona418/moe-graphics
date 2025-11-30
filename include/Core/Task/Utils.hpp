@@ -20,7 +20,7 @@ namespace Detail {
     template<typename FinalU, typename SchedulerT, typename Fn>
     struct AsyncTask {
     public:
-        AsyncTask(SharedPtr<Promise<FinalU>> promise, Fn&& f)
+        AsyncTask(SharedPtr<Promise<FinalU, SchedulerT>> promise, Fn&& f)
             : promise(std::move(promise)), func(std::forward<Fn>(f)) {}
 
         void operator()() {
@@ -49,17 +49,17 @@ namespace Detail {
 
     private:
         std::decay_t<Fn> func;
-        SharedPtr<Promise<FinalU>> promise;
+        SharedPtr<Promise<FinalU, SchedulerT>> promise;
     };
 }// namespace Detail
 
 template<
         typename F,
-        typename SchedulerT = Scheduler,
+        typename SchedulerT = ThreadPoolScheduler,
         typename RawR = Meta::InvokeResultT<std::decay_t<F>>,
         typename UnwrappedR = UnwrapFutureT<std::decay_t<RawR>>>
 Future<UnwrappedR, SchedulerT> async(F&& task) {
-    auto promise = std::make_shared<Promise<UnwrappedR>>();
+    auto promise = std::make_shared<Promise<UnwrappedR, SchedulerT>>();
     auto fut = promise->getFuture();
 
     auto asyncTask = std::make_shared<Detail::AsyncTask<UnwrappedR, SchedulerT, F>>(
@@ -69,6 +69,24 @@ Future<UnwrappedR, SchedulerT> async(F&& task) {
     });
 
     return Future<UnwrappedR, SchedulerT>(std::move(fut));
+}
+
+template<
+        typename F,
+        typename RawR = Meta::InvokeResultT<std::decay_t<F>>,
+        typename UnwrappedR = UnwrapFutureT<std::decay_t<RawR>>>
+Future<UnwrappedR, MainScheduler> asyncOnMainThread(F&& task) {
+    auto& mainThreadDispatcher = MainScheduler::getInstance();
+    auto promise = std::make_shared<Promise<UnwrappedR, MainScheduler>>();
+    auto fut = promise->getFuture();
+
+    auto asyncTask = std::make_shared<Detail::AsyncTask<UnwrappedR, MainScheduler, F>>(
+            promise, std::forward<F>(task));
+    mainThreadDispatcher.schedule([asyncTask]() mutable {
+        (*asyncTask)();
+    });
+
+    return Future<UnwrappedR, MainScheduler>(std::move(fut));
 }
 
 template<
@@ -99,7 +117,7 @@ auto whenAll(Futures&&... futures) {
             : pendingTasks(taskCount) {}
     };
 
-    auto promise = std::make_shared<Promise<ResultTuple>>();
+    auto promise = std::make_shared<Promise<ResultTuple, SchedulerT>>();
     OutFuture outFuture = promise->getFuture();
 
     auto context = std::make_shared<WhenAllContext>(sizeof...(Futures));
@@ -146,7 +164,7 @@ auto whenAny(Futures&&... futures) {
         ResultVariant result;
     };
 
-    auto promise = std::make_shared<Promise<ResultVariant>>();
+    auto promise = std::make_shared<Promise<ResultVariant, SchedulerT>>();
     OutFuture outFuture = promise->getFuture();
 
     auto context = std::make_shared<WhenAnyContext>();
@@ -179,7 +197,7 @@ auto whenAll(Vector<Future<T, SchedulerT>>&& futures) {
             : pendingTasks(taskCount) {}
     };
 
-    auto promise = std::make_shared<Promise<Vector<T>>>();
+    auto promise = std::make_shared<Promise<Vector<T>, SchedulerT>>();
     OutFuture outFuture = promise->getFuture();
 
     auto context = std::make_shared<WhenAllContext>(futures.size());
@@ -210,7 +228,7 @@ auto whenAny(Vector<Future<T, SchedulerT>>&& futures) {
         std::once_flag setFlag;
     };
 
-    auto promise = std::make_shared<Promise<T>>();
+    auto promise = std::make_shared<Promise<T, SchedulerT>>();
     OutFuture outFuture = promise->getFuture();
 
     auto context = std::make_shared<WhenAnyContext>();

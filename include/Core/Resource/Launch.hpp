@@ -24,8 +24,12 @@ public:
             return *m_cachedValue;
         }
 
-        MOE_ASSERT(m_future.has_value(),
-                   "launchAsyncLoad() is not invoked on this AsyncLoad componenet");
+        if (!m_future.has_value()) {
+            launchAsyncLoad();
+            Logger::warn(
+                    "Launch::generate() called but the async task was never initiated. "
+                    "Blocking...");
+        }
 
         MOE_ASSERT(m_future->isValid(),
                    "Future in AsyncLoad is not valid");
@@ -52,7 +56,7 @@ public:
 
 private:
     InnerGenerator m_derived;
-    Optional<Future<void>> m_future;
+    Optional<Future<void, ThreadPoolScheduler>> m_future;
     Optional<value_type> m_cachedValue;
 };
 

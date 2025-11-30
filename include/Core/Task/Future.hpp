@@ -9,15 +9,14 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct Scheduler;
-
-template<typename T, typename SchedulerT = Scheduler>
+template<typename T, typename SchedulerT>
 struct Future;
 
-template<typename T>
+template<typename T, typename SchedulerT>
 struct Promise {
 public:
     using value_type = T;
+    using scheduler_type = SchedulerT;
 
     Promise() = default;
 
@@ -29,16 +28,16 @@ public:
         m_promise.set_value(std::move(value));
     }
 
-    Future<T> getFuture() {
-        return Future<T>(m_promise.get_future());
+    Future<T, SchedulerT> getFuture() {
+        return Future<T, SchedulerT>(m_promise.get_future());
     }
 
 private:
     std::promise<T> m_promise;
 };
 
-template<>
-struct Promise<void> {
+template<typename SchedulerT>
+struct Promise<void, SchedulerT> {
 public:
     using value_type = void;
 
@@ -48,8 +47,8 @@ public:
         m_promise.set_value();
     }
 
-    std::future<void> getFuture() {
-        return m_promise.get_future();
+    Future<void, SchedulerT> getFuture() {
+        return Future<void, SchedulerT>(m_promise.get_future());
     }
 
 private:
@@ -69,7 +68,7 @@ namespace Detail {
     template<typename T, typename FinalU, typename SchedulerT, typename Fn>
     struct VoidPredecessorTask {
     public:
-        VoidPredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU>> promise, Fn&& f)
+        VoidPredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU, SchedulerT>> promise, Fn&& f)
             : predecessor(std::move(pred)), promise(std::move(promise)), func(std::forward<Fn>(f)) {}
 
         void operator()() {
@@ -100,13 +99,13 @@ namespace Detail {
     private:
         Future<T, SchedulerT> predecessor;
         std::decay_t<Fn> func;
-        SharedPtr<Promise<FinalU>> promise;
+        SharedPtr<Promise<FinalU, SchedulerT>> promise;
     };
 
     template<typename T, typename FinalU, typename SchedulerT, typename Fn>
     struct ValuePredecessorTask {
     public:
-        ValuePredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU>> promise, Fn&& f)
+        ValuePredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU, SchedulerT>> promise, Fn&& f)
             : predecessor(std::move(pred)), promise(std::move(promise)), func(std::forward<Fn>(f)) {}
 
         void operator()() {
@@ -137,7 +136,7 @@ namespace Detail {
     private:
         Future<T, SchedulerT> predecessor;
         std::decay_t<Fn> func;
-        SharedPtr<Promise<FinalU>> promise;
+        SharedPtr<Promise<FinalU, SchedulerT>> promise;
     };
 }// namespace Detail
 
@@ -186,7 +185,7 @@ public:
                      Meta::InvokeResultT<std::decay_t<Fn>, T>>,
              typename FinalU = UnwrapFutureT<std::decay_t<RawU>>>
     Future<FinalU, SchedulerT> then(Fn&& func) {
-        auto promise = std::make_shared<Promise<FinalU>>();
+        auto promise = std::make_shared<Promise<FinalU, SchedulerT>>();
         auto nextFuture = promise->getFuture();
 
         if constexpr (Meta::IsVoidV<T>) {
@@ -237,7 +236,7 @@ public:
              typename RawU = Meta::InvokeResultT<std::decay_t<Fn>>,
              typename FinalU = UnwrapFutureT<std::decay_t<RawU>>>
     Future<FinalU, SchedulerT> then(Fn&& func) {
-        auto promise = std::make_shared<Promise<FinalU>>();
+        auto promise = std::make_shared<Promise<FinalU, SchedulerT>>();
         auto nextFuture = promise->getFuture();
 
         auto task = std::make_unique<Detail::VoidPredecessorTask<void, FinalU, SchedulerT, Fn>>(

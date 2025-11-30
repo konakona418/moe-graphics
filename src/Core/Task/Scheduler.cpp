@@ -2,8 +2,8 @@
 
 MOE_BEGIN_NAMESPACE
 
-Scheduler& Scheduler::getInstance() {
-    static Scheduler instance;
+ThreadPoolScheduler& ThreadPoolScheduler::getInstance() {
+    static ThreadPoolScheduler instance;
     if (!instance.m_running.load()) {
         Logger::warn("Scheduler instance requested but not initialized. Forcing initialization");
         std::call_once(
@@ -16,7 +16,7 @@ Scheduler& Scheduler::getInstance() {
     return instance;
 }
 
-void Scheduler::init(size_t threadCount) {
+void ThreadPoolScheduler::init(size_t threadCount) {
     auto& inst = getInstance();
     threadCount = threadCount == 0 ? 1 : threadCount;
     std::call_once(inst.m_initFlag, [threadCount, &inst]() {
@@ -25,7 +25,7 @@ void Scheduler::init(size_t threadCount) {
     });
 }
 
-void Scheduler::shutdown() {
+void ThreadPoolScheduler::shutdown() {
     Logger::info("Shutting down scheduler");
 
     auto& inst = getInstance();
@@ -34,7 +34,7 @@ void Scheduler::shutdown() {
     });
 }
 
-void Scheduler::schedule(Function<void()> task) {
+void ThreadPoolScheduler::schedule(Function<void()> task) {
     {
         std::lock_guard<std::mutex> lk(m_mutex);
         if (!m_running) return;
@@ -43,7 +43,7 @@ void Scheduler::schedule(Function<void()> task) {
     m_cv.notify_one();
 }
 
-void Scheduler::start(size_t threadCount) {
+void ThreadPoolScheduler::start(size_t threadCount) {
     {
         std::lock_guard<std::mutex> lk(m_mutex);
         if (m_running) return;
@@ -58,7 +58,7 @@ void Scheduler::start(size_t threadCount) {
     }
 }
 
-void Scheduler::stop() {
+void ThreadPoolScheduler::stop() {
     {
         std::lock_guard<std::mutex> lk(m_mutex);
         if (!m_running) return;
@@ -77,7 +77,7 @@ void Scheduler::stop() {
     }
 }
 
-void Scheduler::workerMain() {
+void ThreadPoolScheduler::workerMain() {
     while (true) {
         Function<void()> task;
         {
@@ -88,6 +88,43 @@ void Scheduler::workerMain() {
             m_tasks.pop();
         }
 
+        task();
+    }
+}
+
+MainScheduler& MainScheduler::getInstance() {
+    static MainScheduler instance;
+    return instance;
+}
+
+void MainScheduler::schedule(Function<void()> task) {
+    MOE_ASSERT(m_initialized, "MainThreadDispatcher not initialized");
+
+    if (isMainThread()) {
+        task();
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lk(m_queueMutex);
+        m_taskQueue.emplace(std::move(task));
+    }
+}
+
+void MainScheduler::processTasks() {
+    MOE_ASSERT(
+            isMainThread(),
+            "MainThreadDispatcher::processTasks() called from non-main thread");
+
+    Queue<Function<void()>> tasksToProcess;
+    {
+        std::lock_guard<std::mutex> lk(m_queueMutex);
+        std::swap(tasksToProcess, m_taskQueue);
+    }
+
+    while (!tasksToProcess.empty()) {
+        Function<void()> task = std::move(tasksToProcess.front());
+        tasksToProcess.pop();
         task();
     }
 }
