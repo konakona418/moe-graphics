@@ -16,38 +16,59 @@ namespace Detail {
 
     template<typename MaybeVectorOfFutures>
     constexpr bool IsVectorOfFuturesV = IsVectorOfFutures<MaybeVectorOfFutures>::value;
+
+    template<typename FinalU, typename SchedulerT, typename Fn>
+    struct AsyncTask {
+    public:
+        AsyncTask(SharedPtr<Promise<FinalU>> promise, Fn&& f)
+            : promise(std::move(promise)), func(std::forward<Fn>(f)) {}
+
+        void operator()() {
+            using RawU = Meta::InvokeResultT<std::decay_t<Fn>>;
+
+            if constexpr (!Detail::IsFutureV<RawU>) {
+                if constexpr (Meta::IsVoidV<RawU>) {
+                    func();
+                    promise->setValue();
+                } else {
+                    FinalU res = func();
+                    promise->setValue(std::move(res));
+                }
+            } else {
+                RawU innerFuture = func();
+                innerFuture
+                        .then([promise = this->promise](auto&& inner) {
+                            if constexpr (Meta::IsVoidV<FinalU>) {
+                                promise->setValue();
+                            } else {
+                                promise->setValue(std::forward<decltype(inner)>(inner));
+                            }
+                        });
+            }
+        }
+
+    private:
+        std::decay_t<Fn> func;
+        SharedPtr<Promise<FinalU>> promise;
+    };
 }// namespace Detail
 
 template<
         typename F,
+        typename SchedulerT = Scheduler,
         typename RawR = Meta::InvokeResultT<std::decay_t<F>>,
         typename UnwrappedR = UnwrapFutureT<std::decay_t<RawR>>>
-Future<UnwrappedR, Scheduler> async(F&& task) {
+Future<UnwrappedR, SchedulerT> async(F&& task) {
     auto promise = std::make_shared<Promise<UnwrappedR>>();
     auto fut = promise->getFuture();
 
-    Scheduler::getInstance().schedule([task = std::forward<F>(task), prom = promise]() mutable {
-        if constexpr (Detail::IsFutureV<RawR>) {
-            auto innerFuture = task();
-            if constexpr (Meta::IsVoidV<UnwrappedR>) {
-                innerFuture.get();
-                prom->setValue();
-            } else {
-                auto v = innerFuture.get();
-                prom->setValue(std::move(v));
-            }
-        } else {
-            if constexpr (Meta::IsVoidV<RawR>) {
-                task();
-                prom->setValue();
-            } else {
-                auto v = task();
-                prom->setValue(std::move(v));
-            }
-        }
+    auto asyncTask = std::make_shared<Detail::AsyncTask<UnwrappedR, SchedulerT, F>>(
+            promise, std::forward<F>(task));
+    SchedulerT::getInstance().schedule([asyncTask]() mutable {
+        (*asyncTask)();
     });
 
-    return Future<UnwrappedR, Scheduler>(std::move(fut));
+    return Future<UnwrappedR, SchedulerT>(std::move(fut));
 }
 
 template<
@@ -57,7 +78,16 @@ template<
                 !Detail::IsVectorOfFuturesV<Vector<std::decay_t<Futures>...>>>>
 auto whenAll(Futures&&... futures) {
     using ResultTuple = std::tuple<UnwrapFutureT<typename std::decay_t<Futures>::value_type>...>;
-    using OutFuture = Future<ResultTuple, Scheduler>;
+
+    static_assert(
+            (std::is_same_v<
+                     typename std::decay_t<Futures>::scheduler_type,
+                     typename std::decay_t<std::tuple_element_t<0, std::tuple<Futures...>>>::scheduler_type> &&
+             ...),
+            "All Futures passed to whenAll must have the same SchedulerT");
+
+    using SchedulerT = std::decay_t<typename std::decay_t<std::tuple_element_t<0, std::tuple<Futures...>>>::scheduler_type>;
+    using OutFuture = Future<ResultTuple, SchedulerT>;
 
     struct WhenAllContext {
         std::atomic_size_t pendingTasks;
@@ -99,7 +129,15 @@ template<
                 !Detail::IsVectorOfFuturesV<Vector<std::decay_t<Futures>...>>>>
 auto whenAny(Futures&&... futures) {
     using ResultVariant = Variant<UnwrapFutureT<typename std::decay_t<Futures>::value_type>...>;
-    using OutFuture = Future<ResultVariant, Scheduler>;
+
+    static_assert(
+            (std::is_same_v<
+                     typename std::decay_t<Futures>::scheduler_type,
+                     typename std::decay_t<std::tuple_element_t<0, std::tuple<Futures...>>>::scheduler_type> &&
+             ...),
+            "All Futures passed to whenAny must have the same SchedulerT");
+    using SchedulerT = std::decay_t<typename std::decay_t<std::tuple_element_t<0, std::tuple<Futures...>>>::scheduler_type>;
+    using OutFuture = Future<ResultVariant, SchedulerT>;
 
     struct WhenAnyContext {
         std::atomic_bool isSet{false};
@@ -127,9 +165,9 @@ auto whenAny(Futures&&... futures) {
     return outFuture;
 }
 
-template<typename T>
-auto whenAll(Vector<Future<T, Scheduler>>&& futures) {
-    using OutFuture = Future<Vector<T>, Scheduler>;
+template<typename T, typename SchedulerT>
+auto whenAll(Vector<Future<T, SchedulerT>>&& futures) {
+    using OutFuture = Future<Vector<T>, SchedulerT>;
 
     struct WhenAllContext {
         std::atomic_size_t pendingTasks;
@@ -163,9 +201,9 @@ auto whenAll(Vector<Future<T, Scheduler>>&& futures) {
     return outFuture;
 }
 
-template<typename T>
-auto whenAny(Vector<Future<T, Scheduler>>&& futures) {
-    using OutFuture = Future<T, Scheduler>;
+template<typename T, typename SchedulerT>
+auto whenAny(Vector<Future<T, SchedulerT>>&& futures) {
+    using OutFuture = Future<T, SchedulerT>;
 
     struct WhenAnyContext {
         std::atomic_bool isSet{false};

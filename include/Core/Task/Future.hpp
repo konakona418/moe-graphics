@@ -65,6 +65,80 @@ namespace Detail {
 
     template<typename MaybeFutureT>
     constexpr bool IsFutureV = IsFuture<MaybeFutureT>::value;
+
+    template<typename T, typename FinalU, typename SchedulerT, typename Fn>
+    struct VoidPredecessorTask {
+    public:
+        VoidPredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU>> promise, Fn&& f)
+            : predecessor(std::move(pred)), promise(std::move(promise)), func(std::forward<Fn>(f)) {}
+
+        void operator()() {
+            predecessor.get();
+            using RawU = Meta::InvokeResultT<std::decay_t<Fn>>;
+
+            if constexpr (!Detail::IsFutureV<RawU>) {
+                if constexpr (Meta::IsVoidV<RawU>) {
+                    func();
+                    promise->setValue();
+                } else {
+                    FinalU res = func();
+                    promise->setValue(std::move(res));
+                }
+            } else {
+                RawU innerFuture = func();
+                innerFuture
+                        .then([promise = this->promise](auto&& inner) {
+                            if constexpr (Meta::IsVoidV<FinalU>) {
+                                promise->setValue();
+                            } else {
+                                promise->setValue(std::forward<decltype(inner)>(inner));
+                            }
+                        });
+            }
+        }
+
+    private:
+        Future<T, SchedulerT> predecessor;
+        std::decay_t<Fn> func;
+        SharedPtr<Promise<FinalU>> promise;
+    };
+
+    template<typename T, typename FinalU, typename SchedulerT, typename Fn>
+    struct ValuePredecessorTask {
+    public:
+        ValuePredecessorTask(Future<T, SchedulerT> pred, SharedPtr<Promise<FinalU>> promise, Fn&& f)
+            : predecessor(std::move(pred)), promise(std::move(promise)), func(std::forward<Fn>(f)) {}
+
+        void operator()() {
+            T value = predecessor.get();
+            using RawU = Meta::InvokeResultT<std::decay_t<Fn>, T>;
+
+            if constexpr (!Detail::IsFutureV<RawU>) {
+                if constexpr (Meta::IsVoidV<RawU>) {
+                    func(value);
+                    promise->setValue();
+                } else {
+                    FinalU res = func(value);
+                    promise->setValue(std::move(res));
+                }
+            } else {
+                RawU innerFuture = func(value);
+                innerFuture
+                        .then([promise = this->promise](auto&& inner) {
+                            if constexpr (Meta::IsVoidV<FinalU>) {
+                                promise->setValue();
+                            } else {
+                                promise->setValue(std::forward<decltype(inner)>(inner));
+                            }
+                        });
+            }
+        }
+
+    private:
+        Future<T, SchedulerT> predecessor;
+        std::decay_t<Fn> func;
+        SharedPtr<Promise<FinalU>> promise;
+    };
 }// namespace Detail
 
 template<typename MaybeFuture>
@@ -85,6 +159,7 @@ template<typename T, typename SchedulerT>
 struct Future {
 public:
     using value_type = T;
+    using scheduler_type = SchedulerT;
 
     explicit Future(const std::shared_future<T>& future)
         : m_future(future) {}
@@ -114,52 +189,19 @@ public:
         auto promise = std::make_shared<Promise<FinalU>>();
         auto nextFuture = promise->getFuture();
 
-        SchedulerT::getInstance().schedule(
-                [fut = m_future,
-                 func = std::forward<Fn>(func),
-                 prom = promise]() mutable {
-                    if constexpr (std::is_void_v<T>) {
-                        fut.get();
-                        if constexpr (!Detail::IsFutureV<RawU>) {
-                            if constexpr (std::is_void_v<RawU>) {
-                                func();
-                                prom->setValue();
-                            } else {
-                                FinalU result = func();
-                                prom->setValue(std::move(result));
-                            }
-                        } else {
-                            RawU innerFuture = func();
-                            if constexpr (std::is_void_v<FinalU>) {
-                                innerFuture.get();
-                                prom->setValue();
-                            } else {
-                                FinalU inner = innerFuture.get();
-                                prom->setValue(std::move(inner));
-                            }
-                        }
-                    } else {
-                        T value = fut.get();
-                        if constexpr (!Detail::IsFutureV<RawU>) {
-                            if constexpr (std::is_void_v<RawU>) {
-                                func(value);
-                                prom->setValue();
-                            } else {
-                                FinalU result = func(value);
-                                prom->setValue(std::move(result));
-                            }
-                        } else {
-                            RawU innerFuture = func(value);
-                            if constexpr (std::is_void_v<FinalU>) {
-                                innerFuture.get();
-                                prom->setValue();
-                            } else {
-                                FinalU inner = innerFuture.get();
-                                prom->setValue(std::move(inner));
-                            }
-                        }
-                    }
-                });
+        if constexpr (Meta::IsVoidV<T>) {
+            auto task = std::make_shared<Detail::VoidPredecessorTask<T, FinalU, SchedulerT, Fn>>(
+                    *this, promise, std::forward<Fn>(func));
+            SchedulerT::getInstance().schedule([task]() mutable {
+                (*task)();
+            });
+        } else {
+            auto task = std::make_shared<Detail::ValuePredecessorTask<T, FinalU, SchedulerT, Fn>>(
+                    *this, promise, std::forward<Fn>(func));
+            SchedulerT::getInstance().schedule([task]() mutable {
+                (*task)();
+            });
+        }
         return Future<FinalU, SchedulerT>(std::move(nextFuture));
     }
 
@@ -171,6 +213,7 @@ template<typename SchedulerT>
 struct Future<void, SchedulerT> {
 public:
     using value_type = void;
+    using scheduler_type = SchedulerT;
 
     explicit Future(const std::shared_future<void>& future)
         : m_future(future) {}
@@ -197,30 +240,11 @@ public:
         auto promise = std::make_shared<Promise<FinalU>>();
         auto nextFuture = promise->getFuture();
 
-        SchedulerT::getInstance().schedule(
-                [fut = m_future,
-                 func = std::forward<Fn>(func),
-                 prom = promise]() mutable {
-                    fut.get();
-                    if constexpr (!Detail::IsFutureV<RawU>) {
-                        if constexpr (std::is_void_v<RawU>) {
-                            func();
-                            prom->setValue();
-                        } else {
-                            FinalU res = func();
-                            prom->setValue(std::move(res));
-                        }
-                    } else {
-                        RawU innerFuture = func();
-                        if constexpr (std::is_void_v<FinalU>) {
-                            innerFuture.get();
-                            prom->setValue();
-                        } else {
-                            FinalU inner = innerFuture.get();
-                            prom->setValue(std::move(inner));
-                        }
-                    }
-                });
+        auto task = std::make_unique<Detail::VoidPredecessorTask<void, FinalU, SchedulerT, Fn>>(
+                *this, promise, std::forward<Fn>(func));
+        SchedulerT::getInstance().schedule([task]() mutable {
+            (*task)();
+        });
 
         return Future<FinalU, SchedulerT>(std::move(nextFuture));
     }
