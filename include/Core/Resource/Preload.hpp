@@ -3,6 +3,7 @@
 #include "Core/Common.hpp"
 #include "Core/Meta/Generator.hpp"
 #include "Core/Resource/Launch.hpp"
+#include "Core/Resource/Secure.hpp"
 
 MOE_BEGIN_NAMESPACE
 
@@ -70,6 +71,39 @@ public:
 
 private:
     Launch<AsyncInnerGenerator> m_asyncLoad;
+    Optional<value_type> m_cachedValue;
+};
+
+template<typename SecureInnerGenerator>
+struct Preload<Secure<SecureInnerGenerator>> {
+public:
+    using value_type = typename SecureInnerGenerator::value_type;
+
+    template<typename... Args>
+    Preload(Args&&... args) {
+        m_secureLoad = Secure<SecureInnerGenerator>(std::forward<Args>(args)...);
+        m_secureLoad.launchAsyncLoad();
+    }
+
+    Optional<value_type> generate() {
+        if (m_cachedValue) {
+            return *m_cachedValue;
+        }
+
+        m_cachedValue = m_secureLoad.generate();
+        return m_cachedValue;
+    }
+
+    uint64_t hashCode() const {
+        return m_secureLoad.hashCode();
+    }
+
+    String paramString() const {
+        return m_secureLoad.paramString();
+    }
+
+private:
+    Secure<SecureInnerGenerator> m_secureLoad;
     Optional<value_type> m_cachedValue;
 };
 

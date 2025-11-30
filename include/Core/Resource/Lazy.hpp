@@ -29,11 +29,11 @@ public:
     }
 
     uint64_t hashCode() const {
-        return m_derived->hashCode();
+        return m_derived.hashCode();
     }
 
     String paramString() const {
-        return m_derived->paramString();
+        return m_derived.paramString();
     }
 
 private:
