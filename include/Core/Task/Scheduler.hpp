@@ -66,6 +66,7 @@ public:
     void schedule(Function<void()> task);
 
     bool isMainThread() const {
+        MOE_ASSERT(m_initialized, "MainScheduler not initialized");
         return std::this_thread::get_id() == m_mainThreadId;
     }
 

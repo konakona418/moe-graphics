@@ -22,11 +22,6 @@ public:
             return *m_cachedValue;
         }
 
-        if (MainScheduler::getInstance().isMainThread()) {
-            m_cachedValue = m_derived.generate();
-            return m_cachedValue;
-        }
-
         if (!m_future.has_value()) {
             launchAsyncLoad();
             Logger::warn(
@@ -42,6 +37,12 @@ public:
     }
 
     void launchAsyncLoad() {
+        // if the current thread is the main thread, run directly
+        if (MainScheduler::getInstance().isMainThread()) {
+            m_cachedValue = m_derived.generate();
+            return;
+        }
+
         m_future = asyncOnMainThread(
                 [this]() {
                     Optional<value_type> value = m_derived.generate();
