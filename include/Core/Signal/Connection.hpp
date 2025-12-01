@@ -8,15 +8,17 @@
 
 MOE_BEGIN_NAMESPACE
 
-template<typename>
-struct Signal;
+template<typename SlotT>
+struct SyncSignal;
 
 template<typename SlotT>
-struct Connection : public Meta::NonCopyable<Connection<SlotT>> {
-public:
-    Connection(Signal<SlotT>* signal, ConnectionId id)
-        : m_signal(Ref<Signal<SlotT>>(signal)), m_id(id) {}
+struct Signal;
 
+template<typename SlotT, typename SignalT>
+struct Connection : public Meta::NonCopyable<Connection<SlotT, SignalT>> {
+public:
+    Connection(SignalT* signal, ConnectionId id)
+        : m_signal(Ref<SignalT>(signal)), m_id(id) {}
     ~Connection() {
         if (isConnected()) {
             disconnect();
@@ -56,7 +58,7 @@ public:
     }
 
 private:
-    Ref<Signal<SlotT>> m_signal;
+    Ref<SignalT> m_signal;
     ConnectionId m_id{INVALID_CONNECTION_ID};
 };
 

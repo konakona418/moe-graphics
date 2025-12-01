@@ -12,28 +12,28 @@
 MOE_BEGIN_NAMESPACE
 
 template<typename SlotT>
-struct Signal
-    : public AtomicRefCounted<Signal<SlotT>>,
-      public Meta::NonCopyable<Signal<SlotT>>,
-      public RwSynchronized<Signal<SlotT>> {
+struct SyncSignal
+    : public AtomicRefCounted<SyncSignal<SlotT>>,
+      public Meta::NonCopyable<SyncSignal<SlotT>>,
+      public RwSynchronized<SyncSignal<SlotT>> {
 public:
-    Signal() = default;
-    ~Signal() = default;
+    SyncSignal() = default;
+    ~SyncSignal() = default;
 
-    Connection<SlotT> connect(SlotT&& slot) {
+    Connection<SlotT, SyncSignal<SlotT>> connect(SlotT&& slot) {
         ConnectionId id = m_connectionId.fetch_add(1);
         if (m_emittingCount.load(std::memory_order_relaxed) > 0) {
             {
                 std::lock_guard<std::mutex> lk(m_pendingConnectsMutex);
                 m_pendingConnects.emplace_back(id, std::move(slot));
             }
-            return Connection<SlotT>(this, id);
+            return Connection<SlotT, SyncSignal<SlotT>>(this, id);
         }
 
         this->withWriteLock([&]() {
             m_slots.emplace(id, std::move(slot));
         });
-        return Connection<SlotT>(this, id);
+        return Connection<SlotT, SyncSignal<SlotT>>(this, id);
     }
 
     void disconnect(ConnectionId id) {
@@ -102,6 +102,37 @@ private:
     std::mutex m_handlePendingMutex;
 
     std::atomic_size_t m_emittingCount{0};
+};
+
+
+template<typename SlotT>
+struct Signal
+    : public RefCounted<Signal<SlotT>>,
+      public Meta::NonCopyable<Signal<SlotT>> {
+public:
+    Signal() = default;
+    ~Signal() = default;
+
+    Connection<SlotT, Signal<SlotT>> connect(SlotT&& slot) {
+        ConnectionId id = m_connectionId.fetch_add(1);
+        m_slots.emplace(id, std::move(slot));
+        return Connection<SlotT, Signal<SlotT>>(this, id);
+    }
+
+    void disconnect(ConnectionId id) {
+        m_slots.erase(id);
+    }
+
+    template<typename... Args>
+    void emit(Args&&... args) {
+        for (auto& [id, slot]: m_slots) {
+            slot._invoke(std::forward<Args>(args)...);
+        }
+    }
+
+private:
+    AtomicConnectionId m_connectionId{0};
+    UnorderedMap<ConnectionId, SlotT> m_slots;
 };
 
 MOE_END_NAMESPACE
