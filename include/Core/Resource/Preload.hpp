@@ -53,12 +53,7 @@ public:
     }
 
     Optional<value_type> generate() {
-        if (m_cachedValue) {
-            return *m_cachedValue;
-        }
-
-        m_cachedValue = m_asyncLoad.generate();
-        return m_cachedValue;
+        return m_asyncLoad.generate();
     }
 
     uint64_t hashCode() const {
@@ -71,7 +66,6 @@ public:
 
 private:
     Launch<AsyncInnerGenerator> m_asyncLoad;
-    Optional<value_type> m_cachedValue;
 };
 
 template<typename SecureInnerGenerator>
@@ -86,12 +80,7 @@ public:
     }
 
     Optional<value_type> generate() {
-        if (m_cachedValue) {
-            return *m_cachedValue;
-        }
-
-        m_cachedValue = m_secureLoad.generate();
-        return m_cachedValue;
+        return m_secureLoad.generate();
     }
 
     uint64_t hashCode() const {
@@ -104,7 +93,6 @@ public:
 
 private:
     Secure<SecureInnerGenerator> m_secureLoad;
-    Optional<value_type> m_cachedValue;
 };
 
 MOE_END_NAMESPACE
