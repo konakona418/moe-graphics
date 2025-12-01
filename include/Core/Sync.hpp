@@ -54,16 +54,16 @@ public:
 
     template<typename F, typename... Args>
     auto withLock(F&& f, Args&&... args)
-            -> decltype(f(Meta::DeclareValue<Derived&>(), std::forward<Args>(args)...)) {
+            -> decltype(f(std::forward<Args>(args)...)) {
         std::lock_guard<std::mutex> lk(m_mutex);
-        return f(static_cast<Derived&>(*this), std::forward<Args>(args)...);
+        return f(std::forward<Args>(args)...);
     }
 
     template<typename F, typename... Args>
     auto withLock(F&& f, Args&&... args) const
-            -> decltype(f(Meta::DeclareValue<const Derived&>(), std::forward<Args>(args)...)) {
+            -> decltype(f(std::forward<Args>(args)...)) {
         std::lock_guard<std::mutex> lk(m_mutex);
-        return f(static_cast<const Derived&>(*this), std::forward<Args>(args)...);
+        return f(std::forward<Args>(args)...);
     }
 
     LockGuard lock() {
@@ -119,16 +119,16 @@ public:
 
     template<typename F, typename... Args>
     auto withReadLock(F&& f, Args&&... args) const
-            -> decltype(f(Meta::DeclareValue<const Derived&>(), std::forward<Args>(args)...)) {
+            -> decltype(f(std::forward<Args>(args)...)) {
         std::shared_lock<std::shared_mutex> lk(m_mutex);
-        return f(static_cast<const Derived&>(*this), std::forward<Args>(args)...);
+        return f(std::forward<Args>(args)...);
     }
 
     template<typename F, typename... Args>
     auto withWriteLock(F&& f, Args&&... args)
-            -> decltype(f(Meta::DeclareValue<Derived&>(), std::forward<Args>(args)...)) {
+            -> decltype(f(std::forward<Args>(args)...)) {
         std::unique_lock<std::shared_mutex> lk(m_mutex);
-        return f(static_cast<Derived&>(*this), std::forward<Args>(args)...);
+        return f(std::forward<Args>(args)...);
     }
 
     ReadGuard read() {
