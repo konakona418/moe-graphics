@@ -13,6 +13,12 @@ MOE_BEGIN_NAMESPACE
 template<typename Derived>
 struct MutexSynchronized {
 public:
+    MutexSynchronized() = default;
+    ~MutexSynchronized() = default;
+
+    MutexSynchronized(MutexSynchronized&&) {}
+    MutexSynchronized& operator=(MutexSynchronized&&) { return *this; }
+
     struct LockGuard : Meta::NonCopyable<LockGuard> {
     public:
         LockGuard(Derived& obj, std::mutex& mutex) noexcept
@@ -81,6 +87,12 @@ private:
 template<typename Derived>
 struct RwSynchronized {
 public:
+    RwSynchronized() = default;
+    ~RwSynchronized() = default;
+
+    RwSynchronized(RwSynchronized&&) {}
+    RwSynchronized& operator=(RwSynchronized&&) { return *this; }
+
     struct ReadGuard : Meta::NonCopyable<ReadGuard> {
     public:
         ReadGuard(const Derived& obj, std::shared_mutex& mutex) noexcept

@@ -55,7 +55,7 @@ public:
         m_emittingCount.fetch_add(1, std::memory_order_relaxed);
         this->withReadLock([&]() {
             for (auto& [id, slot]: m_slots) {
-                slot._invoke(std::forward<Args>(args)...);
+                slot._signal(std::forward<Args>(args)...);
             }
         });
         m_emittingCount.fetch_sub(1, std::memory_order_relaxed);
@@ -126,7 +126,7 @@ public:
     template<typename... Args>
     void emit(Args&&... args) {
         for (auto& [id, slot]: m_slots) {
-            slot._invoke(std::forward<Args>(args)...);
+            slot._signal(std::forward<Args>(args)...);
         }
     }
 

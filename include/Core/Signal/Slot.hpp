@@ -14,14 +14,13 @@ public:
     virtual ~Slot() = default;
 
     Slot() = default;
-
-    Slot(Slot&& other) noexcept = default;
-    Slot& operator=(Slot&& other) noexcept = default;
+    Slot(Slot&&) = default;
+    Slot& operator=(Slot&&) = default;
 
     template<typename... Args>
-    void _invoke(Args&&... args) {
+    void _signal(Args&&... args) {
         this->withLock([&]() {
-            static_cast<Derived*>(this)->invoke(std::forward<Args>(args)...);
+            static_cast<Derived*>(this)->signal(std::forward<Args>(args)...);
         });
     }
 };
