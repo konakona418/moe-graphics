@@ -22,7 +22,19 @@ struct LayoutSize {
     float height{0.f};
 };
 
+struct LayourPos {
+    float x{0.f};
+    float y{0.f};
+};
+
 struct LayoutRect {
+    float x{0.f};
+    float y{0.f};
+    float width{0.f};
+    float height{0.f};
+};
+
+struct LayoutBorders {
     float left{0.f};
     float top{0.f};
     float right{0.f};

@@ -29,19 +29,19 @@ public:
         return m_children;
     }
 
-    void setMargin(const LayoutRect& margin) {
+    void setMargin(const LayoutBorders& margin) {
         m_margin = margin;
     }
 
-    const LayoutRect& margin() const {
+    const LayoutBorders& margin() const {
         return m_margin;
     }
 
-    void setPadding(const LayoutRect& padding) {
+    void setPadding(const LayoutBorders& padding) {
         m_padding = padding;
     }
 
-    const LayoutRect& padding() const {
+    const LayoutBorders& padding() const {
         return m_padding;
     }
 
@@ -53,8 +53,8 @@ protected:
     Ref<Widget> m_parent{nullptr};
     Vector<Ref<Widget>> m_children;
 
-    LayoutRect m_margin;
-    LayoutRect m_padding;
+    LayoutBorders m_margin;
+    LayoutBorders m_padding;
 
     LayoutRect m_calculatedBounds;
 

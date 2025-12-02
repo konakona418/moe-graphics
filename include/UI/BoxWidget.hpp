@@ -20,7 +20,7 @@ enum class BoxJustify : uint8_t {
     Start,
     Center,
     End,
-    Stretch,
+    SpaceBetween,
 };
 
 // Align: cross axis alignment
