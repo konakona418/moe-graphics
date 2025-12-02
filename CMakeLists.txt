@@ -34,6 +34,7 @@ file(GLOB_RECURSE CORE_SOURCES src/Core/*.cpp)
 file(GLOB_RECURSE MATH_SOURCES src/Math/*.cpp)
 file(GLOB_RECURSE AUDIO_SOURCES src/Audio/*.cpp)
 file(GLOB_RECURSE PHYSICS_SOURCES src/Physics/*.cpp)
+file(GLOB_RECURSE UI_SOURCES src/UI/*.cpp)
 
 file(GLOB IMGUI_SOURCES 
   vendors/imgui/imgui*.h 
@@ -54,6 +55,7 @@ add_executable(moe-graphics
   ${MATH_SOURCES}
   ${AUDIO_SOURCES}
   ${PHYSICS_SOURCES}
+  ${UI_SOURCES}
 
   ${IMGUI_SOURCES}
   ${IM3D_SOURCES}
