@@ -58,3 +58,9 @@
 [submodule "vendors/Catch2"]
 	path = vendors/Catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "vendors/ogg"]
+	path = vendors/ogg
+	url = https://github.com/xiph/ogg.git
+[submodule "vendors/vorbis"]
+	path = vendors/vorbis
+	url = https://github.com/xiph/vorbis.git

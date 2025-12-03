@@ -25,7 +25,10 @@ add_subdirectory(vendors/JoltPhysics/Build)
 add_subdirectory(vendors/harfbuzz)
 add_subdirectory(vendors/freetype)
 add_subdirectory(vendors/utfcpp)
+
 add_subdirectory(vendors/openal-soft)
+add_subdirectory(vendors/ogg)
+add_subdirectory(vendors/vorbis)
 
 include_directories(include)
 
@@ -64,12 +67,13 @@ add_executable(moe-graphics
 
 target_link_libraries(moe-graphics PRIVATE
   glfw glm::glm
-  vk-bootstrap::vk-bootstrap VulkanMemoryAllocator volk_headers
+  vk-bootstrap::vk-bootstrap 
+  VulkanMemoryAllocator volk_headers
   spdlog::spdlog fmt::fmt
   tinygltf
   Jolt
   utf8cpp freetype harfbuzz
-  OpenAL::OpenAL
+  OpenAL::OpenAL ogg vorbis
 )
 
 target_include_directories(moe-graphics PRIVATE
