@@ -29,6 +29,10 @@ namespace moe {
 
     using StringView = std::string_view;
 
+    using U32String = std::u32string;
+
+    using U32StringView = std::u32string_view;
+
     template<typename T, size_t N>
     using Array = std::array<T, N>;
 

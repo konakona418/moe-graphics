@@ -8,6 +8,9 @@ MOE_BEGIN_NAMESPACE
 enum class WidgetType : uint8_t {
     Unknown,
     Container,
+    Text,
+    Button,
+    Image,
 };
 
 struct LayoutConstraints {

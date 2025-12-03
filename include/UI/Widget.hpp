@@ -20,7 +20,7 @@ public:
 
     virtual void layout(const LayoutRect& rectAssigned) = 0;
 
-    void addChild(Ref<Widget>& child) {
+    virtual void addChild(Ref<Widget> child) {
         m_children.push_back(child);
         child->m_parent = this->intoRef();
     }
