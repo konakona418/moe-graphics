@@ -177,16 +177,16 @@ namespace moe {
         uint32_t key = faceKey(fontSize);
         if (m_faces.find(key) != m_faces.end()) return true;
 
-        std::u32string glyphRanges32;
+        U32String glyphRanges32;
+        auto defaultGlyphRange = generateDefaultGlyphRange();
         if (glyphRanges.empty()) {
-            auto defaultGlyphRange = generateDefaultGlyphRange();
             glyphRanges32 = defaultGlyphRange;
         } else {
             glyphRanges32 = utf8::utf8to32(glyphRanges);
         }
 
         PerFace face = createFaceTemplate(fontSize, glyphRanges32.size());
-        if (!loadFontInternal(face, glyphRanges32)) return false;
+        if (!loadFontInternal(face, defaultGlyphRange)) return false;
 
         // create GPU image for this face
         face.fontImageBufferGPU.init(*m_engine,

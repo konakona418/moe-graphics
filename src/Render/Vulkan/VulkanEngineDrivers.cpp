@@ -161,6 +161,15 @@ namespace moe {
 
         auto* fontRef = font->get();
 
+        if (!fontRef->supportSize(fontSize)) {
+            // if the size is not supported yet, create it now with default glyph range
+            bool result = fontRef->ensureSize(fontSize, "");
+            if (!result) {
+                Logger::warn("Font with id {} failed to ensure size {}, text sprite render ignored", fontId, fontSize);
+                return *this;
+            }
+        }
+
         // lazy load pending characters from last frame
         fontRef->lazyLoadCharacters(fontSize);
 
@@ -178,7 +187,7 @@ namespace moe {
 
             glm::vec2 glyphPosOffset = glm::vec2(
                     glyph.bearing.x,
-                    -glyph.bearing.y + fontRef->getFontSize());
+                    -glyph.bearing.y + fontSize);
 
             glm::vec2 glyphSize = glyph.size;
             glm::vec2 texOffset = glyph.pxOffset;

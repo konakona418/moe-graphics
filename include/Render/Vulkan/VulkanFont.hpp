@@ -25,6 +25,8 @@ namespace moe {
         // initialize font binary once; creates an atlas for the initial size
         void init(VulkanEngine& engine, Span<uint8_t> fontData, float fontSize, StringView glyphRanges);
 
+        // ! important: this must be called before loading any other size
+        // ! otherwise segfault
         // create/add another size atlas on demand
         bool ensureSize(float fontSize, StringView glyphRanges);
 
@@ -32,8 +34,13 @@ namespace moe {
 
         // accessors per size (fontSize rounded to integer key)
         UnorderedMap<char32_t, Character>& getCharacters(float fontSize);
+
         ImageId getFontImageId(float fontSize) const;
-        float getFontSize() const { return m_defaultFontSize; }
+
+        bool supportSize(float fontSize) const {
+            uint32_t key = faceKey(fontSize);
+            return m_faces.find(key) != m_faces.end();
+        }
 
         bool lazyLoadCharacters(float fontSize);
         void addCharToLazyLoadQueue(char32_t c, float fontSize) {
