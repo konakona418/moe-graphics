@@ -26,23 +26,30 @@ namespace moe {
         return cached;
     }
 
-    bool VulkanFont::loadFontInternal(std::u32string_view glyphRanges32) {
+    static VulkanFont::PerFace createFaceTemplate(float fontSize, size_t glyphCount) {
+        VulkanFont::PerFace f;
+        f.fontSize = fontSize;
+        f.fontImageBufferCPU = std::make_unique<VulkanFont::FontImageBuffer>(static_cast<int>(glyphCount), fontSize);
+        return f;
+    }
+
+    bool VulkanFont::loadFontInternal(PerFace& face, std::u32string_view glyphRanges32) {
         FT_Library ft;
         if (FT_Init_FreeType(&ft)) {
             Logger::error("Could not init FreeType Library");
             return false;
         }
 
-        FT_Face face;
-        if (FT_New_Memory_Face(ft, m_fontData, m_fontDataSize, 0, &face)) {
+        FT_Face faceFT;
+        if (FT_New_Memory_Face(ft, m_fontData, m_fontDataSize, 0, &faceFT)) {
             Logger::error("Failed to load font from memory");
             FT_Done_FreeType(ft);
             return false;
         }
 
-        if (FT_Set_Pixel_Sizes(face, 0, static_cast<FT_UInt>(m_fontSize))) {
+        if (FT_Set_Pixel_Sizes(faceFT, 0, static_cast<FT_UInt>(face.fontSize))) {
             Logger::error("Failed to set font pixel size");
-            FT_Done_Face(face);
+            FT_Done_Face(faceFT);
             FT_Done_FreeType(ft);
             return false;
         }
@@ -53,22 +60,22 @@ namespace moe {
                 continue;
             }
 
-            auto charGlyphIdx = FT_Get_Char_Index(face, c);
-            if (FT_Load_Glyph(face, charGlyphIdx, FT_LOAD_RENDER)) {
+            auto charGlyphIdx = FT_Get_Char_Index(faceFT, c);
+            if (FT_Load_Glyph(faceFT, charGlyphIdx, FT_LOAD_RENDER)) {
                 Logger::warn("Failed to load Glyph {}", static_cast<uint32_t>(c));
                 continue;
             }
 
-            if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL)) {
+            if (FT_Render_Glyph(faceFT->glyph, FT_RENDER_MODE_NORMAL)) {
                 Logger::warn("Failed to render Glyph {}", static_cast<uint32_t>(c));
                 continue;
             }
 
-            auto& charInfo = m_characters[c];
-            bool result = m_fontImageBufferCPU->addGlyph(
-                    face->glyph->bitmap.buffer,
-                    face->glyph->bitmap.width,
-                    face->glyph->bitmap.rows,
+            auto& charInfo = face.characters[c];
+            bool result = face.fontImageBufferCPU->addGlyph(
+                    faceFT->glyph->bitmap.buffer,
+                    faceFT->glyph->bitmap.width,
+                    faceFT->glyph->bitmap.rows,
                     &charInfo.uvOffset.x,
                     &charInfo.uvOffset.y);
             if (!result) {
@@ -77,18 +84,18 @@ namespace moe {
             }
 
             charInfo.pxOffset = {
-                    charInfo.uvOffset.x * m_fontImageBufferCPU->widthInPixels + CELL_PADDING,
-                    charInfo.uvOffset.y * m_fontImageBufferCPU->heightInPixels + CELL_PADDING,
+                    charInfo.uvOffset.x * face.fontImageBufferCPU->widthInPixels + CELL_PADDING,
+                    charInfo.uvOffset.y * face.fontImageBufferCPU->heightInPixels + CELL_PADDING,
             };
 
-            charInfo.size = glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows);
-            charInfo.bearing = glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top);
-            charInfo.advance = static_cast<uint32_t>(face->glyph->advance.x);
+            charInfo.size = glm::ivec2(faceFT->glyph->bitmap.width, faceFT->glyph->bitmap.rows);
+            charInfo.bearing = glm::ivec2(faceFT->glyph->bitmap_left, faceFT->glyph->bitmap_top);
+            charInfo.advance = static_cast<uint32_t>(faceFT->glyph->advance.x);
 
-            m_characters.emplace(c, charInfo);
+            face.characters.emplace(c, charInfo);
         }
 
-        FT_Done_Face(face);
+        FT_Done_Face(faceFT);
         FT_Done_FreeType(ft);
 
         return true;
@@ -99,6 +106,77 @@ namespace moe {
         MOE_ASSERT(fontSize > 0.0f, "Font size must be greater than 0");
         MOE_ASSERT(!m_initialized, "Font is already initialized");
 
+        U32String glyphRanges32;
+        auto defaultGlyphRange = generateDefaultGlyphRange();
+        if (glyphRanges.empty()) {
+            glyphRanges32 = defaultGlyphRange;
+        } else {
+            glyphRanges32 = utf8::utf8to32(glyphRanges);
+        }
+
+        m_engine = &engine;
+        m_defaultFontSize = fontSize;
+
+        m_fontData = new uint8_t[fontData.size()];
+        m_fontDataSize = fontData.size();
+        std::memcpy(m_fontData, fontData.data(), fontData.size());
+
+        // create initial face
+        uint32_t key = faceKey(fontSize);
+        PerFace face = createFaceTemplate(fontSize, glyphRanges32.size());
+
+        loadFontInternal(face, defaultGlyphRange);
+
+        // create GPU image for this face
+        face.fontImageBufferGPU.init(*m_engine,
+                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     static_cast<size_t>(face.fontImageBufferCPU->widthInPixels * face.fontImageBufferCPU->heightInPixels),
+                                     1);
+
+        VulkanAllocatedImage image = engine.allocateImage(
+                {
+                        static_cast<uint32_t>(face.fontImageBufferCPU->widthInPixels),
+                        static_cast<uint32_t>(face.fontImageBufferCPU->heightInPixels),
+                        1,
+                },
+                VK_FORMAT_R8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                false);
+
+        ImageId fontImageId = engine.m_caches.imageCache.addImage(std::move(image));
+        face.fontImageId = fontImageId;
+
+        // store
+        m_faces[key] = std::move(face);
+
+        m_initialized = true;
+
+        // upload atlas to GPU
+        m_engine->immediateSubmit([this, key](VkCommandBuffer cmd) {
+            auto& f = m_faces[key];
+            f.fontImageBufferGPU.upload(cmd, f.fontImageBufferCPU->pixels, 0, f.fontImageBufferCPU->sizeInBytes());
+            VkUtils::copyFromBufferToImage(
+                    cmd,
+                    f.fontImageBufferGPU.getBuffer().buffer,
+                    m_engine->m_caches.imageCache.getImage(f.fontImageId)->image,
+                    VkExtent3D{
+                            static_cast<uint32_t>(f.fontImageBufferCPU->widthInPixels),
+                            static_cast<uint32_t>(f.fontImageBufferCPU->heightInPixels),
+                            1},
+                    false);
+        });
+
+        Logger::debug(
+                "Initialized font with {} glyphs, atlas size: {}x{} (size {:.1f})",
+                m_faces[key].characters.size(),
+                m_faces[key].fontImageBufferCPU->widthInPixels, m_faces[key].fontImageBufferCPU->heightInPixels,
+                m_defaultFontSize);
+    }
+
+    bool VulkanFont::ensureSize(float fontSize, StringView glyphRanges) {
+        uint32_t key = faceKey(fontSize);
+        if (m_faces.find(key) != m_faces.end()) return true;
+
         std::u32string glyphRanges32;
         if (glyphRanges.empty()) {
             auto defaultGlyphRange = generateDefaultGlyphRange();
@@ -107,76 +185,73 @@ namespace moe {
             glyphRanges32 = utf8::utf8to32(glyphRanges);
         }
 
-        m_engine = &engine;
-        m_fontSize = fontSize;
+        PerFace face = createFaceTemplate(fontSize, glyphRanges32.size());
+        if (!loadFontInternal(face, glyphRanges32)) return false;
 
-        m_fontData = new uint8_t[fontData.size()];
-        m_fontDataSize = fontData.size();
-        std::memcpy(m_fontData, fontData.data(), fontData.size());
+        // create GPU image for this face
+        face.fontImageBufferGPU.init(*m_engine,
+                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     static_cast<size_t>(face.fontImageBufferCPU->widthInPixels * face.fontImageBufferCPU->heightInPixels),
+                                     1);
 
-        m_fontImageBufferCPU = std::make_unique<FontImageBuffer>(static_cast<int>(glyphRanges32.size()), m_fontSize);
-        m_fontImageBuffer.init(*m_engine,
-                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                               m_fontImageBufferCPU->widthInPixels * m_fontImageBufferCPU->heightInPixels,
-                               1);
-
-        auto basicGlyphRange = generateDefaultGlyphRange();
-        loadFontInternal(basicGlyphRange);
-
-        VulkanAllocatedImage image = engine.allocateImage(
+        VulkanAllocatedImage image = m_engine->allocateImage(
                 {
-                        static_cast<uint32_t>(m_fontImageBufferCPU->widthInPixels),
-                        static_cast<uint32_t>(m_fontImageBufferCPU->heightInPixels),
+                        static_cast<uint32_t>(face.fontImageBufferCPU->widthInPixels),
+                        static_cast<uint32_t>(face.fontImageBufferCPU->heightInPixels),
                         1,
                 },
                 VK_FORMAT_R8_UNORM,
                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                 false);
 
-        // upload to gpu
-        ImageId fontImageId = engine.m_caches.imageCache.addImage(std::move(image));
-        m_fontImageId = fontImageId;
+        ImageId fontImageId = m_engine->m_caches.imageCache.addImage(std::move(image));
+        face.fontImageId = fontImageId;
 
-        m_initialized = true;
+        m_faces[key] = std::move(face);
 
-        m_engine->immediateSubmit([&](VkCommandBuffer cmd) {
-            m_fontImageBuffer.upload(cmd, m_fontImageBufferCPU->pixels, 0, m_fontImageBufferCPU->sizeInBytes());
+        // upload atlas to GPU
+        m_engine->immediateSubmit([this, key](VkCommandBuffer cmd) {
+            auto& f = m_faces[key];
+            f.fontImageBufferGPU.upload(cmd, f.fontImageBufferCPU->pixels, 0, f.fontImageBufferCPU->sizeInBytes());
             VkUtils::copyFromBufferToImage(
                     cmd,
-                    m_fontImageBuffer.getBuffer().buffer,
-                    engine.m_caches.imageCache.getImage(m_fontImageId)->image,
+                    f.fontImageBufferGPU.getBuffer().buffer,
+                    m_engine->m_caches.imageCache.getImage(f.fontImageId)->image,
                     VkExtent3D{
-                            static_cast<uint32_t>(m_fontImageBufferCPU->widthInPixels),
-                            static_cast<uint32_t>(m_fontImageBufferCPU->heightInPixels),
+                            static_cast<uint32_t>(f.fontImageBufferCPU->widthInPixels),
+                            static_cast<uint32_t>(f.fontImageBufferCPU->heightInPixels),
                             1},
                     false);
         });
 
-        Logger::debug(
-                "Initialized font with {} glyphs, atlas size: {}x{}",
-                m_characters.size(),
-                m_fontImageBufferCPU->widthInPixels, m_fontImageBufferCPU->heightInPixels);
+        return true;
     }
 
-    bool VulkanFont::lazyLoadCharacters() {
-        if (m_pendingLazyLoadGlyphs.empty()) {
+    bool VulkanFont::lazyLoadCharacters(float fontSize) {
+        uint32_t key = faceKey(fontSize);
+        auto it = m_faces.find(key);
+        if (it == m_faces.end()) return true;
+
+        auto& face = it->second;
+        if (face.pendingLazyLoadGlyphs.empty()) {
             return true;
         }
 
-        Logger::debug("Lazy loading {} glyphs for font", m_pendingLazyLoadGlyphs.size());
-        std::u32string glyphRanges32(m_pendingLazyLoadGlyphs.begin(), m_pendingLazyLoadGlyphs.end());
-        m_pendingLazyLoadGlyphs.clear();
+        Logger::debug("Lazy loading {} glyphs for font size {}", face.pendingLazyLoadGlyphs.size(), fontSize);
+        std::u32string glyphRanges32(face.pendingLazyLoadGlyphs.begin(), face.pendingLazyLoadGlyphs.end());
+        face.pendingLazyLoadGlyphs.clear();
 
-        size_t originalGlyphCount = m_fontImageBufferCPU->currentGlyphCount;
-        loadFontInternal(glyphRanges32);
+        size_t originalGlyphCount = face.fontImageBufferCPU->currentGlyphCount;
+        loadFontInternal(face, glyphRanges32);
 
-        size_t newGlyphCount = m_fontImageBufferCPU->currentGlyphCount - originalGlyphCount;
-        auto copyRange = m_fontImageBufferCPU->getCopyRange(originalGlyphCount);
+        size_t newGlyphCount = face.fontImageBufferCPU->currentGlyphCount - originalGlyphCount;
+        auto copyRange = face.fontImageBufferCPU->getCopyRange(static_cast<int>(originalGlyphCount));
 
         m_engine->immediateSubmit([=](VkCommandBuffer cmd) {
-            m_fontImageBuffer.upload(
+            auto& f = m_faces[key];
+            f.fontImageBufferGPU.upload(
                     cmd,
-                    m_fontImageBufferCPU->pixels + copyRange.offset,
+                    f.fontImageBufferCPU->pixels + copyRange.offset,
                     0,
                     copyRange.size,
                     copyRange.offset);
@@ -187,18 +262,17 @@ namespace moe {
             // |----existing glyphs---|--new glyphs--|
             // |----new glyphs---|--not initialized--|
             // :-> copyRange.offset + copyRange.size
-
             VkUtils::copyFromBufferToImage(
                     cmd,
-                    m_fontImageBuffer.getBuffer().buffer,
-                    m_engine->m_caches.imageCache.getImage(m_fontImageId)->image,
+                    f.fontImageBufferGPU.getBuffer().buffer,
+                    m_engine->m_caches.imageCache.getImage(f.fontImageId)->image,
                     VkExtent3D{
-                            static_cast<uint32_t>(m_fontImageBufferCPU->widthInPixels),
-                            static_cast<uint32_t>(copyRange.size / m_fontImageBufferCPU->widthInPixels),
+                            static_cast<uint32_t>(f.fontImageBufferCPU->widthInPixels),
+                            static_cast<uint32_t>(copyRange.size / f.fontImageBufferCPU->widthInPixels),
                             1},
                     VkOffset3D{
                             0,
-                            static_cast<int32_t>(copyRange.offset / m_fontImageBufferCPU->widthInPixels),
+                            static_cast<int32_t>(copyRange.offset / f.fontImageBufferCPU->widthInPixels),
                             0},
                     copyRange.offset,
                     0,
@@ -209,6 +283,28 @@ namespace moe {
     }
 
     void VulkanFont::destroy() {
-        m_fontImageBuffer.destroy();
+        for (auto& kv: m_faces) {
+            kv.second.fontImageBufferGPU.destroy();
+            // CPU buffer will be freed by UniquePtr destructor
+        }
+        m_faces.clear();
+
+        if (m_fontData) {
+            delete[] m_fontData;
+            m_fontData = nullptr;
+            m_fontDataSize = 0;
+        }
+    }
+
+    UnorderedMap<char32_t, VulkanFont::Character>& VulkanFont::getCharacters(float fontSize) {
+        uint32_t key = faceKey(fontSize);
+        return m_faces[key].characters;
+    }
+
+    ImageId VulkanFont::getFontImageId(float fontSize) const {
+        uint32_t key = faceKey(fontSize);
+        auto it = m_faces.find(key);
+        if (it == m_faces.end()) return NULL_IMAGE_ID;
+        return it->second.fontImageId;
     }
 }// namespace moe

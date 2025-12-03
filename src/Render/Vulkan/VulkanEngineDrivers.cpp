@@ -143,6 +143,7 @@ namespace moe {
 
     VulkanRenderObjectBus& VulkanRenderObjectBus::submitTextSpriteRender(
             FontId fontId,
+            float fontSize,
             StringView text,
             const Transform& transform,
             const Color& color) {
@@ -161,16 +162,16 @@ namespace moe {
         auto* fontRef = font->get();
 
         // lazy load pending characters from last frame
-        fontRef->lazyLoadCharacters();
+        fontRef->lazyLoadCharacters(fontSize);
 
         auto advanceTransform = transform;
 
         std::u32string text32 = utf8::utf8to32(text);
         for (size_t i = 0; i < text32.size(); ++i) {
             char32_t c = text32[i];
-            const auto& glyphIt = fontRef->getCharacters().find(c);
-            if (glyphIt == fontRef->getCharacters().end()) {
-                fontRef->addCharToLazyLoadQueue(c);
+            const auto& glyphIt = fontRef->getCharacters(fontSize).find(c);
+            if (glyphIt == fontRef->getCharacters(fontSize).end()) {
+                fontRef->addCharToLazyLoadQueue(c, fontSize);
                 continue;
             }
             const auto& glyph = glyphIt->second;
@@ -188,7 +189,7 @@ namespace moe {
             glyphTransform.setPosition(glyphTransform.getPosition() + glm::vec3(glyphPosOffset, 0.0f));
 
             submitSpriteRender(
-                    fontRef->getFontImageId(),
+                    fontRef->getFontImageId(fontSize),
                     glyphTransform,
                     color,
                     glyphSize,

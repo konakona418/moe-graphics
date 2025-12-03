@@ -22,20 +22,24 @@ namespace moe {
             uint32_t advance;
         };
 
+        // initialize font binary once; creates an atlas for the initial size
         void init(VulkanEngine& engine, Span<uint8_t> fontData, float fontSize, StringView glyphRanges);
+
+        // create/add another size atlas on demand
+        bool ensureSize(float fontSize, StringView glyphRanges);
 
         void destroy();
 
-        UnorderedMap<char32_t, Character>& getCharacters() { return m_characters; }
-        ImageId getFontImageId() const { return m_fontImageId; }
-        float getFontSize() const { return m_fontSize; }
-        bool lazyLoadCharacters();
-        void addCharToLazyLoadQueue(char32_t c) {
-            m_pendingLazyLoadGlyphs.push_back(c);
-        }
+        // accessors per size (fontSize rounded to integer key)
+        UnorderedMap<char32_t, Character>& getCharacters(float fontSize);
+        ImageId getFontImageId(float fontSize) const;
+        float getFontSize() const { return m_defaultFontSize; }
 
-    private:
-        static constexpr int32_t CELL_PADDING = 1;
+        bool lazyLoadCharacters(float fontSize);
+        void addCharToLazyLoadQueue(char32_t c, float fontSize) {
+            auto key = faceKey(fontSize);
+            m_faces[key].pendingLazyLoadGlyphs.push_back(c);
+        }
 
         struct FontImageBuffer {
             uint8_t* pixels{nullptr};
@@ -166,23 +170,37 @@ namespace moe {
             }
         };
 
+        struct PerFace {
+            float fontSize{0.0f};
+            UniquePtr<FontImageBuffer> fontImageBufferCPU;
+            VulkanSwapBuffer fontImageBufferGPU;
+            ImageId fontImageId{NULL_IMAGE_ID};
+            UnorderedMap<char32_t, Character> characters;
+            Vector<char32_t> pendingLazyLoadGlyphs;
+        };
+
+    private:
+        static constexpr int32_t CELL_PADDING = 1;
+
+        // helper to convert float fontSize into integer key (pixels)
+        static uint32_t faceKey(float fontSize) {
+            return static_cast<uint32_t>(std::lround(fontSize));
+        }
+
         StringView m_path;
         VulkanEngine* m_engine{nullptr};
         bool m_initialized{false};
 
-        float m_fontSize{0.0f};
+        float m_defaultFontSize{0.0f};
 
-        VulkanSwapBuffer m_fontImageBuffer;
-        UniquePtr<FontImageBuffer> m_fontImageBufferCPU;
-
+        // raw font binary kept once for all faces
         uint8_t* m_fontData{nullptr};
         size_t m_fontDataSize{0};
 
-        UnorderedMap<char32_t, Character> m_characters;
-        ImageId m_fontImageId{NULL_IMAGE_ID};
-        Vector<char32_t> m_pendingLazyLoadGlyphs;
+        // map keyed by rounded font size (pixel)
+        UnorderedMap<uint32_t, PerFace> m_faces;
 
-        bool loadFontInternal(std::u32string_view glyphRanges32);
+        bool loadFontInternal(PerFace& face, std::u32string_view glyphRanges32);
     };
 
     struct VulkanFontLoader {

@@ -137,6 +137,7 @@ namespace moe {
 
         VulkanRenderObjectBus& submitTextSpriteRender(
                 FontId fontId,
+                float fontSize,
                 StringView text,
                 const Transform& transform,
                 const Color& color);
