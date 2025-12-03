@@ -10,16 +10,76 @@ MOE_BEGIN_NAMESPACE
 template<typename T, typename = Meta::EnableIfT<(Meta::IsRefCountedV<T> || !Meta::IsCompleteTypeV<T>)>>
 struct Ref {
 public:
+    template<typename V, typename>
+    friend struct Ref;
+
     Ref() = default;
 
     explicit Ref(T* ptr)
         : m_ptr(ptr) {
-        retain();
+        if (m_ptr) {
+            retain();
+        }
     }
 
     Ref(const Ref& other)
         : m_ptr(other.m_ptr) {
-        retain();
+        if (m_ptr) {
+            retain();
+        }
+    }
+
+    template<typename U>
+    Ref(const Ref<U>& other)
+        : m_ptr(other.m_ptr) {
+        static_assert(
+                Meta::IsBaseOfV<T, U> || Meta::IsSameV<T, U>,
+                "Cannot construct Ref<T> from Ref<U> when T is not a base of U, "
+                "nor the same type");
+        if (m_ptr) {
+            retain();
+        }
+    }
+
+    template<typename U>
+    Ref<T>& operator=(const Ref<U>& other) {
+        static_assert(
+                Meta::IsBaseOfV<T, U> || Meta::IsSameV<T, U>,
+                "Cannot assign Ref<T> from Ref<U> when T is not a base of U, "
+                "nor the same type");
+        if (m_ptr != other.m_ptr) {
+            release();
+            m_ptr = other.m_ptr;
+            retain();
+        }
+        return *this;
+    }
+
+    template<typename U>
+    Ref(Ref<U>&& other) noexcept
+        : m_ptr(other.m_ptr) {
+        static_assert(
+                Meta::IsBaseOfV<T, U> || Meta::IsSameV<T, U>,
+                "Cannot construct Ref<T> from Ref<U> when T is not a base of U, "
+                "nor the same type");
+        other.m_ptr = nullptr;
+    }
+
+    template<typename U>
+    Ref& operator=(Ref<U>&& other) noexcept {
+        static_assert(
+                Meta::IsBaseOfV<T, U> || Meta::IsSameV<T, U>,
+                "Cannot assign Ref<T> from Ref<U> when T is not a base of U, "
+                "nor the same type");
+        if (m_ptr == other.m_ptr) {
+            other.m_ptr = nullptr;
+            return *this;
+        }
+
+        release();
+        m_ptr = other.m_ptr;
+        other.m_ptr = nullptr;
+        return *this;
     }
 
     Ref(Ref&& other) noexcept
@@ -41,11 +101,14 @@ public:
     }
 
     Ref& operator=(Ref&& other) noexcept {
-        if (this != &other) {
-            release();
-            m_ptr = other.m_ptr;
+        if (m_ptr == other.m_ptr) {
             other.m_ptr = nullptr;
+            return *this;
         }
+        release();
+        m_ptr = other.m_ptr;
+        other.m_ptr = nullptr;
+
         return *this;
     }
 
@@ -86,6 +149,7 @@ public:
 
     explicit operator bool() const { return m_ptr != nullptr; }
 
+private:
     void retain() {
         if (m_ptr) {
             m_ptr->retain();
@@ -99,7 +163,6 @@ public:
         }
     }
 
-private:
     T* m_ptr{nullptr};
 };
 
