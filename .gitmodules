@@ -64,3 +64,6 @@
 [submodule "vendors/vorbis"]
 	path = vendors/vorbis
 	url = https://github.com/xiph/vorbis.git
+[submodule "vendors/mimalloc"]
+	path = vendors/mimalloc
+	url = https://github.com/microsoft/mimalloc.git

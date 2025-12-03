@@ -4,6 +4,10 @@ project(moe-graphics VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# whether to enable mimalloc
+# enable this in release build
+option(USE_MIMALLOC "Use mimalloc as the memory allocator" OFF)
+
 add_subdirectory(vendors/glfw)
 add_subdirectory(vendors/glm)
 add_subdirectory(vendors/Vulkan-Headers)
@@ -29,6 +33,19 @@ add_subdirectory(vendors/utfcpp)
 add_subdirectory(vendors/openal-soft)
 add_subdirectory(vendors/ogg)
 add_subdirectory(vendors/vorbis)
+
+if(USE_MIMALLOC)
+    message(STATUS "moe-graphics: Using mimalloc as the memory allocator")
+    add_subdirectory(vendors/mimalloc)
+
+    # use static mimalloc
+    set(MIMALLOC_LIB mimalloc-static)
+    set(MIMALLOC_CPP_IMPL "src/MiMallocImpl.cpp")
+else()
+    message(STATUS "moe-graphics: Not using mimalloc")
+    set(MIMALLOC_LIB "")
+    set(MIMALLOC_CPP_IMPL "")
+endif()
 
 include_directories(include)
 
@@ -63,6 +80,8 @@ add_executable(moe-graphics
   ${IMGUI_SOURCES}
   ${IM3D_SOURCES}
   ${STB_IMAGES_SOURCES}
+
+  ${MIMALLOC_CPP_IMPL}
 )
 
 target_link_libraries(moe-graphics PRIVATE
@@ -74,6 +93,7 @@ target_link_libraries(moe-graphics PRIVATE
   Jolt
   utf8cpp freetype harfbuzz
   OpenAL::OpenAL ogg vorbis
+  ${MIMALLOC_LIB}
 )
 
 target_include_directories(moe-graphics PRIVATE
