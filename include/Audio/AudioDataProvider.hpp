@@ -3,10 +3,12 @@
 #include "Audio/AudioBuffer.hpp"
 #include "Audio/Common.hpp"
 
+#include "Core/RefCounted.hpp"
+
 
 MOE_BEGIN_NAMESPACE
 
-struct AudioDataProvider {
+struct AudioDataProvider : public RefCounted<AudioDataProvider> {
     virtual ~AudioDataProvider() = default;
 
     virtual ALuint getFormat() const = 0;
