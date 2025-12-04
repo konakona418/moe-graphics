@@ -3,6 +3,7 @@
 #include "Audio/Common.hpp"
 
 #include "Core/Common.hpp"
+#include "Core/Meta/Feature.hpp"
 #include "Core/RefCounted.hpp"
 
 
@@ -19,12 +20,11 @@ public:
     void destroy();
 };
 
-struct AudioBufferPool {
+struct AudioBufferPool : public Meta::Singleton<AudioBufferPool> {
 public:
-    static constexpr size_t POOL_INIT_SIZE = 32;
+    MOE_SINGLETON(AudioBufferPool)
 
-    AudioBufferPool() = default;
-    ~AudioBufferPool() = default;
+    static constexpr size_t POOL_INIT_SIZE = 32;
 
     void init();
 
@@ -32,17 +32,15 @@ public:
 
     Ref<AudioBuffer> acquireBuffer();
 
-    static AudioBufferPool* get() {
-        MOE_ASSERT(m_instance != nullptr, "AudioBufferPool not initialized");
-        return m_instance;
-    }
-
 private:
     Vector<Pinned<AudioBuffer>> m_buffers;
     Deque<AudioBuffer*> m_freeBuffers;
+    bool m_initialized{false};
 
-    static AudioBufferPool* m_instance;
     static void bufferDeleter(void* ptr);
+
+    AudioBufferPool() = default;
+    ~AudioBufferPool() = default;
 
     void allocBuffer();
 };

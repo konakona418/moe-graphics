@@ -1,4 +1,5 @@
 #include "Audio/AudioEngine.hpp"
+#include "Audio/AudioBuffer.hpp"
 
 MOE_BEGIN_NAMESPACE
 
@@ -37,6 +38,8 @@ void AudioEngine::init() {
         m_listener.init();
 
         m_initialized = true;
+
+        AudioBufferPool::getInstance().init();
     });
 }
 
@@ -44,6 +47,8 @@ void AudioEngine::cleanup() {
     MOE_ASSERT(m_initialized, "AudioEngine not initialized");
 
     Logger::info("Cleaning up audio engine...");
+
+    AudioBufferPool::getInstance().destroy();
 
     m_listener.destroy();
 

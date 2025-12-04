@@ -32,30 +32,26 @@ void AudioBuffer::destroy() {
     bufferId = INVALID_BUFFER_ID;
 }
 
-AudioBufferPool* AudioBufferPool::m_instance{nullptr};
-
 void AudioBufferPool::init() {
-    MOE_ASSERT(m_instance == nullptr, "AudioBufferPool already initialized");
-    m_instance = this;
-
     for (size_t i = 0; i < POOL_INIT_SIZE; i++) {
         allocBuffer();
     }
+    m_initialized = true;
 }
 
 void AudioBufferPool::destroy() {
-    MOE_ASSERT(m_instance == this, "AudioBufferPool instance mismatch");
-
     for (auto& buffer: m_buffers) {
         buffer->destroy();
     }
     m_buffers.clear();
     m_freeBuffers.clear();
 
-    m_instance = nullptr;
+    m_initialized = false;
 }
 
 Ref<AudioBuffer> AudioBufferPool::acquireBuffer() {
+    MOE_ASSERT(m_initialized, "AudioBufferPool not initialized");
+
     if (m_freeBuffers.empty()) {
         // no pending buffers, allocate a new one
         allocBuffer();
@@ -69,7 +65,7 @@ Ref<AudioBuffer> AudioBufferPool::acquireBuffer() {
 
 void AudioBufferPool::bufferDeleter(void* ptr) {
     // Rc reached zero, return to pool
-    AudioBufferPool::get()->m_freeBuffers.push_back(static_cast<AudioBuffer*>(ptr));
+    AudioBufferPool::getInstance().m_freeBuffers.push_back(static_cast<AudioBuffer*>(ptr));
 }
 
 void AudioBufferPool::allocBuffer() {

@@ -10,7 +10,7 @@ MOE_BEGIN_NAMESPACE
 
 struct AudioSource : public RefCounted<AudioSource> {
 public:
-    static constexpr size_t MAX_STREAMING_BUFFERS = 4;
+    static constexpr size_t MAX_STREAMING_BUFFERS = 16;
 
     AudioSource();
     ~AudioSource();

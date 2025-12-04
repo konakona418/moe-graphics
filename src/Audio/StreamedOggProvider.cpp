@@ -125,8 +125,7 @@ Ref<AudioBuffer> StreamedOggProvider::streamNextPacket(size_t* outSize) {
     }
 
     // alloc audio buffer and upload data
-    Ref<AudioBuffer> audioBuffer = AudioBufferPool::get()->acquireBuffer();
-    audioBuffer->init();
+    Ref<AudioBuffer> audioBuffer = AudioBufferPool::getInstance().acquireBuffer();
     if (!audioBuffer->uploadData(
                 Span<const uint8_t>(
                         buffer.data(),
