@@ -92,7 +92,7 @@ target_link_libraries(moe-graphics PRIVATE
   tinygltf
   Jolt
   utf8cpp freetype harfbuzz
-  OpenAL::OpenAL ogg vorbis
+  OpenAL::OpenAL ogg vorbis vorbisfile
   ${MIMALLOC_LIB}
 )
 
