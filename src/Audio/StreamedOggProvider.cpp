@@ -106,23 +106,32 @@ ALsizei StreamedOggProvider::getSampleRate() const {
 }
 
 Ref<AudioBuffer> StreamedOggProvider::streamNextPacket(size_t* outSize) {
+    auto& buffer = m_tempReadBuffer;
+    buffer.resize(m_chunkSize);
     const size_t bufferSize = m_chunkSize;
-    Vector<uint8_t> buffer(bufferSize);
 
-    long bytesRead = ov_read(
-            const_cast<OggVorbis_File*>(&m_oggFile),
-            reinterpret_cast<char*>(buffer.data()),
-            static_cast<int>(bufferSize),
-            0,
-            2,
-            1,
-            nullptr);
+    size_t totalBytesRead = 0;
+    while (totalBytesRead < bufferSize) {
+        long bytesRead = ov_read(
+                const_cast<OggVorbis_File*>(&m_oggFile),
+                reinterpret_cast<char*>(buffer.data() + totalBytesRead),
+                static_cast<int>(bufferSize - totalBytesRead),
+                0,// little endian
+                2,// 16 bits per sample
+                1,// signed data
+                nullptr);
+        if (bytesRead < 0) {
+            Logger::error("Error while reading Ogg Vorbis data");
+            return Ref<AudioBuffer>(nullptr);
+        } else if (bytesRead == 0) {
+            // eof
+            break;
+        }
+        totalBytesRead += static_cast<size_t>(bytesRead);
+    }
 
-    if (bytesRead < 0) {
-        Logger::error("Error while reading Ogg Vorbis data");
-        return Ref<AudioBuffer>(nullptr);
-    } else if (bytesRead == 0) {
-        // eof
+    if (totalBytesRead == 0) {
+        // eof, return null
         return Ref<AudioBuffer>(nullptr);
     }
 
@@ -137,20 +146,22 @@ Ref<AudioBuffer> StreamedOggProvider::streamNextPacket(size_t* outSize) {
     if (!audioBuffer->uploadData(
                 Span<const uint8_t>(
                         buffer.data(),
-                        static_cast<size_t>(bytesRead)),
+                        static_cast<size_t>(totalBytesRead)),
                 getFormat(), getSampleRate())) {
         Logger::error("Failed to upload streamed Ogg Vorbis data to AudioBuffer");
         return Ref<AudioBuffer>(nullptr);
     }
 
     if (outSize) {
-        *outSize = static_cast<size_t>(bytesRead);
+        *outSize = static_cast<size_t>(totalBytesRead);
     }
     return audioBuffer;
 }
 
 void StreamedOggProvider::seekToStart() {
-    ov_raw_seek(const_cast<OggVorbis_File*>(&m_oggFile), 0);
+    if (ov_pcm_seek(const_cast<OggVorbis_File*>(&m_oggFile), 0) != 0) {
+        Logger::error("Failed to seek to start of Ogg Vorbis data");
+    }
 }
 
 MOE_END_NAMESPACE

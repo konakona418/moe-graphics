@@ -20,14 +20,17 @@ void AudioSource::load(Ref<AudioDataProvider> provider, bool loop) {
 }
 
 void AudioSource::play() {
+    m_isPlaying = true;
     alSourcePlay(m_sourceId);
 }
 
 void AudioSource::pause() {
+    m_isPlaying = false;
     alSourcePause(m_sourceId);
 }
 
 void AudioSource::stop() {
+    m_isPlaying = false;
     alSourceStop(m_sourceId);
 }
 
@@ -41,12 +44,42 @@ void AudioSource::update() {
         return;
     }
 
-    unqueueProcessedBuffer();
-    streamUpdate();
+    ALint processedBuffers = 0;
+    alGetSourcei(m_sourceId, AL_BUFFERS_PROCESSED, &processedBuffers);
+
+    while (processedBuffers-- > 0) {
+        auto buffer = m_queuedBuffers.front();
+        alSourceUnqueueBuffers(m_sourceId, 1, &buffer->bufferId);
+        m_queuedBuffers.pop();
+
+        size_t packetSize = 0;
+        Ref<AudioBuffer> newBuffer = m_provider->streamNextPacket(&packetSize);
+        if (!newBuffer) {
+            // eof reached
+            if (m_loop) {
+                m_provider->seekToStart();
+                newBuffer = m_provider->streamNextPacket(&packetSize);
+                if (!newBuffer) {
+                    Logger::error("Failed to loop audio stream, no data after seek");
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
+
+        alSourceQueueBuffers(m_sourceId, 1, &newBuffer->bufferId);
+        m_queuedBuffers.push(newBuffer);
+    }
+
+    ALint currentQueued = 0;
+    alGetSourcei(m_sourceId, AL_BUFFERS_QUEUED, &currentQueued);
 
     ALint sourceState = 0;
     alGetSourcei(m_sourceId, AL_SOURCE_STATE, &sourceState);
-    if (sourceState != AL_PLAYING) {
+
+    if (sourceState != AL_PLAYING && currentQueued > 0 && m_isPlaying) {
+        Logger::debug("Restarting audio source {}", m_sourceId);
         alSourcePlay(m_sourceId);
     }
 }
@@ -78,46 +111,6 @@ void AudioSource::loadStaticBuffer() {
     }
 
     alSourcei(m_sourceId, AL_BUFFER, static_cast<ALint>(buffer->bufferId));
-}
-
-void AudioSource::unqueueProcessedBuffer() {
-    ALint processedCount = 0;
-    alGetSourcei(m_sourceId, AL_BUFFERS_PROCESSED, &processedCount);
-
-    while (processedCount-- > 0) {
-        auto buf = m_queuedBuffers.front();
-        alSourceUnqueueBuffers(m_sourceId, 1, &buf->bufferId);
-
-        m_queuedBuffers.pop();
-    }
-}
-
-void AudioSource::streamUpdate() {
-    while (true) {
-        ALint queuedCount = 0;
-        alGetSourcei(m_sourceId, AL_BUFFERS_QUEUED, &queuedCount);
-        if (queuedCount >= MAX_STREAMING_BUFFERS) {
-            break;
-        }
-
-        size_t packetSize = 0;
-        Ref<AudioBuffer> buffer = m_provider->streamNextPacket(&packetSize);
-        if (!buffer) {
-            // eof reached
-            if (m_loop) {
-                m_provider->seekToStart();
-                buffer = m_provider->streamNextPacket(&packetSize);
-                if (!buffer) {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        alSourceQueueBuffers(m_sourceId, 1, &buffer->bufferId);
-        m_queuedBuffers.push(buffer);
-    }
 }
 
 static void sourceDeleter(void* ptr) {

@@ -18,6 +18,8 @@ void AudioEngine::handleCommands() {
 }
 
 void AudioEngine::mainAudioLoop() {
+    auto lastTime = std::chrono::steady_clock::now();
+    constexpr auto frameDuration = std::chrono::milliseconds(5);
     while (m_running.load()) {
         // process audio commands
         handleCommands();
@@ -27,7 +29,14 @@ void AudioEngine::mainAudioLoop() {
             source->update();
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        auto currentTime = std::chrono::steady_clock::now();
+        auto elapsed = currentTime - lastTime;
+        if (elapsed < frameDuration) {
+            std::this_thread::sleep_for(frameDuration - elapsed);
+        } else {
+            Logger::warn("Audio engine main loop is running behind");
+        }
+        lastTime = std::chrono::steady_clock::now();
     }
 
     handleCommands();// final command handling before exit

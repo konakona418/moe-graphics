@@ -12,6 +12,8 @@ MOE_BEGIN_NAMESPACE
 
 struct StreamedOggProvider : public AudioDataProvider {
 public:
+    static constexpr size_t DEFAULT_CHUNK_SIZE = 1024 * 16;
+
     StreamedOggProvider(Ref<BinaryBuffer> oggData, size_t chunkSize);
     ~StreamedOggProvider() override;
 
@@ -42,6 +44,8 @@ private:
     size_t m_chunkSize;
 
     Pinned<OggReadContext> m_readContext;
+
+    Vector<uint8_t> m_tempReadBuffer;
 
     static ov_callbacks generateCallbacks();
 };

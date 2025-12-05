@@ -11,7 +11,7 @@ MOE_BEGIN_NAMESPACE
 
 struct AudioSource : public AtomicRefCounted<AudioSource> {
 public:
-    static constexpr size_t MAX_STREAMING_BUFFERS = 16;
+    static constexpr size_t MAX_STREAMING_BUFFERS = 8;
 
     AudioSource();
     ~AudioSource() = default;
@@ -37,14 +37,12 @@ private:
 
     Ref<AudioDataProvider> m_provider;
     bool m_loop{false};
+    bool m_isPlaying{false};
 
     Queue<Ref<AudioBuffer>> m_queuedBuffers;
 
     void loadStreamInitialBuffers();
     void loadStaticBuffer();
-
-    void streamUpdate();
-    void unqueueProcessedBuffer();
 };
 
 struct CreateSourceCommand : public BlockingAudioCommand {
