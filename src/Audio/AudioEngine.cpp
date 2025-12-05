@@ -4,6 +4,8 @@
 
 MOE_BEGIN_NAMESPACE
 
+static const char* OPENAL_SOFT_DEVICE_NAME = "OpenAL Soft";
+
 void AudioEngine::handleCommands() {
     std::scoped_lock lk(m_mutex);
     while (!m_commandQueue.empty()) {
@@ -49,11 +51,12 @@ void AudioEngine::initAndLaunchMainAudioLoop() {
         std::call_once(initFlag, [this]() {
             MOE_ASSERT(!m_initialized, "AudioEngine already initialized");
 
-            std::scoped_lock lk(m_mutex);        // lock during init
-            auto device = alcOpenDevice(nullptr);// default
+            std::scoped_lock lk(m_mutex);// lock during init
 
+            auto device = alcOpenDevice(OPENAL_SOFT_DEVICE_NAME);// OpenAL Soft preferred
             if (device) {
                 const ALCchar* deviceName = alcGetString(device, ALC_DEVICE_SPECIFIER);
+
                 Logger::info("Opened OpenAL device: {}", deviceName);
 
                 auto context = alcCreateContext(device, nullptr);
@@ -66,10 +69,20 @@ void AudioEngine::initAndLaunchMainAudioLoop() {
                 } else {
                     Logger::info("EAX 2.0 is not supported");
                 }
+            } else {
+                // ensure OpenAL Soft is used
+                // if OpenAL dynamic library is missing, system default OpenAL implementation may be used instead
+                // and that may cause various issues
+                Logger::critical("Preferred OpenAL device '{}' not found. "
+                                 "Check if dynamic linked library 'OpenAL32.dll'/'libopenal.so' is present",
+                                 OPENAL_SOFT_DEVICE_NAME);
+                m_initialized = false;
+
+                return;
             }
 
             if (alGetError() != AL_NO_ERROR) {
-                Logger::error("OpenAL error occurred, failing to initialize audio engine");
+                Logger::critical("OpenAL error occurred, failing to initialize audio engine");
                 m_initialized = false;
                 return;
             }
