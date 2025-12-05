@@ -191,9 +191,19 @@ namespace moe {
 
         void endFrame();
 
-        void addImGuiDrawCommand(Function<void()>&& fn) { m_imguiDrawQueue.push(std::move(fn)); }
+        void addImGuiDrawCommand(Function<void()>&& fn) {
+            if (m_stopRendering) {
+                return;
+            }
+            m_imguiDrawQueue.push(std::move(fn));
+        }
 
-        void addIm3dDrawCommand(Function<void()>&& fn) { m_im3dDrawQueue.push(std::move(fn)); }
+        void addIm3dDrawCommand(Function<void()>&& fn) {
+            if (m_stopRendering) {
+                return;
+            }
+            m_im3dDrawQueue.push(std::move(fn));
+        }
 
         VulkanBindlessSet& getBindlessSet() {
             MOE_ASSERT(m_bindlessSet.isInitialized(), "VulkanBindlessSet not initialized");
