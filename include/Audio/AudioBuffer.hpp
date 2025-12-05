@@ -11,7 +11,7 @@ MOE_BEGIN_NAMESPACE
 
 constexpr ALuint INVALID_BUFFER_ID = std::numeric_limits<ALuint>::max();
 
-struct AudioBuffer : public RefCounted<AudioBuffer> {
+struct AudioBuffer : public AtomicRefCounted<AudioBuffer> {
 public:
     ALuint bufferId{INVALID_BUFFER_ID};
 
@@ -20,11 +20,12 @@ public:
     void destroy();
 };
 
-struct AudioBufferPool : public Meta::Singleton<AudioBufferPool> {
+struct AudioBufferPool {
 public:
-    MOE_SINGLETON(AudioBufferPool)
-
     static constexpr size_t POOL_INIT_SIZE = 32;
+
+    AudioBufferPool() = default;
+    ~AudioBufferPool() = default;
 
     void init();
 
@@ -38,9 +39,6 @@ private:
     bool m_initialized{false};
 
     static void bufferDeleter(void* ptr);
-
-    AudioBufferPool() = default;
-    ~AudioBufferPool() = default;
 
     void allocBuffer();
 };

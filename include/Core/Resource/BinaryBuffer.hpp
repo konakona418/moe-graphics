@@ -5,7 +5,7 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct BinaryBuffer : public RefCounted<BinaryBuffer> {
+struct BinaryBuffer : public AtomicRefCounted<BinaryBuffer> {
 public:
     BinaryBuffer(Vector<uint8_t>&& data, StringView mimeType = "")
         : m_data(std::move(data)), m_mimeType(mimeType) {}

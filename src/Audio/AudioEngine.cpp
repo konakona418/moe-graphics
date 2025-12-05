@@ -1,54 +1,99 @@
 #include "Audio/AudioEngine.hpp"
 #include "Audio/AudioBuffer.hpp"
+#include "Audio/AudioSource.hpp"
 
 MOE_BEGIN_NAMESPACE
 
-void AudioEngine::init() {
-    std::once_flag initFlag;
-    std::call_once(initFlag, [this]() {
-        MOE_ASSERT(!m_initialized, "AudioEngine already initialized");
+void AudioEngine::handleCommands() {
+    std::scoped_lock lk(m_mutex);
+    while (!m_commandQueue.empty()) {
+        auto& cmd = m_commandQueue.front();
+        cmd->execute(*this);
+        if (cmd->isBlocking()) {
+            auto blockingCmd = static_cast<BlockingAudioCommand*>(cmd.get());
+            blockingCmd->notify();
+        }
+        m_commandQueue.pop_front();
+    }
+}
 
-        auto device = alcOpenDevice(nullptr);// default
+void AudioEngine::mainAudioLoop() {
+    while (m_running.load()) {
+        // process audio commands
+        handleCommands();
 
-        if (device) {
-            const ALCchar* deviceName = alcGetString(device, ALC_DEVICE_SPECIFIER);
-            Logger::info("Opened OpenAL device: {}", deviceName);
+        // update audio sources
+        for (auto& source: m_sources) {
+            source->update();
+        }
 
-            auto context = alcCreateContext(device, nullptr);
-            alcMakeContextCurrent(context);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 
-            bool eaxSupported = alcIsExtensionPresent(device, "EAX2.0");
-            m_eaxSupported = eaxSupported;
-            if (eaxSupported) {
-                Logger::info("EAX 2.0 is supported");
-            } else {
-                Logger::info("EAX 2.0 is not supported");
+    handleCommands();// final command handling before exit
+}
+
+void AudioEngine::initAndLaunchMainAudioLoop() {
+    m_running.store(true);
+    m_audioThread = std::thread([this]() {
+        static std::once_flag initFlag;
+        std::call_once(initFlag, [this]() {
+            MOE_ASSERT(!m_initialized, "AudioEngine already initialized");
+
+            std::scoped_lock lk(m_mutex);        // lock during init
+            auto device = alcOpenDevice(nullptr);// default
+
+            if (device) {
+                const ALCchar* deviceName = alcGetString(device, ALC_DEVICE_SPECIFIER);
+                Logger::info("Opened OpenAL device: {}", deviceName);
+
+                auto context = alcCreateContext(device, nullptr);
+                alcMakeContextCurrent(context);
+
+                bool eaxSupported = alcIsExtensionPresent(device, "EAX2.0");
+                m_eaxSupported = eaxSupported;
+                if (eaxSupported) {
+                    Logger::info("EAX 2.0 is supported");
+                } else {
+                    Logger::info("EAX 2.0 is not supported");
+                }
             }
-        }
 
-        if (alGetError() != AL_NO_ERROR) {
-            Logger::error("OpenAL error occurred, failing to initialize audio engine");
-            m_initialized = false;
-            return;
-        }
+            if (alGetError() != AL_NO_ERROR) {
+                Logger::error("OpenAL error occurred, failing to initialize audio engine");
+                m_initialized = false;
+                return;
+            }
 
-        Logger::info("Audio engine initialized successfully.");
+            Logger::info("Audio engine initialized successfully.");
 
-        Logger::info("Initializing default audio listener...");
-        m_listener.init();
+            Logger::info("Initializing default audio listener...");
+            m_listener.init();
 
-        m_initialized = true;
+            m_initialized = true;
 
-        AudioBufferPool::getInstance().init();
+            m_bufferPool.init();
+        });
+
+        mainAudioLoop();
     });
+}
+
+void AudioEngine::init() {
+    initAndLaunchMainAudioLoop();
 }
 
 void AudioEngine::cleanup() {
     MOE_ASSERT(m_initialized, "AudioEngine not initialized");
 
+    m_running.store(false);
+    if (m_audioThread.joinable()) {
+        m_audioThread.join();
+    }
+
     Logger::info("Cleaning up audio engine...");
 
-    AudioBufferPool::getInstance().destroy();
+    m_bufferPool.destroy();
 
     m_listener.destroy();
 
@@ -59,6 +104,54 @@ void AudioEngine::cleanup() {
     alcCloseDevice(device);
 
     Logger::info("Audio engine cleaned up.");
+}
+
+AudioEngineInterface AudioEngine::getInterface() {
+    return AudioEngineInterface(AudioEngine::getInstance());
+}
+
+Ref<AudioSource> AudioEngineInterface::createAudioSource() {
+    Ref<AudioSource> source;
+
+    std::promise<void> promise;
+    auto future = promise.get_future();
+
+    submitCommand(
+            std::make_unique<CreateSourceCommand>(
+                    &source, std::move(promise)));
+    future.get();
+
+    Logger::debug("Audio source created with id {}", source->sourceId());
+
+    return source;
+}
+
+void AudioEngineInterface::loadAudioSource(
+        Ref<AudioSource> source,
+        Ref<AudioDataProvider> provider, bool loop) {
+    submitCommand(
+            std::make_unique<SourceLoadCommand>(
+                    std::move(source),
+                    std::move(provider),
+                    loop));
+}
+
+void AudioEngineInterface::playAudioSource(Ref<AudioSource> source) {
+    submitCommand(
+            std::make_unique<SourcePlayCommand>(
+                    std::move(source)));
+}
+
+void AudioEngineInterface::pauseAudioSource(Ref<AudioSource> source) {
+    submitCommand(
+            std::make_unique<SourcePauseCommand>(
+                    std::move(source)));
+}
+
+void AudioEngineInterface::stopAudioSource(Ref<AudioSource> source) {
+    submitCommand(
+            std::make_unique<SourceStopCommand>(
+                    std::move(source)));
 }
 
 MOE_END_NAMESPACE

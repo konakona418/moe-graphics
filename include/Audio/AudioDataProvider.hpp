@@ -8,7 +8,7 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct AudioDataProvider : public RefCounted<AudioDataProvider> {
+struct AudioDataProvider : public AtomicRefCounted<AudioDataProvider> {
     virtual ~AudioDataProvider() = default;
 
     virtual ALuint getFormat() const = 0;

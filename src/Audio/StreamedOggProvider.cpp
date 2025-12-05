@@ -1,4 +1,6 @@
 #include "Audio/StreamedOggProvider.hpp"
+#include "Audio/AudioEngine.hpp"
+
 #include "Math/Util.hpp"
 
 MOE_BEGIN_NAMESPACE
@@ -124,8 +126,14 @@ Ref<AudioBuffer> StreamedOggProvider::streamNextPacket(size_t* outSize) {
         return Ref<AudioBuffer>(nullptr);
     }
 
+    // Logger::debug("Streamed {} bytes of Ogg Vorbis data", bytesRead);
+
     // alloc audio buffer and upload data
-    Ref<AudioBuffer> audioBuffer = AudioBufferPool::getInstance().acquireBuffer();
+    Ref<AudioBuffer> audioBuffer =
+            AudioEngine::getInstance()
+                    .getBufferPool()
+                    .acquireBuffer();
+
     if (!audioBuffer->uploadData(
                 Span<const uint8_t>(
                         buffer.data(),

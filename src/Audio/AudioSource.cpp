@@ -1,13 +1,11 @@
 #include "Audio/AudioSource.hpp"
+#include "Audio/AudioEngine.hpp"
+#include <algorithm>
 
 MOE_BEGIN_NAMESPACE
 
 AudioSource::AudioSource() {
     alGenSources(1, &m_sourceId);
-}
-
-AudioSource::~AudioSource() {
-    alDeleteSources(1, &m_sourceId);
 }
 
 void AudioSource::load(Ref<AudioDataProvider> provider, bool loop) {
@@ -34,6 +32,11 @@ void AudioSource::stop() {
 }
 
 void AudioSource::update() {
+    if (!m_provider) {
+        // n/a
+        return;
+    }
+
     if (!m_provider->isStreaming()) {
         return;
     }
@@ -63,6 +66,11 @@ void AudioSource::loadStreamInitialBuffers() {
 }
 
 void AudioSource::loadStaticBuffer() {
+    if (!m_provider) {
+        // n/a
+        return;
+    }
+
     Ref<AudioBuffer> buffer = m_provider->loadStaticData();
     if (!buffer) {
         Logger::error("Failed to load static audio data");
@@ -110,6 +118,62 @@ void AudioSource::streamUpdate() {
         alSourceQueueBuffers(m_sourceId, 1, &buffer->bufferId);
         m_queuedBuffers.push(buffer);
     }
+}
+
+static void sourceDeleter(void* ptr) {
+    AudioEngine::getInterface()
+            .submitCommand(
+                    std::make_unique<DestroySourceCommand>(
+                            static_cast<AudioSource*>(ptr)));
+}
+
+void CreateSourceCommand::execute(AudioEngine& engine) {
+    Pinned<AudioSource> sourcePinned = makePinned<AudioSource>();
+
+    auto source = Ref<AudioSource>(sourcePinned.get());
+    source->setDeleter(sourceDeleter);
+
+    engine.getSources().push_back(std::move(sourcePinned));
+
+    *outSource = source;
+}
+
+void DestroySourceCommand::execute(AudioEngine& engine) {
+    auto id = source->sourceId();
+
+    source->manualDestroy();
+
+    auto& sources = engine.getSources();
+    sources.erase(
+            std::remove_if(
+                    sources.begin(),
+                    sources.end(),
+                    [this](const Pinned<AudioSource>& s) {
+                        return s.get() == source;
+                    }),
+            sources.end());
+
+    Logger::debug("Audio source id {} removed", id);
+}
+
+void SourceLoadCommand::execute(AudioEngine& engine) {
+    Logger::debug("Loading audio data for source {}", source->sourceId());
+    source->load(provider, loop);
+}
+
+void SourcePlayCommand::execute(AudioEngine& engine) {
+    Logger::debug("Play audio source {}", source->sourceId());
+    source->play();
+}
+
+void SourcePauseCommand::execute(AudioEngine& engine) {
+    Logger::debug("Pause audio source {}", source->sourceId());
+    source->pause();
+}
+
+void SourceStopCommand::execute(AudioEngine& engine) {
+    Logger::debug("Stop audio source {}", source->sourceId());
+    source->stop();
 }
 
 MOE_END_NAMESPACE

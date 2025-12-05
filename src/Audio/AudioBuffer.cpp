@@ -1,4 +1,5 @@
 #include "Audio/AudioBuffer.hpp"
+#include "Audio/AudioEngine.hpp"
 
 MOE_BEGIN_NAMESPACE
 
@@ -65,7 +66,10 @@ Ref<AudioBuffer> AudioBufferPool::acquireBuffer() {
 
 void AudioBufferPool::bufferDeleter(void* ptr) {
     // Rc reached zero, return to pool
-    AudioBufferPool::getInstance().m_freeBuffers.push_back(static_cast<AudioBuffer*>(ptr));
+    AudioEngine::getInstance()
+            .getBufferPool()
+            .m_freeBuffers
+            .push_back(static_cast<AudioBuffer*>(ptr));
 }
 
 void AudioBufferPool::allocBuffer() {
