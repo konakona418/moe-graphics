@@ -4,6 +4,4 @@
 /CMakePresets.json
 /out
 
-/shaders/slang/*.vert
-/shaders/slang/*.frag
-/shaders/slang/*.comp
+/shaders/slang/*.glsl
