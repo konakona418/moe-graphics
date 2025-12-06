@@ -7,8 +7,8 @@ struct SkinningData {
 
 struct SkinningPCS {
     VertexBuffer vertexBuffer;
-    StructuredBuffer<SkinningData> skinningDataBuffer;
-    StructuredBuffer<float4x4> jointMatrices;
+    Ptr<SkinningData, Access.Read> skinningDataBuffer;
+    Ptr<float4x4, Access.Read> jointMatrices;
     OutputVertexBuffer outputVertexBuffer;
     uint jointMatrixStartIndex;
     uint vertexCount;
@@ -40,13 +40,14 @@ void main(
         getJointMatrix(skinData.jointIndices.w) * skinData.jointWeights.w;
 
     Vertex inVertex = pcs.vertexBuffer[idx];
+
     Vertex outVertex;
-    outVertex.position = mul(skinMatrix, float4(inVertex.position, 1.0)).xyz;
+    outVertex.position = (float3)(mul(float4(inVertex.position, 1.0f), skinMatrix)).xyz;
 
-    float3x3 normalMatrix = (float3x3)skinMatrix;
-    outVertex.normal = normalize(mul(normalMatrix, inVertex.normal));
+    outVertex.normal = (float3)(mul(float4(inVertex.normal, 0.0f), skinMatrix)).xyz;
 
-    outVertex.tangent = float4(normalize(mul(normalMatrix, inVertex.tangent.xyz)), inVertex.tangent.w);
+    float4 tangent_transformed = mul(float4(inVertex.tangent.xyz, 0.0f), skinMatrix);
+    outVertex.tangent = float4(tangent_transformed.xyz, inVertex.tangent.w);
 
     outVertex.uv_x = inVertex.uv_x;
     outVertex.uv_y = inVertex.uv_y;

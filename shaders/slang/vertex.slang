@@ -6,5 +6,5 @@ struct Vertex {
     float4 tangent;
 };
 
-typedef StructuredBuffer<Vertex> VertexBuffer;
-typedef RWStructuredBuffer<Vertex> OutputVertexBuffer;
+typedef Ptr<Vertex, Access.Read> VertexBuffer;
+typedef Ptr<Vertex, Access.ReadWrite> OutputVertexBuffer;
