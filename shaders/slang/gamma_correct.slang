@@ -1,13 +1,14 @@
-// [[moe("vertex", "fragment")]]
+// [moe("vertex", "fragment")]
 
 import moe.sampler;
+import moe.common;
 
 struct VertexOutput {
     float2 uv : TEXCOORD0;
     float4 position : SV_Position;
 };
 
-[[shader("vertex")]]
+[shader("vertex")]
 VertexOutput vertexMain(uint vertexIndex: SV_VulkanVertexID) {
     // Use Vulkan vertex ID.
     // SV_VertexID and SV_VulkanVertexId is not the same
@@ -20,14 +21,14 @@ VertexOutput vertexMain(uint vertexIndex: SV_VulkanVertexID) {
 }
 
 struct GammaCorrectPCS {
-    uint inputTextureId;
+    ImageId inputTextureId;
     float gamma;
 }
 
-[[vk::push_constant]]
+[vk::push_constant]
 GammaCorrectPCS pcs;
 
-[[shader("fragment")]]
+[shader("fragment")]
 float4 fragmentMain(float2 inUV: TEXCOORD0) {
     float4 color = sampleTextureLinear(pcs.inputTextureId, inUV);
     color.rgb = pow(color.rgb, float3(1.0 / pcs.gamma));

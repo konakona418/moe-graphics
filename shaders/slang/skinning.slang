@@ -1,4 +1,4 @@
-// [[moe("compute")]]
+// [moe("compute")]
 
 import moe.vertex;
 
@@ -16,17 +16,15 @@ struct SkinningPCS {
     uint vertexCount;
 }
 
-[[vk::push_constant]]
-cbuffer SkinningPC : register(b0) {
-    SkinningPCS pcs;
-}
+[vk::push_constant]
+SkinningPCS pcs;
 
 float4x4 getJointMatrix(uint jointIndex) {
     return pcs.jointMatrices[pcs.jointMatrixStartIndex + jointIndex];
 }
 
 [numthreads(128, 1, 1)]
-[[shader("compute")]]
+[shader("compute")]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     uint idx = dispatchThreadID.x;
     if (idx >= pcs.vertexCount) {
@@ -43,11 +41,11 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     Vertex inVertex = pcs.vertexBuffer[idx];
 
     Vertex outVertex;
-    outVertex.position = (float3) (mul(float4(inVertex.position, 1.0f), skinMatrix)).xyz;
+    outVertex.position = (float3) (mul(skinMatrix, float4(inVertex.position, 1.0f))).xyz;
 
-    outVertex.normal = (float3) (mul(float4(inVertex.normal, 0.0f), skinMatrix)).xyz;
+    outVertex.normal = (float3) (mul(skinMatrix, float4(inVertex.normal, 0.0f))).xyz;
 
-    float4 tangent_transformed = mul(float4(inVertex.tangent.xyz, 0.0f), skinMatrix);
+    float4 tangent_transformed = mul(skinMatrix, float4(inVertex.tangent.xyz, 0.0f));
     outVertex.tangent = float4(tangent_transformed.xyz, inVertex.tangent.w);
 
     outVertex.uv_x = inVertex.uv_x;

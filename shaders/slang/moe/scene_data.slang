@@ -1,5 +1,6 @@
 import light;
 import material;
+import common;
 
 struct SceneData {
     float4x4 view;
@@ -20,10 +21,10 @@ struct SceneData {
     LightBuffer lightBuffer;
     uint numLights;
 
-    uint skyboxId;
+    ImageId skyboxId;
 
     // use csm
-    uint shadowMapId;
+    ImageId shadowMapId;
     float4x4 shadowMapLightTransform;
     float4 shadowMapCascadeSplits;
 }
