@@ -37,7 +37,7 @@ class BuildDescription:
         self.output_dir = os.path.join(self.root_dir, "bin_shaders")
         
         try:
-            with open(json_path, 'r') as f:
+            with open(json_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
             if 'include_dirs' in config:
@@ -109,7 +109,7 @@ def load_hashes(desc: BuildDescription):
     hash_path = os.path.join(desc.output_dir, HASH_FILE)
     if os.path.exists(hash_path):
         try:
-            with open(hash_path, 'r') as f:
+            with open(hash_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             return {}
@@ -119,14 +119,14 @@ def save_hashes(hashes, desc: BuildDescription):
     os.makedirs(desc.output_dir, exist_ok=True)
     hash_path = os.path.join(desc.output_dir, HASH_FILE)
     try:
-        with open(hash_path, 'w') as f:
+        with open(hash_path, 'w', encoding='utf-8') as f:
             json.dump(hashes, f, indent=4)
     except IOError:
         pass
 
 def parse_metadata_to_stages(file_path):
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except FileNotFoundError:
         return []

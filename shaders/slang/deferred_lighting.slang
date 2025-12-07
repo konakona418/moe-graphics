@@ -48,7 +48,27 @@ float sampleShadow(float3 worldPos, uint shadowMapId, float NoL) {
 
     uint cascadeIdx = getCascadeIndex(worldPos, cameraPos, cascadeSplits);
 
-    float4x4 lightViewProj = pcs.sceneData.shadowMapLightTransform[cascadeIdx];
+    // ! this just works and i have no fucking idea why
+    // ! maybe because non-uniform indexing is not well supported?
+    float4x4 lightViewProj;
+    switch (cascadeIdx) {
+        case 0:
+            lightViewProj = pcs.sceneData.shadowMapLightTransform[0];
+            break;
+        case 1:
+            lightViewProj = pcs.sceneData.shadowMapLightTransform[1];
+            break;
+        case 2:
+            lightViewProj = pcs.sceneData.shadowMapLightTransform[2];
+            break;
+        case 3:
+            lightViewProj = pcs.sceneData.shadowMapLightTransform[3];
+            break;
+        default:
+            lightViewProj = pcs.sceneData.shadowMapLightTransform[CASCADED_SHADOW_MAPS - 1];
+            break;
+    }
+
     float4 lightSpacePos = mul(lightViewProj, float4(worldPos, 1.0));
     lightSpacePos /= lightSpacePos.w;
 
@@ -113,39 +133,6 @@ float4 sampleSkyBox(float2 uv) {
     float3 samplePos = normalize(worldPos.xyz / worldPos.w - pcs.sceneData.cameraPosition.xyz);
 
     return sampleTextureCubeLinear(skyboxId, samplePos);
-}
-
-bool screenSpaceShadowTestSpot(float3 fragPosWorld, float3 lightPosWorld, float4x4 view, float4x4 proj, uint depthTexture) {
-    // world to view space
-    float3 fragPos = (mul(view, float4(fragPosWorld, 1.0))).xyz;
-    float3 lightPos = (mul(view, float4(lightPosWorld, 1.0))).xyz;
-
-    float3 L = normalize(lightPos - fragPos);
-    float distanceToLight = length(lightPos - fragPos);
-
-    const int maxSteps = 16;
-    const float bias = 0.01;
-    for (int i = 0; i < maxSteps; i++) {
-        float t = float(i) / float(maxSteps);
-        float3 samplePos = fragPos + L * distanceToLight * t;
-
-        float4 clip = mul(proj, float4(samplePos, 1.0));
-        float3 ndc = clip.xyz / clip.w;
-        float2 sampleUV = ndc.xy * 0.5 + 0.5;
-
-        if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) {
-            continue;
-        }
-
-        float sampleDepth = sampleTextureLinear(depthTexture, sampleUV).x;
-        float sampleDepthLinear = ndc.z * 0.5 + 0.5;
-
-        if (sampleDepth < sampleDepthLinear - bias) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 [shader("fragment")]
