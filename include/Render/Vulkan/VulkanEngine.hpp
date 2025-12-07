@@ -3,7 +3,7 @@
 #include "Render/Vulkan/Pipeline/CSMPipeline.hpp"
 #include "Render/Vulkan/Pipeline/DeferredLightingPipeline.hpp"
 #include "Render/Vulkan/Pipeline/GBufferPipeline.hpp"
-#include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
+//#include "Render/Vulkan/Pipeline/MeshPipeline.hpp"
 #include "Render/Vulkan/Pipeline/PostFXPipeline.hpp"
 #include "Render/Vulkan/Pipeline/ShadowMapPipeline.hpp"
 #include "Render/Vulkan/Pipeline/SkinningPipeline.hpp"
@@ -159,7 +159,7 @@ namespace moe {
 
         struct {
             Pipeline::SkinningPipeline skinningPipeline;
-            Pipeline::VulkanMeshPipeline meshPipeline;
+            //Pipeline::VulkanMeshPipeline meshPipeline;
             //Pipeline::SkyBoxPipeline skyBoxPipeline;
             //Pipeline::ShadowMapPipeline shadowMapPipeline;
             Pipeline::CSMPipeline csmPipeline;

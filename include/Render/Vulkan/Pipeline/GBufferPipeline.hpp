@@ -45,6 +45,7 @@ namespace moe {
         private:
             struct PushConstants {
                 glm::mat4 transform;
+                glm::mat3 clampedInverseTransform;
                 VkDeviceAddress vertexBufferAddr;
                 VkDeviceAddress sceneDataAddress;
                 MaterialId materialId;

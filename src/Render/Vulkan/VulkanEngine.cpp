@@ -1564,7 +1564,7 @@ namespace moe {
         m_resourceLoader.init(*this);
 
         m_pipelines.skinningPipeline.init(*this);
-        m_pipelines.meshPipeline.init(*this);
+        //m_pipelines.meshPipeline.init(*this);
         //m_pipelines.skyBoxPipeline.init(*this);
         //m_pipelines.shadowMapPipeline.init(*this);
         m_pipelines.csmPipeline.init(*this);
@@ -1621,7 +1621,7 @@ namespace moe {
             m_pipelines.csmPipeline.destroy();
             //m_pipelines.shadowMapPipeline.destroy();
             //m_pipelines.skyBoxPipeline.destroy();
-            m_pipelines.meshPipeline.destroy();
+            //m_pipelines.meshPipeline.destroy();
             m_pipelines.skinningPipeline.destroy();
 
             m_renderBus.destroy();

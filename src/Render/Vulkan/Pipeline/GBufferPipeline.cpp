@@ -152,12 +152,17 @@ namespace moe {
                 vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
                 vkCmdBindIndexBuffer(cmdBuffer, meshAsset.gpuBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                auto vertexBufferAddr =
+                        cmd.skinned
+                                ? meshAsset.gpuBuffer.skinnedVertexBufferAddr
+                                : meshAsset.gpuBuffer.vertexBufferAddr;
+
                 const auto pushConstants = PushConstants{
                         .transform = cmd.transform,
-                        .vertexBufferAddr =
-                                cmd.skinned
-                                        ? meshAsset.gpuBuffer.skinnedVertexBufferAddr
-                                        : meshAsset.gpuBuffer.vertexBufferAddr,
+                        .clampedInverseTransform =
+                                glm::mat3(glm::inverse(cmd.transform)),
+                        .vertexBufferAddr = vertexBufferAddr,
                         .sceneDataAddress = sceneDataBuffer.address,
                         .materialId = cmd.materialId,
                 };
