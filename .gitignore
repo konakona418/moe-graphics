@@ -10,4 +10,4 @@
 /shaders/**/*.cmd
 /shaders/**/*.ps1
 /shaders/**/*.sh
-/shaders/**/.shader_cached.json
+/shaders/**/build

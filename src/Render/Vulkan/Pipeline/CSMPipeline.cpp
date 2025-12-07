@@ -33,7 +33,7 @@ namespace moe {
                             m_engine->m_device, "shaders/csm_depth.frag.spv");
 
             auto pushRange = VkPushConstantRange{
-                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                     .offset = 0,
                     .size = sizeof(PushConstants),
             };
@@ -193,7 +193,7 @@ namespace moe {
                                             : mesh.gpuBuffer.vertexBufferAddr,
                     };
 
-                    vkCmdPushConstants(cmdBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pushConstants);
+                    vkCmdPushConstants(cmdBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants);
                     vkCmdDrawIndexed(cmdBuffer, mesh.gpuBuffer.indexCount, 1, 0, 0, 0);
                 }
 

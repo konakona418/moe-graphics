@@ -2,6 +2,8 @@ import light;
 import material;
 import common;
 
+static const uint CASCADED_SHADOW_MAPS = 4;
+
 struct SceneData {
     float4x4 view;
     float4x4 projection;
@@ -25,8 +27,8 @@ struct SceneData {
 
     // use csm
     ImageId shadowMapId;
-    float4x4 shadowMapLightTransform;
+    Array<float4x4, CASCADED_SHADOW_MAPS> shadowMapLightTransform;
     float4 shadowMapCascadeSplits;
 }
 
-typedef Ptr<SceneData, Access.Read> SceneDataPtr;
+typedef Ptr<SceneData, Access.Read> SceneDataBuffer;
