@@ -5,3 +5,8 @@
 /out
 
 /shaders/slang/*.glsl
+
+/shaders/**/*.bat
+/shaders/**/*.cmd
+/shaders/**/*.ps1
+/shaders/**/*.sh

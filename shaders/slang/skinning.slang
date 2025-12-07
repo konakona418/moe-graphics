@@ -1,4 +1,6 @@
-import vertex;
+// [[moe("compute")]]
+
+import moe.vertex;
 
 struct SkinningData {
     uint4 jointIndices;
@@ -24,7 +26,8 @@ float4x4 getJointMatrix(uint jointIndex) {
 }
 
 [numthreads(128, 1, 1)]
-void main(uint3 dispatchThreadID: SV_DispatchThreadID) {
+[[shader("compute")]]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     uint idx = dispatchThreadID.x;
     if (idx >= pcs.vertexCount) {
         return;
