@@ -8,6 +8,7 @@ MOE_BEGIN_NAMESPACE
 enum class WidgetType : uint8_t {
     Unknown,
     Container,
+    AnySprite,
     Text,
     Button,
     Image,

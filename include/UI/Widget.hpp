@@ -7,7 +7,7 @@
 
 MOE_BEGIN_NAMESPACE
 
-struct Widget : public RefCounted<Widget> {
+struct Widget : public AtomicRefCounted<Widget> {
 public:
     Widget() = default;
     virtual ~Widget() = default;
