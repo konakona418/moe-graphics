@@ -10,6 +10,30 @@
 #include "Core/Ref.hpp"
 #include "Core/RefCounted.hpp"
 
+#include "Core/Resource/Lazy.hpp"
+#include "Core/Resource/OrDefault.hpp"
+#include "Core/Resource/Preload.hpp"
+#include "Core/Resource/Test.hpp"
+
+
+#include "Core/Task/Future.hpp"
+#include "Core/Task/Scheduler.hpp"
+#include "Core/Task/Utils.hpp"
+
+#include "Core/Signal/Signal.hpp"
+#include "Core/Signal/Slot.hpp"
+
+#include "Core/Sync.hpp"
+
+#include "Core/Expected.hpp"
+
+#include "UI/BoxWidget.hpp"
+#include "UI/TextWidget.hpp"
+
+#include "Audio/AudioSource.hpp"
+#include "Audio/StreamedOggProvider.hpp"
+#include "Core/Resource/BinaryBuffer.hpp"
+
 #include "imgui.h"
 
 #include <iostream>
@@ -178,7 +202,7 @@ struct CameraMovementMask {
     }
 };
 
-void testRefcount() {
+/*void testRefcount() {
     struct RefCountedObject : public moe::RefCounted<RefCountedObject> {
         RefCountedObject() {
             moe::Logger::debug("RefCountedObject created");
@@ -201,10 +225,256 @@ void testRefcount() {
     moe::Logger::debug("Ref count after ref2 out of scope: {}", ref1->getRefCount());
 }
 
-int main() {
-    testRefcount();
+void testLazy() {
+    auto lazyValue = moe::Lazy<moe::OrDefault<moe::TestGenerator<int, true>>>(42, 123);
+    moe::Logger::debug("Lazy value created");
+    int value = lazyValue.generate().value();
+    moe::Logger::debug("Lazy value generated: {}", value);
+}
 
+void testPreload() {
+    auto preloadValue =
+            moe::Preload<moe::Launch<moe::TestGeneratorAsync<int>>>(123, std::chrono::milliseconds(2000));
+    moe::Logger::debug("Preload value created");
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    moe::Logger::debug("Waiting for preload to complete...");
+    int value = preloadValue.generate().value();
+    moe::Logger::debug("Preload value generated: {}", value);
+
+    auto preloadSecureValue =
+            moe::Preload<moe::Secure<moe::TestGeneratorAsync<int>>>(456, std::chrono::milliseconds(2000));
+    moe::Logger::debug("Preload secure value created");
+    value = preloadSecureValue.generate().value();
+    moe::Logger::debug("Preload secure value generated: {}", value);
+}
+
+void testExpect() {
+    auto okValue = moe::Ok<int>(100);
+    if (okValue.isOk()) {
+        moe::Logger::debug(
+                "Ok value: {}, andThen {}",
+                okValue.unwrap(),
+                okValue.andThen([](int x) { return x * 2.0f; }).unwrap());
+    }
+
+    enum class SampleError {
+        ErrorA,
+        ErrorB
+    };
+
+    auto errValue = moe::Expected<int, SampleError>(moe::Err(SampleError::ErrorA));
+    if (errValue.isErr()) {
+        moe::Logger::debug(
+                "Error: {}, orElse {}",
+                static_cast<int>(errValue.unwrapErr()),
+                errValue.orElse(
+                                [](SampleError x) {
+                                    return static_cast<int>(x) + 1;
+                                })
+                        .unwrapErr());
+    }
+}
+
+void testScheduler() {
+    auto fut1 =
+            moe::async(
+                    []() {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        moe::Logger::debug("Task running in scheduler");
+                        return 42;
+                    })
+                    .then([](int x) {
+                        return 12;
+                    });
+    auto fut2 =
+            moe::async([]() {
+                moe::Logger::debug("Another task running in scheduler");
+                return std::string("Hello, Scheduler!");
+            });
+    moe::whenAny(fut1, fut2)
+            .then([](auto result) {
+                std::visit(
+                        [](auto&& value) {
+                            moe::Logger::debug("whenAny result: {}", value);
+                        },
+                        result);
+            })
+            .get();
+
+    auto& scheduler = moe::ThreadPoolScheduler::getInstance();
+    moe::Vector<moe::Future<moe::Expected<int, moe::Infallible>, moe::ThreadPoolScheduler>> futures;
+    for (int i = 0; i < 5; ++i) {
+        futures.push_back(
+                moe::async([i]() {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50 * (5 - i)));
+                    moe::Logger::debug("Task {} completed", i);
+                    return moe::Ok(i * 10);
+                }));
+    }
+
+    moe::whenAll(std::move(futures))
+            .then([](auto results) {
+                moe::Logger::debug("All tasks completed with results:");
+                for (const auto& r: moe::collectExpected(std::move(results)).unwrap()) {
+                    moe::Logger::debug("Result: {}", r);
+                }
+            })
+            .get();
+}
+
+void testWrappedFuture() {
+    auto fut = moe::async([]() {
+        return moe::async([]() {
+            return 1;
+        });
+    });
+    int result = fut.get();
+    moe::Logger::debug("Wrapped future result: {}", result);
+}
+
+void testDispatchOnMainThread() {
+    auto& mainThreadDispatcher = moe::MainScheduler::getInstance();
+    auto taskSubmittedPromise = std::promise<void>();
+    auto taskSubmittedFuture = taskSubmittedPromise.get_future();
+    std::thread workerThread([&mainThreadDispatcher, prom = std::move(taskSubmittedPromise)]() mutable {
+        moe::Logger::debug("Scheduling task on main thread from worker thread");
+        auto fut = moe::asyncOnMainThread(
+                           []() {
+                               moe::Logger::debug("Task running on main thread");
+                               return 12;
+                           })
+                           .then([](int x) { return 2 * x; });
+        prom.set_value();
+
+        int result = fut.get();
+        moe::Logger::debug("Result from main thread task: {}", result);
+    });
+    taskSubmittedFuture.wait();
+    mainThreadDispatcher.processTasks();
+    workerThread.join();
+}
+
+void testSync() {
+    struct SharedCounter
+        : public moe::RefCounted<SharedCounter>,
+          public moe::RwSynchronized<SharedCounter> {
+        SharedCounter() : counter(0) {}
+
+        void increment() {
+            auto writeLock = this->write();
+            ++counter;
+        }
+
+        int get() const {
+            auto readLock = this->read();
+            return counter;
+        }
+
+    private:
+        int counter;
+    };
+
+    auto counter = moe::Ref(new SharedCounter());
+    const int numThreads = 10;
+    const int incrementsPerThread = 1000;
+    moe::Vector<std::thread> threads;
+    for (int i = 0; i < numThreads; ++i) {
+        threads.emplace_back([counter, incrementsPerThread]() mutable {
+            for (int j = 0; j < incrementsPerThread; ++j) {
+                counter->increment();
+            }
+        });
+    }
+
+    for (auto& t: threads) {
+        t.join();
+    }
+
+    moe::Logger::debug("Final counter value: {}", counter->get());
+}
+
+void testSignal() {
+    struct TestSlot : public moe::Slot<TestSlot> {
+    public:
+        explicit TestSlot(int id) : slotId(id) {}
+        void signal(int value) {
+            moe::Logger::debug("TestSlot invoked with value: {}, slot id: {}", value, slotId);
+        }
+
+    private:
+        int slotId = 0;
+    };
+
+    auto testSlot = TestSlot(99);
+    TestSlot other = std::move(testSlot);
+
+    auto signal = moe::Ref(new moe::Signal<TestSlot>());
+    auto conn1 = signal->connect(TestSlot(0));
+    auto conn2 = signal->connect(TestSlot(1));
+    {
+        auto conn3 = signal->connect(TestSlot(2));
+        signal->emit(123);
+    }
+    {
+        signal->emit(456);
+        conn1.disconnect();
+    }
+    signal->emit(42);
+
+    struct TestSyncSlot : public moe::SyncSlot<TestSyncSlot> {
+    public:
+        explicit TestSyncSlot(int id) : slotId(id) {}
+        void signal(int value) {
+            moe::Logger::debug("TestSyncSlot invoked with value: {}", value);
+        }
+
+    private:
+        int slotId = 0;
+    };
+
+    auto syncSignal = moe::Ref(new moe::SyncSignal<TestSyncSlot>());
+    auto syncConn1 = syncSignal->connect(TestSyncSlot(10));
+    auto syncConn2 = syncSignal->connect(TestSyncSlot(20));
+    syncSignal->emit(789);
+}
+
+void test() {
+    testRefcount();
+    testLazy();
+    testPreload();
+    testExpect();
+    testScheduler();
+    testWrappedFuture();
+    testDispatchOnMainThread();
+    testSync();
+    testSignal();
+}*/
+
+void testUILayout() {
+    auto boxWidget = moe::Ref(new moe::BoxWidget());
+    boxWidget->setMargin({10.0f, 10.0f, 10.0f, 10.0f});
+    boxWidget->setPadding({5.0f, 5.0f, 5.0f, 5.0f});
+    auto textWidget = moe::Ref(new moe::TextWidget());
+    textWidget->setText(U"测试文本测试文本测试文本");
+    textWidget->setMargin({5.0f, 5.0f, 0.0f, 0.0f});
+    textWidget->setFontSize(24.0f);
+    boxWidget->addChild(textWidget);
+    boxWidget->layout({
+            0,
+            0,
+            50,
+            1000,
+    });
+    auto boxBounds = boxWidget->calculatedBounds();
+    auto textBounds = textWidget->calculatedBounds();
+}
+
+int main() {
+    moe::MainScheduler::getInstance().init();
+    moe::ThreadPoolScheduler::getInstance().init();
     moe::FileReader::initReader(new moe::DebugFileReader<moe::DefaultFileReader>());
+
+    testUILayout();
 
     JPH::RegisterDefaultAllocator();
 
@@ -281,11 +551,18 @@ int main() {
 
     physicsSystem.OptimizeBroadPhase();
 
+    auto& audioEngine = moe::AudioEngine::getInstance();
+    auto audioInterface = audioEngine.getInterface();
+
+    size_t outFileSize;
+    auto oggBuffer = moe::Ref<moe::BinaryBuffer>(new moe::BinaryBuffer(moe::FileReader::s_instance->readFile("bgm.ogg", outFileSize).value()));
+    auto oggProvider = moe::Ref(new moe::StreamedOggProvider(oggBuffer, 1024 * 16));
+    auto audioSource = audioInterface.createAudioSource();
+    audioInterface.loadAudioSource(audioSource, oggProvider, true);
+    audioInterface.playAudioSource(audioSource);
+
     moe::VulkanEngine engine;
     engine.init();
-
-    moe::AudioEngine audioEngine;
-    audioEngine.init();
 
     auto zhcnGlyphRangeGenerator = []() -> moe::String {
         moe::Vector<char32_t> ss;
@@ -335,7 +612,7 @@ int main() {
 
     auto& loader = engine.getResourceLoader();
 
-    auto sceneId = loader.load("vrm0/vroid.gltf", moe::Loader::Gltf);
+    auto sceneId = loader.load("vrm0/vroid.glb", moe::Loader::Gltf);
 
     auto scene = engine.m_caches.objectCache.get(sceneId).value();
     auto* animatableRenderable = scene->checkedAs<moe::VulkanSkeletalAnimation>(moe::VulkanRenderableFeature::HasSkeletalAnimation).value();
@@ -550,7 +827,7 @@ int main() {
 
         {
             renderBus.submitSpriteRender(
-                    font->getFontImageId(),
+                    font->getFontImageId(24.0f),
                     moe::Transform{},
                     moe::Colors::White,
                     glm::vec2(3822.0f, 3769.0f),
@@ -567,9 +844,16 @@ int main() {
 
             renderBus.submitTextSpriteRender(
                     defaultFontId,
+                    24.0f,
                     text,
                     moe::Transform{},
                     moe::Colors::Blue);
+            renderBus.submitTextSpriteRender(
+                    defaultFontId,
+                    32.0f,
+                    text,
+                    moe::Transform{}.setPosition(glm::vec3(0.0f, 50.0f, 0.0f)),
+                    moe::Colors::Red);
         }
 
         illuminationBus.setAmbient(glm::vec3(1.f, 1.f, 1.f), 0.2f);
@@ -605,7 +889,7 @@ int main() {
     }
 
     engine.cleanup();
-    audioEngine.cleanup();
+    moe::ThreadPoolScheduler::shutdown();
     moe::FileReader::destroyReader();
 
     bodyInterface.RemoveBody(floorBody);
